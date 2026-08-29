@@ -270,6 +270,15 @@ public final class ApiDtos {
     }
 
     /**
+     * Returned by create/update/relock so the caller can refresh its card
+     * from this response alone - no follow-up GET needed. {@code game}
+     * carries both markets' current pick state, not just the one just
+     * touched, so the games board can replace the whole row in one shot.
+     */
+    public record PickResponse(PickSummary pick, GameSummary game) {
+    }
+
+    /**
      * A pick with its game.
      *
      * <p>{@code lineImproved} says the game's current spread is strictly

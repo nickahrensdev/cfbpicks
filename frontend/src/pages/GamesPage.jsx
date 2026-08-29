@@ -15,6 +15,7 @@ const NO_FILTERS = {
   maxSpread: null,
   mine: false,
   pickableOnly: false,
+  todayOnly: false,
 };
 
 export default function GamesPage() {
@@ -119,6 +120,12 @@ export default function GamesPage() {
       // Literal: a locked game is not actionable even if it was already
       // picked, which is what "still pick" means.
       if (filters.pickableOnly && !isPickable(game)) return false;
+      // Local calendar day, not UTC - a kickoff at 11pm local should not
+      // fall off "today" just because it is already tomorrow in UTC.
+      if (filters.todayOnly
+          && new Date(game.kickoff).toDateString() !== new Date().toDateString()) {
+        return false;
+      }
       if (filters.conference) {
         // Read from the game, not the team record: non-FBS opponents have a
         // conference here but no team row to hang it off.
@@ -143,39 +150,23 @@ export default function GamesPage() {
   }, [games, filters]);
 
   /**
-   * Applies a pick without reloading the board. The refreshed game from the
-   * server is the source of truth; only the affected card and the counter
-   * change, so nothing jumps under the user's thumb.
+   * Applies a pick without reloading the board. `action` resolves straight
+   * to the mutation's own updated GameSummary - create/update/relock/delete
+   * all return it inline now, so there is no follow-up GET to make (and
+   * nothing for a dropped connection on a second request to falsely blame
+   * the pick for).
    */
   const applyPick = async (game, action, delta) => {
     setBusyGameId(game.id);
     setNotice(null);
-    // Tracks whether the write itself (as opposed to the refresh fetched
-    // right after it) is what failed - a dropped connection on that
-    // follow-up GET must not be reported as the pick having failed when it
-    // actually went through.
-    let actionSucceeded = false;
     try {
-      await action();
-      actionSucceeded = true;
-      const refreshed = await api.game(game.id);
+      const updatedGame = await action();
       setGames((current) =>
-        current.map((row) => (row.id === game.id ? refreshed.game : row)),
+        current.map((row) => (row.id === game.id ? updatedGame : row)),
       );
       setPicksUsed((current) => current + delta);
     } catch (err) {
-      if (actionSucceeded) {
-        // The pick already committed - only the refresh afterward failed.
-        // Trust the write, apply the count change, and quietly retry the
-        // refresh once rather than alarming the user over an unrelated GET.
-        setPicksUsed((current) => current + delta);
-        const refreshed = await api.game(game.id).catch(() => null);
-        if (refreshed) {
-          setGames((current) =>
-            current.map((row) => (row.id === game.id ? refreshed.game : row)),
-          );
-        }
-      } else if (err.code === 'LINE_MOVED') {
+      if (err.code === 'LINE_MOVED') {
         // The board was stale. Pull the real number in and let them decide
         // rather than committing them to a line they never saw.
         setNotice({
@@ -218,19 +209,22 @@ export default function GamesPage() {
     return applyPick(
       game,
       () =>
-        existing
+        (existing
           ? api.updatePick(existing.id, selection, line)
-          : api.createPick(game.id, selection, line),
+          : api.createPick(game.id, selection, line)
+        ).then((response) => response.game),
       // Switching sides within a market spends nothing extra.
       existing ? 0 : 1,
     );
   };
 
   const handleClear = (game, selection) =>
+    // deletePick resolves straight to the GameSummary - there is no pick
+    // left to wrap it in.
     applyPick(game, () => api.deletePick(pickFor(game, selection).id), -1);
 
   const handleRelock = (game, pick) =>
-    applyPick(game, () => api.relockPick(pick.id), 0);
+    applyPick(game, () => api.relockPick(pick.id).then((response) => response.game), 0);
 
   const remaining = Math.max(0, maxPicks - picksUsed);
   const weekNotLoaded =

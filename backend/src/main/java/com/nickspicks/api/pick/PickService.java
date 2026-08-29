@@ -202,8 +202,9 @@ public class PickService {
                 .orElse(false);
     }
 
+    /** @return the pick's game, so the caller can hand back updated card state without a second read. */
     @Transactional
-    public void delete(UUID userId, UUID pickId) {
+    public Game delete(UUID userId, UUID pickId) {
         Pick pick = requireOwnedPick(userId, pickId);
         Game game = requireGame(pick.getGameId());
         requireOpen(game, pick.getMarket());
@@ -215,6 +216,12 @@ public class PickService {
         // Audit before delete so the row still has its final state to record.
         audit.save(PickAudit.cancelled(pick));
         picks.delete(pick);
+        return game;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Pick> findForUserGame(UUID userId, Long gameId) {
+        return picks.findAllByUserIdAndGameId(userId, gameId);
     }
 
     private WeeklyEntry lockEntry(UUID userId, Game game) {

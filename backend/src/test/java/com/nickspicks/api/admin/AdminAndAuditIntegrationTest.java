@@ -115,7 +115,7 @@ class AdminAndAuditIntegrationTest extends IntegrationTest {
                                 .content("{\"gameId\": 700, \"selection\": \"HOME\"}"))
                         .andExpect(status().isCreated())
                         .andReturn().getResponse().getContentAsString(),
-                "$.id");
+                "$.pick.id");
 
         // Line moves, member re-locks by editing.
         game.setHomeSpread(new BigDecimal("-3.0"));
@@ -126,7 +126,7 @@ class AdminAndAuditIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(delete("/api/picks/" + pickId).with(member()))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/admin/activity").with(admin()))
                 .andExpect(status().isOk())

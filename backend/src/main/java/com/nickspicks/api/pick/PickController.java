@@ -3,14 +3,15 @@ package com.nickspicks.api.pick;
 import com.nickspicks.api.config.AppProperties;
 import com.nickspicks.api.game.Game;
 import com.nickspicks.api.game.GameRepository;
+import com.nickspicks.api.ranking.RankingService;
 import com.nickspicks.api.season.CurrentWeekResolver;
 import com.nickspicks.api.team.Team;
 import com.nickspicks.api.team.TeamRepository;
 import com.nickspicks.api.security.CurrentUserService;
 import com.nickspicks.api.web.ApiDtos;
 import com.nickspicks.api.web.DtoMapper;
+import com.nickspicks.api.web.NotFoundException;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -22,7 +23,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -44,10 +44,12 @@ public class PickController {
     private final AppProperties properties;
     private final PickWindow window;
     private final TeamRepository teams;
+    private final RankingService rankings;
 
     public PickController(PickService picks, GameRepository games, CurrentWeekResolver weeks,
                           CurrentUserService currentUser, DtoMapper mapper,
-                          AppProperties properties, PickWindow window, TeamRepository teams) {
+                          AppProperties properties, PickWindow window, TeamRepository teams,
+                          RankingService rankings) {
         this.picks = picks;
         this.games = games;
         this.weeks = weeks;
@@ -56,6 +58,27 @@ public class PickController {
         this.properties = properties;
         this.window = window;
         this.teams = teams;
+        this.rankings = rankings;
+    }
+
+    /**
+     * Builds the game card for whichever game a pick action just touched, so
+     * create/update/relock/delete can hand it straight back instead of the
+     * caller making a second request. Deliberately cheaper than {@code
+     * GameService.detail()}: no CFBD ATS refresh, no ESPN box score, no
+     * full-table user/team scans - none of that is needed to show an updated
+     * pick on the games board, and paying for it on every click is what made
+     * pick actions feel slow.
+     */
+    private ApiDtos.GameSummary gameSummaryFor(UUID userId, Game game) {
+        List<Pick> myPicks = picks.findForUserGame(userId, game.getId());
+        Map<Integer, Integer> ranks = rankings.rankLookup(game.getSeason(), game.getWeek());
+        return mapper.gameSummary(game, myPicks, null, ranks);
+    }
+
+    private Game requireGame(Long gameId) {
+        return games.findById(gameId)
+                .orElseThrow(() -> new NotFoundException("Game %d not found".formatted(gameId)));
     }
 
     @GetMapping("/picks")
@@ -77,22 +100,27 @@ public class PickController {
     }
 
     @PostMapping("/picks")
-    public ResponseEntity<ApiDtos.PickSummary> create(
+    public ResponseEntity<ApiDtos.PickResponse> create(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ApiDtos.CreatePickRequest request) {
+        UUID userId = currentUser.resolveId(jwt);
 
-        Pick pick = picks.create(currentUser.resolveId(jwt), request.gameId(), request.selection(),
+        Pick pick = picks.create(userId, request.gameId(), request.selection(),
                 request.expectedLine());
+        Game game = requireGame(pick.getGameId());
         return ResponseEntity.created(URI.create("/api/picks/" + pick.getId()))
-                .body(mapper.pickSummary(pick));
+                .body(new ApiDtos.PickResponse(mapper.pickSummary(pick), gameSummaryFor(userId, game)));
     }
 
     @PutMapping("/picks/{id}")
-    public ApiDtos.PickSummary update(@AuthenticationPrincipal Jwt jwt,
-                                      @PathVariable UUID id,
-                                      @Valid @RequestBody ApiDtos.UpdatePickRequest request) {
-        return mapper.pickSummary(picks.update(currentUser.resolveId(jwt), id,
-                request.selection(), request.expectedLine()));
+    public ApiDtos.PickResponse update(@AuthenticationPrincipal Jwt jwt,
+                                       @PathVariable UUID id,
+                                       @Valid @RequestBody ApiDtos.UpdatePickRequest request) {
+        UUID userId = currentUser.resolveId(jwt);
+
+        Pick pick = picks.update(userId, id, request.selection(), request.expectedLine());
+        Game game = requireGame(pick.getGameId());
+        return new ApiDtos.PickResponse(mapper.pickSummary(pick), gameSummaryFor(userId, game));
     }
 
     /**
@@ -100,14 +128,20 @@ public class PickController {
      * unless the line actually improved.
      */
     @PostMapping("/picks/{id}/relock")
-    public ApiDtos.PickSummary relock(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return mapper.pickSummary(picks.relock(currentUser.resolveId(jwt), id));
+    public ApiDtos.PickResponse relock(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        UUID userId = currentUser.resolveId(jwt);
+
+        Pick pick = picks.relock(userId, id);
+        Game game = requireGame(pick.getGameId());
+        return new ApiDtos.PickResponse(mapper.pickSummary(pick), gameSummaryFor(userId, game));
     }
 
+    /** Returns the game's updated card state rather than 204 - there is no pick left to report. */
     @DeleteMapping("/picks/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        picks.delete(currentUser.resolveId(jwt), id);
+    public ApiDtos.GameSummary delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        UUID userId = currentUser.resolveId(jwt);
+        Game game = picks.delete(userId, id);
+        return gameSummaryFor(userId, game);
     }
 
     /**

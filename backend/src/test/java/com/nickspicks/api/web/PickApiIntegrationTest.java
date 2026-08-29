@@ -100,9 +100,9 @@ class PickApiIntegrationTest extends IntegrationTest {
                                 {"gameId": %d, "selection": "AWAY"}
                                 """.formatted(game.getId())))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.selection").value("AWAY"))
-                .andExpect(jsonPath("$.lockedLine").value(-7.5))
-                .andExpect(jsonPath("$.result").value("PENDING"));
+                .andExpect(jsonPath("$.pick.selection").value("AWAY"))
+                .andExpect(jsonPath("$.pick.lockedLine").value(-7.5))
+                .andExpect(jsonPath("$.pick.result").value("PENDING"));
 
         mockMvc.perform(get("/api/picks?season=2026&week=1").with(member()))
                 .andExpect(status().isOk())

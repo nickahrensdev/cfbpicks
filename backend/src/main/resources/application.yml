@@ -21,6 +21,13 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+          # The season loads write ~888 rows each. Without batching that is a
+          # round trip per row through Supabase's pooler, which is what made
+          # the schedule load take ~53s and starve the JVM badly enough for
+          # the /lines call right after it to time out.
+          batch_size: 100
+        order_inserts: true
+        order_updates: true
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -70,6 +77,11 @@ app:
     enabled: false
     base-url: https://api.collegefootballdata.com
     api-key: ${CFB_DATA_API_KEY:}
+    # Generous on purpose: the season-wide /lines load runs right after ~888
+    # single-row game writes, and on Render's throttled free tier a starved
+    # JVM can stall a socket read long past a tight limit even though the
+    # response itself is small and fast. 10s here failed that load outright.
+    timeout-seconds: ${CFBD_TIMEOUT_SECONDS:90}
     # Which games members pick.
     classification: fbs
     # Which programs are stored for team/roster/coach pages. /teams returns

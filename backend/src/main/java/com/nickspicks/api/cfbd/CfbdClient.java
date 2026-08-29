@@ -32,13 +32,23 @@ public class CfbdClient {
     /** Leaves headroom under the real 5,000/month Tier 1 allowance. */
     private static final long MONTHLY_CALL_CEILING = 4500;
 
-    // Unbounded by default (RestClient sets neither a connect nor a read
-    // timeout on its own) - a slow or hanging CFBD response would otherwise
-    // block whatever request triggered it (e.g. a game detail page view via
-    // TeamAtsService.ensureFresh) indefinitely, well past the point a
-    // browser or Render's own proxy gives up and reports it as failed, even
-    // though the write this call was making may still complete afterwards.
-    private static final Duration TIMEOUT = Duration.ofSeconds(10);
+    /**
+     * A bound is still wanted - RestClient sets none of its own, and a hung
+     * response should not wedge a load forever - but it has to be generous.
+     *
+     * <p>This was 10s, which broke the season-wide {@code /lines} load: the
+     * response is a healthy 364KB in under a second from a desktop, but on
+     * Render's free tier the JVM is CPU-throttled, and that load calls
+     * {@code /lines} straight after writing ~888 games one row at a time.
+     * Starved of CPU, a socket read stalls past 10s and the call dies with an
+     * I/O error having never read a byte of a perfectly good response.
+     *
+     * <p>The short timeout was originally added to stop a per-page-view ATS
+     * refresh hanging the game details page. Nothing on a request path fetches
+     * ATS any more (see {@code TeamAtsService}), so that pressure is gone and
+     * the ceiling can go back up to where a slow-but-working load survives.
+     */
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(90);
 
     private final RestClient restClient;
     private final AppProperties properties;
@@ -51,9 +61,14 @@ public class CfbdClient {
         this.callLog = callLog;
         this.recorder = recorder;
 
+        int timeoutSeconds = properties.getCfbd().getTimeoutSeconds();
+        Duration timeout = timeoutSeconds > 0
+                ? Duration.ofSeconds(timeoutSeconds)
+                : DEFAULT_TIMEOUT;
+
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout((int) TIMEOUT.toMillis());
-        requestFactory.setReadTimeout((int) TIMEOUT.toMillis());
+        requestFactory.setConnectTimeout((int) timeout.toMillis());
+        requestFactory.setReadTimeout((int) timeout.toMillis());
 
         this.restClient = RestClient.builder()
                 .baseUrl(properties.getCfbd().getBaseUrl())

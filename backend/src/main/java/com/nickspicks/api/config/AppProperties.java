@@ -156,6 +156,13 @@ public class AppProperties {
         /** Free tier key from collegefootballdata.com/key. */
         private String apiKey = "";
 
+        /**
+         * Connect and read timeout for every CFBD call, in seconds. Generous
+         * on purpose - see {@code CfbdClient}. 0 or less falls back to the
+         * client's own default.
+         */
+        private int timeoutSeconds = 90;
+
         /** Which games are ingested for picking. Members pick FBS games. */
         private String classification = "fbs";
 
@@ -189,6 +196,14 @@ public class AppProperties {
 
         public void setApiKey(String apiKey) {
             this.apiKey = apiKey;
+        }
+
+        public int getTimeoutSeconds() {
+            return timeoutSeconds;
+        }
+
+        public void setTimeoutSeconds(int timeoutSeconds) {
+            this.timeoutSeconds = timeoutSeconds;
         }
 
         public String getClassification() {

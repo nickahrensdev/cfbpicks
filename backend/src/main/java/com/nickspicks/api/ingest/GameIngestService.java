@@ -13,8 +13,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Schedules, lines and scores. Upserts by CFBD game id, so re-running any of
@@ -57,11 +61,20 @@ public class GameIngestService {
     public int ingestSchedule(int season) {
         List<CfbdDtos.GameDto> dtos = cfbd.games(season);
 
+        // One read for the whole season rather than a lookup per game. At ~888
+        // games that is the difference between one query and 888 round trips
+        // through the pooler, and the saves below batch for the same reason.
+        Map<Long, Game> existing = loadExisting(dtos.stream()
+                .filter(dto -> dto.startDate() != null)
+                .map(CfbdDtos.GameDto::id)
+                .toList());
+
+        List<Game> touched = new ArrayList<>();
         for (CfbdDtos.GameDto dto : dtos) {
             if (dto.startDate() == null) {
                 continue;
             }
-            Game game = games.findById(dto.id()).orElseGet(Game::new);
+            Game game = existing.getOrDefault(dto.id(), new Game());
             game.setId(dto.id());
             game.setSeason(dto.season());
             game.setWeek(dto.week());
@@ -81,11 +94,21 @@ public class GameIngestService {
             game.setAwayPregameElo(dto.awayPregameElo());
             applyScore(game, dto);
             game.setUpdatedAt(Instant.now());
-            games.save(game);
+            touched.add(game);
         }
 
+        games.saveAll(touched);
         log.info("Ingested {} games for {}", dtos.size(), season);
         return dtos.size();
+    }
+
+    /** The games we already hold for these ids, keyed by id. One query. */
+    private Map<Long, Game> loadExisting(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return games.findAllById(ids).stream()
+                .collect(Collectors.toMap(Game::getId, Function.identity(), (a, b) -> a));
     }
 
     /**
@@ -98,10 +121,15 @@ public class GameIngestService {
     @Transactional
     public int ingestLines(int season) {
         List<CfbdDtos.LineDto> dtos = cfbd.lines(season);
-        int updated = 0;
 
+        // Batched for the same reason as the schedule above - one query for
+        // the games these lines belong to, one flush for the updates.
+        Map<Long, Game> existing = loadExisting(
+                dtos.stream().map(CfbdDtos.LineDto::id).toList());
+
+        List<Game> touched = new ArrayList<>();
         for (CfbdDtos.LineDto dto : dtos) {
-            Game game = games.findById(dto.id()).orElse(null);
+            Game game = existing.get(dto.id());
             if (game == null || dto.lines() == null || dto.lines().isEmpty()) {
                 continue;
             }
@@ -129,12 +157,12 @@ public class GameIngestService {
             game.setSpreadProvider(best.provider());
             game.setSpreadUpdatedAt(Instant.now());
             game.setUpdatedAt(Instant.now());
-            games.save(game);
-            updated++;
+            touched.add(game);
         }
 
-        log.info("Updated lines on {} games for {}", updated, season);
-        return updated;
+        games.saveAll(touched);
+        log.info("Updated lines on {} games for {}", touched.size(), season);
+        return touched.size();
     }
 
     /**

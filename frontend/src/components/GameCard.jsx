@@ -6,7 +6,6 @@ import {
   LockCountdown,
   ResultBadge,
   formatKickoff,
-  formatLine,
   formatSpread,
   formatTotal,
 } from './common.jsx';
@@ -228,48 +227,26 @@ export default function GameCard({
   };
 
   /**
-   * What this member is holding, shown while the game is on.
+   * The tint on a held pick's row. Carries the pick's state now that the
+   * chips beside the clock are gone:
    *
-   * <p>A market they skipped still gets a chip, muted, showing the side the
-   * board would have handed them: the favourite against the spread and the
-   * over on the total. Watching a game you did not pick is more interesting
-   * with a number attached to it, and the muted styling keeps that number
-   * from being mistaken for a pick.
+   * <p>graded - green won, red lost, neutral for a push or a void; live -
+   * the same primary the chips used, so a glance says "this one is riding";
+   * otherwise neutral, or warning while the board has moved somewhere better
+   * and there is an Update button to press.
+   *
+   * <p>Subtle variants rather than solid: these sit behind body text and a
+   * badge, and the -subtle/-emphasis pairs are the ones Bootstrap keeps
+   * legible in both light and dark.
    */
-  const pickChip = (pick, fallbackLabel, key) => {
-    const mine = Boolean(pick);
-    const label = mine ? formatLine(pick.lockedLine, pick.selection) : fallbackLabel;
-    if (label == null) return null;
-
-    const name = mine
-      ? pick.selection === 'HOME'
-        ? game.homeTeamName
-        : pick.selection === 'AWAY'
-          ? game.awayTeamName
-          : null
-      : null;
-
-    return (
-      <Badge
-        key={key}
-        bg={mine ? 'primary' : 'secondary-subtle'}
-        text={mine ? undefined : 'secondary-emphasis'}
-        className="fw-normal text-truncate"
-        title={mine ? 'Your pick' : 'Not picked - showing the default side'}
-      >
-        {name ? `${name} ${label}` : label}
-      </Badge>
-    );
-  };
-
-  /** The favourite and their number, as "Texas -7.5". */
-  const favouriteLabel = () => {
-    if (game.homeSpread == null) return null;
-    const spread = Number(game.homeSpread);
-    if (spread === 0) return `Pick'em ${formatSpread(0, 'HOME')}`;
-    const side = spread < 0 ? 'HOME' : 'AWAY';
-    const name = side === 'HOME' ? game.homeTeamName : game.awayTeamName;
-    return `${name} ${formatSpread(game.homeSpread, side)}`;
+  const pickTint = (pick, improved) => {
+    if (finished) {
+      if (pick?.result === 'WIN') return 'bg-success-subtle';
+      if (pick?.result === 'LOSS') return 'bg-danger-subtle';
+      return 'bg-body-tertiary';
+    }
+    if (inProgress) return 'bg-primary-subtle';
+    return improved ? 'bg-warning-subtle' : 'bg-body-tertiary';
   };
 
   const spreadRow = pickRow({
@@ -323,17 +300,6 @@ export default function GameCard({
             ) : (
               <LockCountdown locksAt={game.locksAt} locked={locked} />
             )}
-
-            {live && (
-              <div className="d-flex flex-wrap justify-content-end gap-1 small">
-                {pickChip(spreadPick, favouriteLabel(), 'spread')}
-                {pickChip(
-                  totalPick,
-                  game.overUnder == null ? null : formatTotal(game.overUnder, 'OVER'),
-                  'total',
-                )}
-              </div>
-            )}
           </div>
         </div>
 
@@ -373,7 +339,7 @@ export default function GameCard({
               {spreadRow && (
                 <div
                   className={`rounded-3 p-1 p-sm-2 ${
-                    game.spreadLineImproved ? 'bg-warning-subtle' : 'bg-body-tertiary'
+                    pickTint(spreadPick, game.spreadLineImproved)
                   }`}
                 >
                   {spreadRow}
@@ -382,7 +348,7 @@ export default function GameCard({
               {totalRow && (
                 <div
                   className={`rounded-3 p-1 p-sm-2 ${
-                    game.totalLineImproved ? 'bg-warning-subtle' : 'bg-body-tertiary'
+                    pickTint(totalPick, game.totalLineImproved)
                   }`}
                 >
                   {totalRow}

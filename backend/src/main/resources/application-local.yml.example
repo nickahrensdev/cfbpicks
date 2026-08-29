@@ -1,0 +1,56 @@
+﻿# Active when SPRING_PROFILES_ACTIVE=local (the default).
+#
+# Connects to Supabase through the *transaction* pooler (port 6543), so
+# server-side prepared statements must be turned off with prepareThreshold=0.
+# Switch the port to 5432 (session pooler) if you want prepared statements
+# back; everything else stays the same.
+#
+# The values below are read straight from this file. Each still accepts an
+# environment override (${VAR:default}) so CI or a container can point the
+# same profile somewhere else without editing YAML.
+#
+# !! This file holds a real database password. It is gitignored - keep it
+# !! that way, and never move these values into application.yml.
+spring:
+  datasource:
+    url: ${SUPABASE_DB_URL:jdbc:postgresql://<region>.pooler.supabase.com:6543/postgres?sslmode=require}
+    username: ${SUPABASE_DB_USER:postgres.<project-ref>}
+    password: ${SUPABASE_DB_PASSWORD:PASTE_YOUR_DATABASE_PASSWORD_HERE}
+    hikari:
+      maximum-pool-size: 5
+      data-source-properties:
+        prepareThreshold: 0
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+logging:
+  level:
+    com.nickspicks: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,env,configprops,metrics
+  endpoint:
+    health:
+      show-details: always
+
+app:
+  environment: local
+  allowed-origins:
+    - http://localhost:5173
+    - http://127.0.0.1:5173
+  supabase:
+    # Not secret - safe to keep here.
+    url: ${SUPABASE_URL:https://<project-ref>.supabase.co}
+    # Only needed if you call the Supabase REST/Auth/Storage API.
+    anon-key: ${SUPABASE_ANON_KEY:}
+    service-key: ${SUPABASE_SERVICE_KEY:}
+

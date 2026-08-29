@@ -1,0 +1,315 @@
+// ---------------------------------------------------------------
+// Bootstrap theming.
+// Override Sass variables BEFORE importing Bootstrap, then add a few
+// project styles after. This is real theming - it recompiles Bootstrap's
+// own utilities and components with these values rather than fighting
+// the stock CSS with overrides.
+// ---------------------------------------------------------------
+
+// 1. Brand palette
+//
+//   #031926  midnight   #468189  teal      #77ACA2  sage
+//   #9DBEBB  mist       #F4E9CD  cream
+//
+// Teal carries actions, midnight carries chrome, cream is the page. Danger
+// and warning stay outside the palette on purpose: destructive and
+// time-critical states have to read as different in kind, not just in hue.
+$midnight: #031926;
+$teal:     #468189;
+$sage:     #77ACA2;
+$mist:     #9DBEBB;
+$cream:    #F4E9CD;
+
+$primary:   $teal;
+$secondary: #2E5F66;      // darkened teal - $sage on white fails contrast
+$success:   #2F7D63;
+$info:      $sage;
+$warning:   #C98A2E;
+$danger:    #B23A32;
+$light:     $cream;
+$dark:      $midnight;
+
+$body-bg:    #FBF7EC;     // cream, lifted so cards still read as raised
+$body-color: $midnight;
+
+// 2. Type - system stack keeps first paint fast on phones
+$font-family-sans-serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+  "Helvetica Neue", Arial, sans-serif;
+$font-size-base: 1rem;
+$headings-font-weight: 700;
+$line-height-base: 1.6;
+
+// 3. Shape
+$border-radius:    0.65rem;
+$border-radius-sm: 0.4rem;
+$border-radius-lg: 1rem;
+$card-border-width: 0;
+$card-bg: #FFFDF7;
+$card-box-shadow: 0 1px 2px rgba(3, 25, 38, 0.07), 0 8px 24px rgba(3, 25, 38, 0.07);
+
+// 4. Touch targets - comfortable thumb sizes on mobile
+$btn-padding-y:       0.6rem;
+$btn-padding-x:       1.1rem;
+$input-btn-focus-width: 0.2rem;
+$navbar-toggler-focus-width: 0.15rem;
+
+// 5. Bootstrap itself
+@import "bootstrap/scss/bootstrap";
+
+// ---------------------------------------------------------------
+// Project styles
+// ---------------------------------------------------------------
+
+:root {
+  scroll-behavior: smooth;
+}
+
+body {
+  // Respect the notch / home indicator on phones.
+  padding-bottom: env(safe-area-inset-bottom);
+  -webkit-text-size-adjust: 100%;
+}
+
+// Stop iOS Safari zooming in when a form field is focused.
+@media (max-width: 575.98px) {
+  .form-control,
+  .form-select {
+    font-size: 16px;
+  }
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.app-main {
+  flex: 1 0 auto;
+}
+
+.hero {
+  background: linear-gradient(140deg, $midnight 0%, $teal 100%);
+  color: $white;
+}
+
+.pick-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 2px 4px rgba(3, 25, 38, 0.09), 0 14px 32px rgba(3, 25, 38, 0.12);
+    }
+  }
+}
+
+// A card whose game is already locked recedes rather than disappearing -
+// still readable, clearly not actionable.
+.pick-card.is-locked {
+  opacity: 0.72;
+}
+
+// The banner across the top of a team page, tinted with that team's colour.
+.team-banner {
+  background: linear-gradient(140deg, $midnight 0%, $teal 100%);
+  color: $white;
+}
+
+// The pick budget stays visible while scrolling a long board. Sits directly
+// under the sticky navbar rather than overlapping it.
+.picks-bar {
+  position: sticky;
+  // Sits directly below the sticky navbar rather than under it. 3.5rem is the
+  // navbar's height at its default padding and brand size.
+  top: 3.5rem;
+  z-index: 1019; // just under Bootstrap's sticky navbar (1020)
+  background: rgba($cream, 0.97);
+  backdrop-filter: blur(6px);
+}
+
+// Two-thumb range slider. The inputs are transparent and stacked; only their
+// thumbs take pointer events, so both handles stay grabbable where they meet.
+.range-slider {
+  position: relative;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+
+  &__track,
+  &__fill {
+    position: absolute;
+    height: 0.375rem;
+    border-radius: 1rem;
+  }
+
+  &__track {
+    left: 0;
+    right: 0;
+    background: rgba($midnight, 0.15);
+  }
+
+  &__fill {
+    background: $primary;
+  }
+
+  &__input {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    background: none;
+    appearance: none;
+    pointer-events: none; // the track must not swallow drags
+    height: 1.75rem;
+
+    &:focus {
+      outline: none;
+    }
+
+    // Thumbs are the only interactive part.
+    &::-webkit-slider-thumb {
+      pointer-events: auto;
+      appearance: none;
+      width: 1.15rem;
+      height: 1.15rem;
+      border-radius: 50%;
+      background: $primary;
+      border: 2px solid #fff;
+      box-shadow: 0 1px 3px rgba($midnight, 0.4);
+      cursor: pointer;
+    }
+
+    &::-moz-range-thumb {
+      pointer-events: auto;
+      width: 1.15rem;
+      height: 1.15rem;
+      border-radius: 50%;
+      background: $primary;
+      border: 2px solid #fff;
+      box-shadow: 0 1px 3px rgba($midnight, 0.4);
+      cursor: pointer;
+    }
+
+    &:focus-visible::-webkit-slider-thumb {
+      box-shadow: 0 0 0 0.2rem rgba($primary, 0.4);
+    }
+
+    &:focus-visible::-moz-range-thumb {
+      box-shadow: 0 0 0 0.2rem rgba($primary, 0.4);
+    }
+
+    // Firefox paints a track on the input itself; hide it so only ours shows.
+    &::-moz-range-track {
+      background: none;
+    }
+  }
+}
+
+// Controls on the games board share a height so the row reads as one unit.
+//
+// A text button and an icon-only button do not match by default: the text
+// button's height comes from its line box, the icon button's from a 16px
+// SVG, leaving the icon roughly five pixels shorter. Deriving the height
+// from Bootstrap's own button metrics keeps them equal without a magic
+// pixel value that would drift if the font size changed.
+.control-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(#{$btn-line-height} * #{$btn-font-size-sm} + #{$btn-padding-y-sm} * 2 + #{$btn-border-width} * 2);
+}
+
+// Poll rank before a team name. Smaller and lighter than the name itself -
+// it qualifies the team rather than competing with it.
+// The pick buttons and their "SPR" heading share one column width, so the
+// spreads line up vertically however long the team names are - and the
+// heading sits squarely over them.
+.pick-col {
+  min-width: 4.5rem;
+}
+
+.pick-button {
+  @extend .pick-col;
+  font-variant-numeric: tabular-nums;
+}
+
+// The dot on a live badge. Pulses so a glance at the board tells you which
+// games are actually on, without reading a word.
+.live-dot {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+// Someone who has asked for less motion gets a plain dot.
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+  }
+}
+
+// A line on a schedule, boxed by how it settled. The unboxed variant keeps
+// the same padding and a transparent border so numbers stay in one column
+// whether or not the game has been played.
+.line-box {
+  display: inline-block;
+  min-width: 3.5rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: $border-radius-sm;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+
+  &--win {
+    border-color: $success;
+    background: rgba($success, 0.12);
+    color: shade-color($success, 15%);
+    font-weight: 600;
+  }
+
+  &--loss {
+    border-color: $danger;
+    background: rgba($danger, 0.1);
+    color: shade-color($danger, 15%);
+    font-weight: 600;
+  }
+}
+
+.team-rank {
+  font-size: 0.8em;
+  font-weight: 700;
+  color: $teal;
+  vertical-align: baseline;
+}
+
+.stat-tile {
+  background: rgba($sage, 0.16);
+  border-radius: $border-radius;
+  padding: 0.75rem 1rem;
+}
+
+// Category chips scroll sideways instead of wrapping into a tall stack.
+.chip-scroller {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  > * {
+    flex: 0 0 auto;
+  }
+}

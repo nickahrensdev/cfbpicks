@@ -1,0 +1,38 @@
+# Active when SPRING_PROFILES_ACTIVE=prod.
+# Every value here comes from the environment - no secrets in the repo.
+# Uses the Supabase transaction pooler (port 6543), so server-side
+# prepared statements must be disabled.
+spring:
+  datasource:
+    url: ${SUPABASE_DB_URL}
+    username: ${SUPABASE_DB_USER}
+    password: ${SUPABASE_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      data-source-properties:
+        prepareThreshold: 0
+  # Flyway needs a session-level connection for its advisory lock; the app
+  # pool above is on the transaction pooler.
+  flyway:
+    url: ${SUPABASE_MIGRATION_URL}
+    user: ${SUPABASE_DB_USER}
+    password: ${SUPABASE_DB_PASSWORD}
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    root: WARN
+    com.nickspicks: INFO
+
+server:
+  error:
+    include-message: never
+    include-stacktrace: never
+
+app:
+  environment: production
+  allowed-origins: ${ALLOWED_ORIGINS}
+  cfbd:
+    api-key: ${CFB_DATA_API_KEY}
+    enabled: true

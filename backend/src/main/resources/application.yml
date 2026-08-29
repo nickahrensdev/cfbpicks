@@ -1,0 +1,79 @@
+# Shared defaults for every environment.
+# Anything environment-specific belongs in application-local.yml or
+# application-prod.yml, which are layered on top of this file.
+spring:
+  application:
+    name: nickspicks-api
+  profiles:
+    # Overridden at runtime with SPRING_PROFILES_ACTIVE or -Dspring.profiles.active
+    default: local
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: nickspicks-pool
+      connection-timeout: 30000
+  jpa:
+    open-in-view: false
+    # The schema is owned by Flyway in every environment.
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # The Supabase "public" schema already contains objects (the scaffold's
+    # demo table, plus whatever Supabase puts there), and Flyway refuses to
+    # touch a non-empty schema with no history table. Baseline at 0 so V1
+    # still runs on top of what is already there.
+    baseline-on-migrate: true
+    baseline-version: 0
+# JWT verification is configured in code (SecurityConfig#jwtDecoder) rather
+# than here: it needs the ES256 algorithm AND an audience check, and having
+# half the setup in YAML and half in Java is how the two drift apart.
+# The JWKS URL is derived from app.supabase.url.
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  compression:
+    enabled: true
+    mime-types: application/json,text/html,text/css,application/javascript
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+app:
+  environment: unknown
+  allowed-origins: []
+  # Emails auto-promoted to ADMIN on sign-in. Bootstrap for the first admin;
+  # after that, roles are managed from the admin page.
+  admin-emails: ${ADMIN_EMAILS:}
+  supabase:
+    url: ${SUPABASE_URL:}
+    anon-key: ${SUPABASE_ANON_KEY:}
+    service-key: ${SUPABASE_SERVICE_KEY:}
+  pickem:
+    season: 2026
+    max-picks-per-week: 10
+    lock-lead-minutes: 30
+  cfbd:
+    enabled: true
+    base-url: https://api.collegefootballdata.com
+    api-key: ${CFB_DATA_API_KEY:}
+    # Which games members pick.
+    classification: fbs
+    # Which programs are stored for team/roster/coach pages. /teams returns
+    # all 684 across every division in one call, so adding fcs is free and
+    # makes non-FBS opponents clickable. Append ii and iii to go further.
+    team-classifications:
+      - fbs
+      - fcs

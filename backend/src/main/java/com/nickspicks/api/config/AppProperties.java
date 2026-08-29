@@ -1,0 +1,218 @@
+package com.nickspicks.api.config;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+import java.util.List;
+
+/**
+ * Profile-aware application settings. Values are supplied by
+ * application.yml and overridden per profile by application-local.yml
+ * and application-prod.yml.
+ */
+@ConfigurationProperties(prefix = "app")
+public class AppProperties {
+
+    /** Human readable environment label, surfaced by /api/meta. */
+    private String environment = "unknown";
+
+    /** Origins allowed to call the API from a browser. */
+    private List<String> allowedOrigins = List.of();
+
+    /**
+     * Emails promoted to ADMIN automatically on sign-in. Bootstrap only - the
+     * admin page can promote or demote anyone afterwards, but the first admin
+     * has to come from somewhere.
+     */
+    private List<String> adminEmails = List.of();
+
+    /** Supabase project settings. */
+    private Supabase supabase = new Supabase();
+
+    /** Pick'em rules. */
+    private Pickem pickem = new Pickem();
+
+    /** CollegeFootballData API settings. */
+    private Cfbd cfbd = new Cfbd();
+
+    public String getEnvironment() {
+        return environment;
+    }
+
+    public void setEnvironment(String environment) {
+        this.environment = environment;
+    }
+
+    public List<String> getAllowedOrigins() {
+        return allowedOrigins;
+    }
+
+    public void setAllowedOrigins(List<String> allowedOrigins) {
+        this.allowedOrigins = allowedOrigins;
+    }
+
+    public List<String> getAdminEmails() {
+        return adminEmails;
+    }
+
+    public void setAdminEmails(List<String> adminEmails) {
+        this.adminEmails = adminEmails;
+    }
+
+    public Supabase getSupabase() {
+        return supabase;
+    }
+
+    public void setSupabase(Supabase supabase) {
+        this.supabase = supabase;
+    }
+
+    public Pickem getPickem() {
+        return pickem;
+    }
+
+    public void setPickem(Pickem pickem) {
+        this.pickem = pickem;
+    }
+
+    public Cfbd getCfbd() {
+        return cfbd;
+    }
+
+    public void setCfbd(Cfbd cfbd) {
+        this.cfbd = cfbd;
+    }
+
+    public static class Supabase {
+
+        /** https://<project-ref>.supabase.co */
+        private String url = "";
+
+        /** Anon key. Safe to expose to browsers; used only for REST calls. */
+        private String anonKey = "";
+
+        /** Service role key. Never log or return this value. */
+        private String serviceKey = "";
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public String getAnonKey() {
+            return anonKey;
+        }
+
+        public void setAnonKey(String anonKey) {
+            this.anonKey = anonKey;
+        }
+
+        public String getServiceKey() {
+            return serviceKey;
+        }
+
+        public void setServiceKey(String serviceKey) {
+            this.serviceKey = serviceKey;
+        }
+    }
+
+    public static class Pickem {
+
+        /** Season the site is currently running. */
+        private int season = 2026;
+
+        /** Maximum picks a member may have in a single week. */
+        private int maxPicksPerWeek = 10;
+
+        /** Picks close this many minutes before kickoff. */
+        private int lockLeadMinutes = 30;
+
+        public int getSeason() {
+            return season;
+        }
+
+        public void setSeason(int season) {
+            this.season = season;
+        }
+
+        public int getMaxPicksPerWeek() {
+            return maxPicksPerWeek;
+        }
+
+        public void setMaxPicksPerWeek(int maxPicksPerWeek) {
+            this.maxPicksPerWeek = maxPicksPerWeek;
+        }
+
+        public int getLockLeadMinutes() {
+            return lockLeadMinutes;
+        }
+
+        public void setLockLeadMinutes(int lockLeadMinutes) {
+            this.lockLeadMinutes = lockLeadMinutes;
+        }
+    }
+
+    public static class Cfbd {
+
+        /** Turn the scheduled ingest jobs on or off. */
+        private boolean enabled = true;
+
+        private String baseUrl = "https://api.collegefootballdata.com";
+
+        /** Free tier key from collegefootballdata.com/key. */
+        private String apiKey = "";
+
+        /** Which games are ingested for picking. Members pick FBS games. */
+        private String classification = "fbs";
+
+        /**
+         * Which programs are stored as reference data. /teams returns all 684
+         * across every division in a single call, so including FCS costs
+         * nothing extra and makes non-FBS opponents clickable instead of
+         * plain text. Add "ii" and "iii" to go further.
+         */
+        private List<String> teamClassifications = List.of("fbs", "fcs");
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        public String getClassification() {
+            return classification;
+        }
+
+        public void setClassification(String classification) {
+            this.classification = classification;
+        }
+
+        public List<String> getTeamClassifications() {
+            return teamClassifications;
+        }
+
+        public void setTeamClassifications(List<String> teamClassifications) {
+            this.teamClassifications = teamClassifications;
+        }
+    }
+}

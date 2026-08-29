@@ -1,0 +1,28 @@
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# Java / Maven
+backend/target/
+
+# Env + secrets
+.env
+.env.local
+.env.*.local
+backend/src/main/resources/application-*.local.yml
+
+# Holds the real database password - commit the .example instead.
+backend/src/main/resources/application-local.yml
+!backend/src/main/resources/application-local.yml.example
+
+# Editors / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Claude Code session state - local tool-permission history, not project code
+.claude/

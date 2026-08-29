@@ -1,0 +1,35 @@
+# Integration tests run against a throwaway Postgres container so the real
+# Flyway migrations execute - H2 cannot run the Postgres-specific DDL.
+# The datasource is supplied by @ServiceConnection.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    # No url/user/password here on purpose: with none set Flyway uses the main
+    # datasource, which @ServiceConnection points at the container. (The local
+    # profile overrides those to reach the session pooler; that profile is not
+    # active here.)
+
+app:
+  environment: test
+  admin-emails:
+    - admin@example.com
+  allowed-origins:
+    - http://localhost:5173
+  supabase:
+    # Never contacted - tests inject JWTs directly rather than verifying them.
+    url: https://test.supabase.co
+  pickem:
+    season: 2026
+    max-picks-per-week: 10
+    lock-lead-minutes: 30
+  cfbd:
+    enabled: false
+    api-key: ""
+
+logging:
+  level:
+    org.hibernate: WARN

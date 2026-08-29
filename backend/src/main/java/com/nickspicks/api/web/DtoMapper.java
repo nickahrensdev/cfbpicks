@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -44,8 +45,13 @@ public class DtoMapper {
         if (ats == null) {
             return null;
         }
-        return new ApiDtos.AtsSummary(ats.getGames(), ats.getAtsWins(), ats.getAtsLosses(),
-                ats.getAtsPushes(), ats.getAvgCoverMargin());
+        return new ApiDtos.AtsSummary(ats.getSeason(), ats.getGames(), ats.getAtsWins(),
+                ats.getAtsLosses(), ats.getAtsPushes(), ats.getAvgCoverMargin());
+    }
+
+    /** A team's ATS record season by season, newest first. */
+    public List<ApiDtos.AtsSummary> atsHistory(List<TeamAts> rows) {
+        return rows == null ? List.of() : rows.stream().map(this::atsSummary).toList();
     }
 
     public ApiDtos.RecordSummary recordSummary(TeamRecord row) {

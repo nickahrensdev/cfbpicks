@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Card, Col, Container, Row, Table } from 'react-bootstrap';
+import { Alert, Button, Card, Col, Container, Row, Table } from 'react-bootstrap';
 import { Link, useParams } from 'react-router-dom';
 
 import GameCard from '../components/GameCard.jsx';
@@ -40,24 +40,17 @@ function movement(current, open) {
   return `${delta > 0 ? '+' : ''}${Number(delta.toFixed(1))} since open`;
 }
 
-/** "11-4" from an ATS summary, with the average cover margin underneath. */
-function AtsStat({ label, ats }) {
-  if (!ats) return null;
-  return (
-    <Col xs={6} md={3}>
-      <div className="small text-body-secondary">{label}</div>
-      <div className="fw-semibold">
-        {ats.wins}-{ats.losses}
-        {ats.pushes ? `-${ats.pushes}` : ''}
-      </div>
-      {ats.avgCoverMargin != null && (
-        <div className="small text-body-tertiary">
-          {Number(ats.avgCoverMargin) > 0 ? '+' : ''}
-          {Number(ats.avgCoverMargin).toFixed(1)} avg cover
-        </div>
-      )}
-    </Col>
-  );
+/** "11-4-1" from an ATS summary, or a dash when that team has no row for the season. */
+function atsRecord(ats) {
+  if (!ats) return '—';
+  return `${ats.wins}-${ats.losses}${ats.pushes ? `-${ats.pushes}` : ''}`;
+}
+
+/** "+1.5" average cover margin, or nothing when it is absent. */
+function atsMargin(ats) {
+  if (!ats || ats.avgCoverMargin == null) return null;
+  const margin = Number(ats.avgCoverMargin);
+  return `${margin > 0 ? '+' : ''}${margin.toFixed(1)}`;
 }
 
 export default function GameDetailPage() {
@@ -186,6 +179,18 @@ export default function GameDetailPage() {
   const live = game.live;
   const espn = detail.espn;
 
+  // ATS keyed by season for each side, plus the union of the years either of
+  // them has - so the table can show one row per season with a dash where a
+  // team has no record for that year.
+  const homeAtsBySeason = new Map(
+    (detail.homeAtsHistory ?? []).map((row) => [row.season, row]),
+  );
+  const awayAtsBySeason = new Map(
+    (detail.awayAtsHistory ?? []).map((row) => [row.season, row]),
+  );
+  const atsSeasons = [...new Set([...homeAtsBySeason.keys(), ...awayAtsBySeason.keys()])]
+    .sort((a, b) => b - a);
+
   // ESPN's in-game model while the game is on, our stored postgame figure
   // once it is over. Both are "home team's chance of winning", 0..1.
   const homeWinProbability =
@@ -203,7 +208,12 @@ export default function GameDetailPage() {
 
   return (
     <Container className="py-4 py-md-5">
-      <BackButton className="mb-3" />
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <BackButton />
+        <Button variant="outline-secondary" size="sm" onClick={load} disabled={loading || busy}>
+          Refresh
+        </Button>
+      </div>
 
       {notice && (
         <Alert variant={notice.variant} dismissible onClose={() => setNotice(null)} className="mb-3">
@@ -272,14 +282,53 @@ export default function GameDetailPage() {
       {/* Season-long ATS, refreshed on demand - see TeamAtsService. Distinct
           from ESPN's per-game "Around the game" ATS summary below, which is
           a different provider's number for this matchup specifically. */}
-      {(detail.homeAts || detail.awayAts) && (
+      {atsSeasons.length > 0 && (
         <Card className="shadow-sm mb-4">
           <Card.Body>
-            <h2 className="h6 text-uppercase text-body-secondary mb-3">Season ATS</h2>
-            <Row className="g-3">
-              <AtsStat label={game.awayTeamName} ats={detail.awayAts} />
-              <AtsStat label={game.homeTeamName} ats={detail.homeAts} />
-            </Row>
+            <h2 className="h6 text-uppercase text-body-secondary mb-3">
+              Against the spread by season
+            </h2>
+            <div className="table-responsive" style={{ maxHeight: '20rem' }}>
+              <Table size="sm" className="align-middle mb-0 text-center">
+                <thead>
+                  <tr>
+                    <th scope="col" className="text-start">Season</th>
+                    <th scope="col">{game.awayTeamName}</th>
+                    <th scope="col">{game.homeTeamName}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Every season either side has a record for, newest first.
+                      A team with nothing for a given year shows a dash rather
+                      than dropping the row, so the years stay aligned. */}
+                  {atsSeasons.map((season) => {
+                    const away = awayAtsBySeason.get(season);
+                    const home = homeAtsBySeason.get(season);
+                    return (
+                      <tr key={season}>
+                        <td className="text-start">{season}</td>
+                        <td>
+                          <div className="fw-semibold">{atsRecord(away)}</div>
+                          {atsMargin(away) && (
+                            <div className="small text-body-tertiary">
+                              {atsMargin(away)} avg cover
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <div className="fw-semibold">{atsRecord(home)}</div>
+                          {atsMargin(home) && (
+                            <div className="small text-body-tertiary">
+                              {atsMargin(home)} avg cover
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </div>
           </Card.Body>
         </Card>
       )}

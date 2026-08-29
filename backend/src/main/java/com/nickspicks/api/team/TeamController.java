@@ -154,7 +154,13 @@ public class TeamController {
                                 .toList()))
                 .toList();
 
-        TeamAts ats = teamAtsService.find(id, season);
+        // One read covers both the season being viewed and the full history
+        // below it, rather than querying the same table twice.
+        List<TeamAts> atsHistory = teamAtsService.history(id);
+        TeamAts ats = atsHistory.stream()
+                .filter(row -> Integer.valueOf(season).equals(row.getSeason()))
+                .findFirst()
+                .orElse(null);
 
         return new ApiDtos.TeamDetail(team.getId(), team.getSchool(), team.getMascot(),
                 team.getAbbreviation(), team.getConference(), team.getDivision(), team.getColor(),
@@ -166,7 +172,8 @@ public class TeamController {
                 // detail. Optional by design - null just means a plainer page.
                 espn.team(id).orElse(null),
                 mapper.recordSummary(teamRecords.findByTeamIdAndSeason(id, season).orElse(null)),
-                mapper.atsSummary(ats));
+                mapper.atsSummary(ats),
+                mapper.atsHistory(atsHistory));
     }
 
     /**

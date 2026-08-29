@@ -9,8 +9,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -51,6 +53,29 @@ public class TeamAtsService {
             return null;
         }
         return teamAts.findByTeamIdAndSeason(teamId, season).orElse(null);
+    }
+
+    /** Every season this team has a record for, newest first. Never calls the provider. */
+    @Transactional(readOnly = true)
+    public List<TeamAts> history(Integer teamId) {
+        if (teamId == null) {
+            return List.of();
+        }
+        return teamAts.findAllByTeamIdOrderBySeasonDesc(teamId);
+    }
+
+    /**
+     * Both sides of a matchup in one query, grouped by team id. Saves the
+     * game details page a second round trip for what is the same table.
+     */
+    @Transactional(readOnly = true)
+    public Map<Integer, List<TeamAts>> historyFor(Collection<Integer> teamIds) {
+        List<Integer> wanted = teamIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (wanted.isEmpty()) {
+            return Map.of();
+        }
+        return teamAts.findAllByTeamIdInOrderBySeasonDesc(wanted).stream()
+                .collect(Collectors.groupingBy(TeamAts::getTeamId));
     }
 
     /**

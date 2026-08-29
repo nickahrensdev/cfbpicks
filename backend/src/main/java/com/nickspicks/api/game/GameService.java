@@ -7,6 +7,7 @@ import com.nickspicks.api.pick.PickRepository;
 import com.nickspicks.api.pick.PickWindow;
 import com.nickspicks.api.ranking.RankingService;
 import com.nickspicks.api.team.Team;
+import com.nickspicks.api.team.TeamAts;
 import com.nickspicks.api.team.TeamAtsService;
 import com.nickspicks.api.team.TeamRepository;
 import com.nickspicks.api.user.AppUser;
@@ -194,10 +195,16 @@ public class GameService {
         boolean revealed = window.isRevealed(game, Instant.now());
         List<ApiDtos.MemberPick> memberPicks = revealed ? memberPicks(gameId) : List.of();
 
-        // Refreshed on demand, not on a schedule - see TeamAtsService. A
-        // non-FBS opponent with no team id just gets no ATS section.
-        ApiDtos.AtsSummary homeAts = atsSummary(game.getHomeTeamId(), game.getSeason());
-        ApiDtos.AtsSummary awayAts = atsSummary(game.getAwayTeamId(), game.getSeason());
+        // Both sides in one query. Loaded straight from our own table - see
+        // TeamAtsService, nothing here calls the provider. A non-FBS opponent
+        // with no team id, or a season nobody has loaded ATS for, just gets
+        // an empty list and no section on the page.
+        // Stream.of, not List.of - a non-FBS side has a null team id, and
+        // List.of would throw on it before the filter ever ran.
+        Map<Integer, List<TeamAts>> ats = teamAtsService.historyFor(
+                Stream.of(game.getHomeTeamId(), game.getAwayTeamId())
+                        .filter(Objects::nonNull)
+                        .toList());
 
         return new ApiDtos.GameDetail(
                 mapper.gameSummary(game, myPicks, teamCache, ranks, liveScoresFor(List.of(game))),
@@ -221,12 +228,17 @@ public class GameService {
                 // Box score, leaders and venue detail. A page that renders
                 // without it is the normal case before kickoff.
                 espnGames.summary(gameId).orElse(null),
-                homeAts,
-                awayAts);
+                atsFor(ats, game.getHomeTeamId()),
+                atsFor(ats, game.getAwayTeamId()));
     }
 
-    private ApiDtos.AtsSummary atsSummary(Integer teamId, int season) {
-        return teamId == null ? null : mapper.atsSummary(teamAtsService.find(teamId, season));
+    /**
+     * One side's ATS history, empty when that side has no team id (a non-FBS
+     * opponent) or no stored rows. The null check is not optional: an empty
+     * {@code Map.of()} throws on {@code get(null)} rather than returning null.
+     */
+    private List<ApiDtos.AtsSummary> atsFor(Map<Integer, List<TeamAts>> ats, Integer teamId) {
+        return teamId == null ? List.of() : mapper.atsHistory(ats.get(teamId));
     }
 
     @Transactional(readOnly = true)

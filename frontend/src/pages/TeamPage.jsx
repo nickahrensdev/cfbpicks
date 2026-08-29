@@ -215,6 +215,51 @@ export default function TeamPage() {
         </Card>
       )}
 
+      {/* Every season this team has an ATS record for, newest first. Only as
+          deep as the seasons an admin has actually loaded. */}
+      {team.atsHistory?.length > 0 && (
+        <Card className="shadow-sm mb-4">
+          <Card.Body>
+            <h2 className="h6 text-uppercase text-body-secondary mb-3">
+              Against the spread by season
+            </h2>
+            <div className="table-responsive" style={{ maxHeight: '20rem' }}>
+              <Table size="sm" hover className="align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">Season</th>
+                    <th scope="col" className="text-center">Games</th>
+                    <th scope="col" className="text-center">ATS</th>
+                    <th scope="col" className="text-end">Avg cover</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {team.atsHistory.map((row) => (
+                    <tr key={row.season}>
+                      <td>{row.season}</td>
+                      <td className="text-center text-body-secondary">{row.games ?? '—'}</td>
+                      <td className="text-center fw-semibold">
+                        {row.wins}-{row.losses}
+                        {row.pushes ? (
+                          <span className="fw-normal text-body-secondary">-{row.pushes}</span>
+                        ) : null}
+                      </td>
+                      <td className="text-end text-body-secondary">
+                        {row.avgCoverMargin == null
+                          ? '—'
+                          : `${Number(row.avgCoverMargin) > 0 ? '+' : ''}${Number(
+                              row.avgCoverMargin,
+                            ).toFixed(1)}`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+          </Card.Body>
+        </Card>
+      )}
+
       {/* Current placement in all three polls, so the single rank shown by
           the name can be checked against the others. */}
       {team.currentRankings?.length > 0 && (

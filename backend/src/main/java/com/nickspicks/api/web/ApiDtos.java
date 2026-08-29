@@ -65,8 +65,10 @@ public final class ApiDtos {
             EspnDtos.EspnTeam espn,
             /** Season win/loss splits. Null until an admin loads /records. */
             RecordSummary record,
-            /** Against-the-spread record for the season. Null until fetched. */
-            AtsSummary ats) {
+            /** Against-the-spread record for the season being viewed. Null until fetched. */
+            AtsSummary ats,
+            /** Every season this team has an ATS record for, newest first. */
+            List<AtsSummary> atsHistory) {
     }
 
     public record PollPlacement(String poll, Integer week, Integer rank,
@@ -92,8 +94,9 @@ public final class ApiDtos {
             WinLossSplit postseason) {
     }
 
-    public record AtsSummary(Integer games, Integer wins, Integer losses, Integer pushes,
-                             BigDecimal avgCoverMargin) {
+    /** One season's against-the-spread record. {@code season} labels the row in a history. */
+    public record AtsSummary(Integer season, Integer games, Integer wins, Integer losses,
+                             Integer pushes, BigDecimal avgCoverMargin) {
     }
 
     // ------------------------------------------------------------- matchup
@@ -251,9 +254,12 @@ public final class ApiDtos {
             boolean picksRevealed,
             /** Box score, leaders and venue detail from ESPN. May be null. */
             EspnGameService.EspnGame espn,
-            /** Season-long ATS record for each side, refreshed on demand. May be null. */
-            AtsSummary homeAts,
-            AtsSummary awayAts) {
+            /**
+             * Each side's ATS record season by season, newest first. Empty
+             * until an admin has loaded ATS for a season the team played.
+             */
+            List<AtsSummary> homeAtsHistory,
+            List<AtsSummary> awayAtsHistory) {
     }
 
     // ----------------------------------------------------------------- picks

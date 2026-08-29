@@ -3,6 +3,7 @@ import { Alert, Button, Card, Col, Container, Row, Table } from 'react-bootstrap
 import { Link, useParams } from 'react-router-dom';
 
 import GameCard from '../components/GameCard.jsx';
+import { TeamLogo } from '../components/links.jsx';
 import WinProbabilityDonut from '../components/WinProbabilityDonut.jsx';
 import {
   BackButton,
@@ -291,10 +292,22 @@ export default function GameDetailPage() {
             <div className="table-responsive" style={{ maxHeight: '20rem' }}>
               <Table size="sm" className="align-middle mb-0 text-center">
                 <thead>
+                  {/* Logos rather than names - the names are wide enough to
+                      dominate a table whose actual content is short records,
+                      and both are already named at the top of the page. The
+                      title and visually-hidden text keep the column readable
+                      to a screen reader and on hover. TeamLogo falls back to
+                      abbreviation initials when a team has no logo on file. */}
                   <tr>
                     <th scope="col" className="text-start">Season</th>
-                    <th scope="col">{game.awayTeamName}</th>
-                    <th scope="col">{game.homeTeamName}</th>
+                    <th scope="col" title={game.awayTeamName}>
+                      <TeamLogo team={game.awayTeam} size={28} />
+                      <span className="visually-hidden">{game.awayTeamName}</span>
+                    </th>
+                    <th scope="col" title={game.homeTeamName}>
+                      <TeamLogo team={game.homeTeam} size={28} />
+                      <span className="visually-hidden">{game.homeTeamName}</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

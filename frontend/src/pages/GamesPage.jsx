@@ -35,6 +35,7 @@ export default function GamesPage() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [busyGameId, setBusyGameId] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Distinguishes the first load of a week (show a spinner) from a pick
   // (leave the board on screen).
@@ -77,6 +78,18 @@ export default function GamesPage() {
   useEffect(() => {
     loadWeek();
   }, [loadWeek]);
+
+  // A manual refresh of the week already on screen - loadWeek only flips
+  // the full-page spinner for a week it has not shown yet, so this is its
+  // own indicator for re-fetching the one already displayed.
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadWeek();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // A scoreboard that does not move is not a scoreboard. While any game on
   // this week's board is in progress, pull the games array again every 30
@@ -273,6 +286,8 @@ export default function GamesPage() {
           onChange={updateFilters}
           resultCount={visibleGames.length}
           totalCount={games.length}
+          onRefresh={handleRefresh}
+          refreshing={loading || refreshing}
         />
 
         {notice && (

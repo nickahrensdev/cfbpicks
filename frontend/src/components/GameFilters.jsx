@@ -42,6 +42,24 @@ function CheckIcon() {
   );
 }
 
+/** Refresh arrows. Decorative - the button around it carries the accessible name. */
+function RefreshIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z" />
+      <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466" />
+    </svg>
+  );
+}
+
 /**
  * Conference / team / spread-size filters, collapsed by default so the board
  * is the first thing on screen.
@@ -60,6 +78,9 @@ export default function GameFilters({
   totalCount,
   /** Rendered first in the control row - the week picker on the games board. */
   weekSelector = null,
+  /** Manual re-fetch of the current board, next to the filter toggle. */
+  onRefresh = null,
+  refreshing = false,
 }) {
   const [open, setOpen] = useState(false);
 
@@ -120,6 +141,20 @@ export default function GameFilters({
               </span>
             )}
           </Button>
+
+          {onRefresh && (
+            <Button
+              size="sm"
+              className="control-btn"
+              variant="outline-secondary"
+              onClick={onRefresh}
+              disabled={refreshing}
+              aria-label="Refresh games"
+              title="Refresh"
+            >
+              <RefreshIcon />
+            </Button>
+          )}
         </div>
       </div>
 

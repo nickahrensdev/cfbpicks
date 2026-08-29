@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge, Card, Col, Container, Form, Row, Table } from 'react-bootstrap';
+import { Badge, Button, Card, Col, Container, Form, Row, Table } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 
 import { EmptyState, ErrorNotice, Loading } from '../components/common.jsx';
@@ -48,7 +48,12 @@ export default function LeaderboardPage() {
 
   return (
     <Container className="py-4 py-md-5">
-      <h1 className="h3 mb-4">Leaderboard</h1>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h1 className="h3 mb-0">Leaderboard</h1>
+        <Button variant="outline-secondary" size="sm" onClick={load} disabled={loading}>
+          Refresh
+        </Button>
+      </div>
 
       <Row className="g-3 mb-4">
         <Col xs={12} sm={5} md={4}>

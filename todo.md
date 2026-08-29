@@ -128,9 +128,15 @@ need to read as different in kind, not just a different hue.
 > Superseded by the theme system below once that ships — this table describes the single fixed
 > palette live today.
 
-## Theming (in progress)
-- [ ] Five selectable color-scheme themes, each with light and dark support, chosen from **Profile**
-  - Replaces the single fixed palette above. Being planned as its own design pass before code.
+## Theming
+- [x] Five selectable color-scheme themes, each with light and dark support, chosen from **Profile**
+  - Midnight (the original palette), Ocean, Ember, Forest, Slate — each with a light and dark
+    variant. Implemented as CSS custom-property overrides toggled by `data-theme` /
+    `data-bs-theme` attributes on `<html>`, not five compiled Bootstrap bundles — Bootstrap 5.3
+    already renders through `var(--bs-*)`, so switching themes is instant with nothing to fetch.
+    Success/danger/warning stay fixed across every theme — the win/loss coloring above depends on
+    green always meaning win. Persisted per account (`app_user.theme` / `color_mode`), defaulting
+    everyone to Midnight/Light so nothing changes until a member opts in.
 
 ---
 

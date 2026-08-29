@@ -64,7 +64,10 @@ app:
     max-picks-per-week: 10
     lock-lead-minutes: 30
   cfbd:
-    enabled: true
+    # Gates IngestScheduler's cron jobs only (schedule sync, line sync, score
+    # poll) - manual admin loads and on-demand ATS/matchup fetches go through
+    # CfbdClient directly and are unaffected by this flag either way.
+    enabled: false
     base-url: https://api.collegefootballdata.com
     api-key: ${CFB_DATA_API_KEY:}
     # Which games members pick.

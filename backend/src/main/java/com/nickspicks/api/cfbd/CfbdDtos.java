@@ -164,4 +164,79 @@ public final class CfbdDtos {
                 BigDecimal spDefense) {
         }
     }
+
+    /** Season win/loss splits for one team. /records?year=N returns every team. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record RecordDto(
+            Integer year,
+            Integer teamId,
+            String team,
+            String classification,
+            String conference,
+            String division,
+            BigDecimal expectedWins,
+            Splits total,
+            Splits conferenceGames,
+            Splits homeGames,
+            Splits awayGames,
+            Splits neutralSiteGames,
+            Splits regularSeason,
+            Splits postseason) {
+
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public record Splits(Integer games, Integer wins, Integer losses, Integer ties) {
+        }
+    }
+
+    /** One team's against-the-spread record for the season so far. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record AtsDto(
+            Integer year,
+            Integer teamId,
+            String team,
+            String conference,
+            Integer games,
+            Integer atsWins,
+            Integer atsLosses,
+            Integer atsPushes,
+            BigDecimal avgCoverMargin) {
+    }
+
+    /**
+     * All-time head-to-head history between two schools, by name - this
+     * endpoint has no team-id parameter and returns one object, not a list.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record MatchupDto(
+            String team1,
+            String team2,
+            Integer team1Wins,
+            Integer team2Wins,
+            Integer ties,
+            List<MatchupGameDto> games) {
+
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public record MatchupGameDto(
+                Integer season,
+                Integer week,
+                String seasonType,
+                Instant date,
+                Boolean neutralSite,
+                String venue,
+                String homeTeam,
+                Integer homeScore,
+                String awayTeam,
+                Integer awayScore,
+                String winner) {
+        }
+    }
+
+    /** The account's real quota state. One object, not a list. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record InfoDto(
+            Integer monthlyLimit,
+            Integer usedCalls,
+            Integer remainingCalls,
+            Instant resetAt) {
+    }
 }

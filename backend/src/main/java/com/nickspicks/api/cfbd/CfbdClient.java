@@ -17,16 +17,18 @@ import java.util.Map;
  * Thin wrapper over the CollegeFootballData API.
  *
  * <p>Every call is logged so quota consumption is visible, and a monthly
- * ceiling stops a runaway loop from burning the whole allowance. The free tier
- * is 1,000 calls a month.
+ * ceiling stops a runaway loop from burning the whole allowance. The account
+ * this runs against is Tier 1 (5,000 calls/month, confirmed live via
+ * {@code /info}) - the true number is what {@link #info()} reports, this
+ * ceiling is only an internal safety stop set comfortably under it.
  */
 @Component
 public class CfbdClient {
 
     private static final Logger log = LoggerFactory.getLogger(CfbdClient.class);
 
-    /** Leaves headroom under the 1,000/month free tier. */
-    private static final long MONTHLY_CALL_CEILING = 900;
+    /** Leaves headroom under the real 5,000/month Tier 1 allowance. */
+    private static final long MONTHLY_CALL_CEILING = 4500;
 
     private final RestClient restClient;
     private final AppProperties properties;
@@ -117,13 +119,52 @@ public class CfbdClient {
         });
     }
 
+    /**
+     * Season-long win/loss splits for every team - overall, conference,
+     * home/away/neutral, regular season vs. postseason - in one call.
+     */
+    public List<CfbdDtos.RecordDto> records(int year) {
+        return get("/records", Map.of("year", year), new ParameterizedTypeReference<>() {
+        });
+    }
+
+    /**
+     * Every team's against-the-spread record for the season so far, in one
+     * call. Cost is identical whether one team or the whole league is
+     * needed, so a refresh always upserts everyone - see
+     * {@code TeamAtsService}, which is what decides when this is worth
+     * calling at all.
+     */
+    public List<CfbdDtos.AtsDto> teamAts(int year) {
+        return get("/teams/ats", Map.of("year", year), new ParameterizedTypeReference<>() {
+        });
+    }
+
+    /**
+     * All-time head-to-head history between two programs, by school name -
+     * this endpoint has no team-id parameter. A single object, not a list.
+     */
+    public CfbdDtos.MatchupDto matchup(String team1, String team2) {
+        return getOne("/teams/matchup", Map.of("team1", team1, "team2", team2),
+                CfbdDtos.MatchupDto.class);
+    }
+
+    /**
+     * The account's real quota state - monthly limit, used, remaining, reset
+     * date. Costs a call like anything else; see {@code CfbdQuotaService} for
+     * why this is not fetched on every request.
+     */
+    public CfbdDtos.InfoDto info() {
+        return getOne("/info", Map.of(), CfbdDtos.InfoDto.class);
+    }
+
     /** Calls used so far in the trailing 30 days. */
     public long callsThisMonth() {
         return callLog.countSince(Instant.now().minus(30, ChronoUnit.DAYS));
     }
 
-    private <T> List<T> get(String path, Map<String, Object> params,
-                            ParameterizedTypeReference<List<T>> type) {
+    /** Shared quota guard and URI-building for both the list and single-object callers. */
+    private String checkedTarget(String path, Map<String, Object> params) {
         if (!isConfigured()) {
             throw new CfbdUnavailableException("No CollegeFootballData API key configured");
         }
@@ -144,6 +185,12 @@ public class CfbdClient {
         String target = display.build().encode().toUriString();
 
         log.info("CFBD GET {} (call {} of {} this month)", target, used + 1, MONTHLY_CALL_CEILING);
+        return target;
+    }
+
+    private <T> List<T> get(String path, Map<String, Object> params,
+                            ParameterizedTypeReference<List<T>> type) {
+        String target = checkedTarget(path, params);
 
         try {
             List<T> body = restClient.get()
@@ -159,6 +206,35 @@ public class CfbdClient {
                     .body(type);
             recorder.record(target, 200);
             return body == null ? List.of() : body;
+        } catch (org.springframework.web.client.RestClientResponseException ex) {
+            recorder.record(target, ex.getStatusCode().value());
+            throw new CfbdUnavailableException(
+                    "CFBD call to %s failed: %s".formatted(path, ex.getStatusCode()), ex);
+        } catch (CfbdUnavailableException ex) {
+            throw ex;
+        } catch (RuntimeException ex) {
+            recorder.record(target, null);
+            throw new CfbdUnavailableException("CFBD call to %s failed".formatted(path), ex);
+        }
+    }
+
+    private <T> T getOne(String path, Map<String, Object> params, Class<T> type) {
+        String target = checkedTarget(path, params);
+
+        try {
+            T body = restClient.get()
+                    .uri(builder -> {
+                        builder.path(path);
+                        params.forEach(builder::queryParam);
+                        return builder.build();
+                    })
+                    .retrieve()
+                    .body(type);
+            recorder.record(target, 200);
+            if (body == null) {
+                throw new CfbdUnavailableException("CFBD call to %s returned no body".formatted(path));
+            }
+            return body;
         } catch (org.springframework.web.client.RestClientResponseException ex) {
             recorder.record(target, ex.getStatusCode().value());
             throw new CfbdUnavailableException(

@@ -7,6 +7,7 @@ import com.nickspicks.api.pick.PickRepository;
 import com.nickspicks.api.pick.PickWindow;
 import com.nickspicks.api.ranking.RankingService;
 import com.nickspicks.api.team.Team;
+import com.nickspicks.api.team.TeamAtsService;
 import com.nickspicks.api.team.TeamRepository;
 import com.nickspicks.api.user.AppUser;
 import com.nickspicks.api.user.AppUserRepository;
@@ -40,13 +41,15 @@ public class GameService {
     private final RankingService rankings;
     private final LiveScoreService liveScores;
     private final EspnGameService espnGames;
+    private final TeamAtsService teamAtsService;
 
     public GameService(GameRepository games, PickRepository picks, TeamRepository teams,
                        AppUserRepository users, PickWindow window, DtoMapper mapper,
                        RankingService rankings, LiveScoreService liveScores,
-                       EspnGameService espnGames) {
+                       EspnGameService espnGames, TeamAtsService teamAtsService) {
         this.liveScores = liveScores;
         this.espnGames = espnGames;
+        this.teamAtsService = teamAtsService;
         this.games = games;
         this.picks = picks;
         this.teams = teams;
@@ -191,6 +194,11 @@ public class GameService {
         boolean revealed = window.isRevealed(game, Instant.now());
         List<ApiDtos.MemberPick> memberPicks = revealed ? memberPicks(gameId) : List.of();
 
+        // Refreshed on demand, not on a schedule - see TeamAtsService. A
+        // non-FBS opponent with no team id just gets no ATS section.
+        ApiDtos.AtsSummary homeAts = atsSummary(game.getHomeTeamId(), game.getSeason());
+        ApiDtos.AtsSummary awayAts = atsSummary(game.getAwayTeamId(), game.getSeason());
+
         return new ApiDtos.GameDetail(
                 mapper.gameSummary(game, myPicks, teamCache, ranks, liveScoresFor(List.of(game))),
                 game.getSpreadOpen(),
@@ -212,7 +220,13 @@ public class GameService {
                 revealed,
                 // Box score, leaders and venue detail. A page that renders
                 // without it is the normal case before kickoff.
-                espnGames.summary(gameId).orElse(null));
+                espnGames.summary(gameId).orElse(null),
+                homeAts,
+                awayAts);
+    }
+
+    private ApiDtos.AtsSummary atsSummary(Integer teamId, int season) {
+        return teamId == null ? null : mapper.atsSummary(teamAtsService.ensureFresh(teamId, season));
     }
 
     @Transactional(readOnly = true)

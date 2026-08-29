@@ -1,6 +1,8 @@
 package com.nickspicks.api.ingest;
 
 import com.nickspicks.api.cfbd.CfbdClient;
+import com.nickspicks.api.cfbd.CfbdQuotaService;
+import com.nickspicks.api.cfbd.CfbdQuotaSnapshot;
 import com.nickspicks.api.season.CurrentWeekResolver;
 import com.nickspicks.api.security.CurrentUserService;
 import com.nickspicks.api.team.Team;
@@ -32,27 +34,31 @@ public class AdminIngestController {
     private final ReferenceIngestService referenceIngest;
     private final CurrentWeekResolver weeks;
     private final CfbdClient cfbd;
+    private final CfbdQuotaService quotaService;
     private final CurrentUserService currentUser;
     private final TeamRepository teams;
 
     public AdminIngestController(GameIngestService gameIngest,
                                  ReferenceIngestService referenceIngest,
                                  CurrentWeekResolver weeks, CfbdClient cfbd,
+                                 CfbdQuotaService quotaService,
                                  CurrentUserService currentUser, TeamRepository teams) {
         this.teams = teams;
         this.gameIngest = gameIngest;
         this.referenceIngest = referenceIngest;
         this.weeks = weeks;
         this.cfbd = cfbd;
+        this.quotaService = quotaService;
         this.currentUser = currentUser;
     }
 
     /**
-     * Calendar, teams and coaches for a season. One API call per part.
+     * Calendar, teams, coaches and season records for a season. One API call
+     * per part.
      *
      * <p>{@code parts} names which to run, so a season whose coaches are not
      * published yet can have its calendar refreshed without spending a call to
-     * find that out again. Omitted means all three.
+     * find that out again. Omitted means all four.
      */
     @PostMapping("/ingest/reference")
     public Map<String, Object> ingestReference(@AuthenticationPrincipal Jwt jwt,
@@ -61,7 +67,7 @@ public class AdminIngestController {
         currentUser.requireAdmin(jwt);
         int year = season == null ? weeks.currentSeason() : season;
         Set<String> wanted = parts == null || parts.isEmpty()
-                ? Set.of("calendar", "teams", "coaches")
+                ? Set.of("calendar", "teams", "coaches", "records")
                 : parts.stream().map(part -> part.trim().toLowerCase(Locale.ROOT))
                         .collect(Collectors.toSet());
 
@@ -75,6 +81,9 @@ public class AdminIngestController {
         }
         if (wanted.contains("coaches")) {
             result.put("coaches", referenceIngest.ingestCoaches(year));
+        }
+        if (wanted.contains("records")) {
+            result.put("records", referenceIngest.ingestRecords(year));
         }
         result.put("callsUsedLast30Days", cfbd.callsThisMonth());
         return result;
@@ -156,14 +165,27 @@ public class AdminIngestController {
         return result;
     }
 
-    /** Quota check - no API call. */
+    /**
+     * The account's real quota state, from CFBD's own {@code /info}. Refreshed
+     * at most once a day - see {@code CfbdQuotaService} - so most visits to
+     * this page cost nothing.
+     */
     @GetMapping("/quota")
     public Map<String, Object> quota(@AuthenticationPrincipal Jwt jwt) {
         currentUser.requireAdmin(jwt);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("callsUsedLast30Days", cfbd.callsThisMonth());
-        result.put("freeTierMonthlyLimit", 1000);
         result.put("configured", cfbd.isConfigured());
+
+        if (cfbd.isConfigured()) {
+            CfbdQuotaSnapshot snapshot = quotaService.current();
+            if (snapshot != null) {
+                result.put("usedCalls", snapshot.getUsedCalls());
+                result.put("remainingCalls", snapshot.getRemainingCalls());
+                result.put("monthlyLimit", snapshot.getMonthlyLimit());
+                result.put("resetAt", snapshot.getResetAt());
+                result.put("fetchedAt", snapshot.getFetchedAt());
+            }
+        }
         return result;
     }
 }

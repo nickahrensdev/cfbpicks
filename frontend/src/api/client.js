@@ -84,6 +84,9 @@ export const api = {
 
   teams: ({ conference, search } = {}) => request(`/api/teams${query({ conference, search })}`),
   team: (id) => request(`/api/teams/${id}`),
+  // Cached and refreshed server-side; safe to call every time a matchup is
+  // viewed - see TeamMatchupService for the staleness rule.
+  matchup: (team1Id, team2Id) => request(`/api/teams/matchup${query({ team1Id, team2Id })}`),
   athlete: (id) => request(`/api/athletes/${id}`),
   coach: (id) => request(`/api/coaches/${id}`),
 

@@ -4,11 +4,12 @@ import { Alert, Button, Card, Container, Form, ProgressBar } from 'react-bootstr
 import { ErrorNotice } from '../../components/common.jsx';
 import { api } from '../../api/client.js';
 
-/** The three reference feeds, each its own CFBD call and its own checkbox. */
+/** The four reference feeds, each its own CFBD call and its own checkbox. */
 const REFERENCE_PARTS = [
   ['calendar', 'Calendar', 'Week boundaries, so future weeks are selectable.'],
   ['teams', 'Teams', 'Every FBS and FCS program. Team pages need this.'],
   ['coaches', 'Coaches', 'FBS only - the provider has no FCS coach records.'],
+  ['records', 'Records', 'Season win/loss splits for every team.'],
 ];
 
 /**
@@ -115,8 +116,12 @@ export default function AdminPage() {
       current.includes(key) ? current.filter((part) => part !== key) : [...current, key],
     );
 
-  const used = quota?.callsUsedLast30Days ?? 0;
-  const limit = quota?.freeTierMonthlyLimit ?? 1000;
+  // From CFBD's own /info, refreshed server-side at most once a day - see
+  // CfbdQuotaService. usedCalls/monthlyLimit are undefined for the first
+  // instant before that first fetch has ever happened.
+  const used = quota?.usedCalls;
+  const limit = quota?.monthlyLimit;
+  const hasQuota = used != null && limit != null;
 
   return (
     <Container className="py-4 py-md-5">
@@ -125,20 +130,33 @@ export default function AdminPage() {
       <Card className="shadow-sm mb-4">
         <Card.Body>
           <div className="d-flex justify-content-between small mb-1">
-            <span>API calls used (trailing 30 days)</span>
-            <span className="fw-semibold">
-              {used} / {limit}
-            </span>
+            <span>API calls used this month</span>
+            <span className="fw-semibold">{hasQuota ? `${used} / ${limit}` : '—'}</span>
           </div>
           <ProgressBar
-            now={(used / limit) * 100}
-            variant={used > limit * 0.8 ? 'danger' : used > limit * 0.5 ? 'warning' : 'success'}
+            now={hasQuota ? (used / limit) * 100 : 0}
+            variant={
+              hasQuota && used > limit * 0.8
+                ? 'danger'
+                : hasQuota && used > limit * 0.5
+                  ? 'warning'
+                  : 'success'
+            }
             style={{ height: 8 }}
           />
           {quota && !quota.configured && (
             <Alert variant="warning" className="mt-3 mb-0 py-2 small">
               No API key configured - set <code>app.cfbd.api-key</code>.
             </Alert>
+          )}
+          {quota?.resetAt && (
+            <div className="small text-body-secondary mt-2">
+              Resets {new Date(quota.resetAt).toLocaleDateString(undefined, {
+                month: 'long',
+                day: 'numeric',
+              })}
+              . Checked at most once a day.
+            </div>
           )}
           {meta && (
             <div className="small text-body-secondary mt-2">
@@ -164,7 +182,7 @@ export default function AdminPage() {
           <Card.Body>
             <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-start gap-3">
               <div>
-                <div className="fw-semibold">Calendar, teams &amp; coaches</div>
+                <div className="fw-semibold">Calendar, teams, coaches &amp; records</div>
                 <div className="small text-body-secondary">
                   Run once per season. One API call per feed selected.
                 </div>

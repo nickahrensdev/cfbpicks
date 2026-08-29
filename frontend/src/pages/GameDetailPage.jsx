@@ -42,11 +42,32 @@ function movement(current, open) {
   return `${delta > 0 ? '+' : ''}${Number(delta.toFixed(1))} since open`;
 }
 
+/** "11-4" from an ATS summary, with the average cover margin underneath. */
+function AtsStat({ label, ats }) {
+  if (!ats) return null;
+  return (
+    <Col xs={6} md={3}>
+      <div className="small text-body-secondary">{label}</div>
+      <div className="fw-semibold">
+        {ats.wins}-{ats.losses}
+        {ats.pushes ? `-${ats.pushes}` : ''}
+      </div>
+      {ats.avgCoverMargin != null && (
+        <div className="small text-body-tertiary">
+          {Number(ats.avgCoverMargin) > 0 ? '+' : ''}
+          {Number(ats.avgCoverMargin).toFixed(1)} avg cover
+        </div>
+      )}
+    </Col>
+  );
+}
+
 export default function GameDetailPage() {
   const { id } = useParams();
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [matchup, setMatchup] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,6 +84,21 @@ export default function GameDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Head-to-head history. Fetched once the two team ids are known - a
+  // non-FBS opponent with no team id just means no section, not an error.
+  // The backend caches this and only re-hits CFBD when it's actually stale,
+  // so this call is safe to make on every page view.
+  const homeTeamId = detail?.game?.homeTeam?.id;
+  const awayTeamId = detail?.game?.awayTeam?.id;
+
+  useEffect(() => {
+    if (!homeTeamId || !awayTeamId) {
+      setMatchup(null);
+      return;
+    }
+    api.matchup(homeTeamId, awayTeamId).then(setMatchup).catch(() => setMatchup(null));
+  }, [homeTeamId, awayTeamId]);
 
   // Refresh the score, clock and box score while the game is on. Silent: a
   // dropped poll leaves the page as it was rather than replacing it with a
@@ -224,6 +260,21 @@ export default function GameDetailPage() {
         </Card.Body>
       </Card>
 
+      {/* Season-long ATS, refreshed on demand - see TeamAtsService. Distinct
+          from ESPN's per-game "Around the game" ATS summary below, which is
+          a different provider's number for this matchup specifically. */}
+      {(detail.homeAts || detail.awayAts) && (
+        <Card className="shadow-sm mb-4">
+          <Card.Body>
+            <h2 className="h6 text-uppercase text-body-secondary mb-3">Season ATS</h2>
+            <Row className="g-3">
+              <AtsStat label={game.awayTeamName} ats={detail.awayAts} />
+              <AtsStat label={game.homeTeamName} ats={detail.homeAts} />
+            </Row>
+          </Card.Body>
+        </Card>
+      )}
+
       {/* Win probability is a postgame figure from the provider - shown
           whenever it is stored, which in practice means once the game has
           been scored. */}
@@ -354,6 +405,57 @@ export default function GameDetailPage() {
                 value={espn.attendance != null ? espn.attendance.toLocaleString() : null}
               />
             </Row>
+          </Card.Body>
+        </Card>
+      )}
+
+      {matchup && matchup.games?.length > 0 && (
+        <Card className="shadow-sm mb-4">
+          <Card.Body>
+            <h2 className="h6 text-uppercase text-body-secondary mb-3">Head-to-head</h2>
+            <div className="mb-3">
+              {matchup.team1Wins === matchup.team2Wins ? (
+                <>
+                  Series tied {matchup.team1Wins}-{matchup.team2Wins}
+                  {matchup.ties ? `-${matchup.ties}` : ''} all-time.
+                </>
+              ) : (
+                <>
+                  <span className="fw-semibold">
+                    {matchup.team1Wins > matchup.team2Wins ? matchup.team1Name : matchup.team2Name}
+                  </span>{' '}
+                  leads {Math.max(matchup.team1Wins, matchup.team2Wins)}-
+                  {Math.min(matchup.team1Wins, matchup.team2Wins)}
+                  {matchup.ties ? `-${matchup.ties}` : ''} all-time.
+                </>
+              )}
+            </div>
+            <div className="table-responsive" style={{ maxHeight: '20rem' }}>
+              <Table hover size="sm" className="align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">Season</th>
+                    <th scope="col">Matchup</th>
+                    <th scope="col">Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...matchup.games].reverse().map((meeting, index) => (
+                    <tr key={`${meeting.season}-${index}`}>
+                      <td>{meeting.season}</td>
+                      <td>
+                        {meeting.awayTeam} at {meeting.homeTeam}
+                      </td>
+                      <td>
+                        {meeting.homeScore != null && meeting.awayScore != null
+                          ? `${meeting.awayTeam} ${meeting.awayScore} · ${meeting.homeTeam} ${meeting.homeScore}`
+                          : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
           </Card.Body>
         </Card>
       )}

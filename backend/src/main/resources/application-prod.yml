@@ -35,4 +35,6 @@ app:
   allowed-origins: ${ALLOWED_ORIGINS}
   cfbd:
     api-key: ${CFB_DATA_API_KEY}
-    enabled: true
+    # Off for now - all ingest is manual via the admin Data page. Flip back
+    # to true when scheduled ingest should resume.
+    enabled: false

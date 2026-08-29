@@ -60,6 +60,12 @@ function totalOutcome(game) {
 // pick the rank shown beside a team's name.
 const POLLS = ['Playoff Committee Rankings', 'AP Top 25', 'Coaches Poll'];
 
+/** "11-4" from a split, or "-" once there is nothing to show yet. */
+function record(split) {
+  if (!split || split.games == null) return '-';
+  return split.ties ? `${split.wins}-${split.losses}-${split.ties}` : `${split.wins}-${split.losses}`;
+}
+
 export default function TeamPage() {
   const { id } = useParams();
   const [team, setTeam] = useState(null);
@@ -150,6 +156,61 @@ export default function TeamPage() {
             {team.coaches.map((coach) => (
               <CoachLink key={coach.id} coach={coach} className="fw-semibold" />
             ))}
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* Season record and ATS. Neither has necessarily been loaded yet -
+          record is an admin-triggered pull, ATS refreshes the first time
+          anyone views a team since its last game concluded - so the whole
+          card is skipped rather than showing a wall of dashes. */}
+      {(team.record || team.ats) && (
+        <Card className="shadow-sm mb-4">
+          <Card.Body>
+            <h2 className="h6 text-uppercase text-body-secondary mb-3">Record</h2>
+            <Row className="g-3">
+              {team.record && (
+                <>
+                  <Col xs={6} md={3}>
+                    <div className="stat-tile h-100">
+                      <div className="small text-body-secondary">Overall</div>
+                      <div className="fs-4 fw-bold">{record(team.record.total)}</div>
+                    </div>
+                  </Col>
+                  <Col xs={6} md={3}>
+                    <div className="stat-tile h-100">
+                      <div className="small text-body-secondary">Conference</div>
+                      <div className="fs-4 fw-bold">{record(team.record.conference)}</div>
+                    </div>
+                  </Col>
+                  <Col xs={6} md={3}>
+                    <div className="stat-tile h-100">
+                      <div className="small text-body-secondary">Home / Away</div>
+                      <div className="fs-4 fw-bold">
+                        {record(team.record.home)} / {record(team.record.away)}
+                      </div>
+                    </div>
+                  </Col>
+                </>
+              )}
+              {team.ats && (
+                <Col xs={6} md={3}>
+                  <div className="stat-tile h-100">
+                    <div className="small text-body-secondary">Against the spread</div>
+                    <div className="fs-4 fw-bold">
+                      {team.ats.wins}-{team.ats.losses}
+                      {team.ats.pushes ? `-${team.ats.pushes}` : ''}
+                    </div>
+                    {team.ats.avgCoverMargin != null && (
+                      <div className="small text-body-tertiary">
+                        {Number(team.ats.avgCoverMargin) > 0 ? '+' : ''}
+                        {Number(team.ats.avgCoverMargin).toFixed(1)} avg cover
+                      </div>
+                    )}
+                  </div>
+                </Col>
+              )}
+            </Row>
           </Card.Body>
         </Card>
       )}

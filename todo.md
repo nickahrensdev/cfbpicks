@@ -104,3 +104,16 @@ need to read as different in kind, not just a different hue.
   FCS *rosters* do work.
 - **Grading unproven on a real game** — the logic is covered by tests, but no real game has
   finished yet. Week 1 kicks off 29 Aug 2026.
+
+
+
+
+
+# Games
+## Dont highlight selected lines in the 4 box grid. they should just be disabled if picked.
+## for a pick that has been made that doenst have an updated line, make the gray a light blue instead
+## I want to apply a similar but reverse scenario of line changing in a users favor. if a line moves
+
+## when a game completes. the pick of a user should be either green or red depending on the outcome
+
+## i want to implement a different color scheme throughout the app. remove the colors that i had before and add a theme selection option in a users profile. Create 5 different color scheme themes that users can choose from. Make sure there is support for light and dark modes

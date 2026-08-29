@@ -62,7 +62,11 @@ public final class ApiDtos {
             /** Week-by-week placements across the season, newest first. */
             List<RankingHistoryWeek> rankingHistory,
             /** Branding and venue detail from ESPN. Null when unavailable. */
-            EspnDtos.EspnTeam espn) {
+            EspnDtos.EspnTeam espn,
+            /** Season win/loss splits. Null until an admin loads /records. */
+            RecordSummary record,
+            /** Against-the-spread record for the season. Null until fetched. */
+            AtsSummary ats) {
     }
 
     public record PollPlacement(String poll, Integer week, Integer rank,
@@ -70,6 +74,53 @@ public final class ApiDtos {
     }
 
     public record RankingHistoryWeek(Integer week, List<PollPlacement> placements) {
+    }
+
+    // ----------------------------------------------------------- records/ats
+
+    public record WinLossSplit(Integer games, Integer wins, Integer losses, Integer ties) {
+    }
+
+    public record RecordSummary(
+            BigDecimal expectedWins,
+            WinLossSplit total,
+            WinLossSplit conference,
+            WinLossSplit home,
+            WinLossSplit away,
+            WinLossSplit neutral,
+            WinLossSplit regularSeason,
+            WinLossSplit postseason) {
+    }
+
+    public record AtsSummary(Integer games, Integer wins, Integer losses, Integer pushes,
+                             BigDecimal avgCoverMargin) {
+    }
+
+    // ------------------------------------------------------------- matchup
+
+    public record MatchupSummary(
+            Integer team1Id,
+            String team1Name,
+            Integer team2Id,
+            String team2Name,
+            Integer team1Wins,
+            Integer team2Wins,
+            Integer ties,
+            List<MatchupGame> games) {
+    }
+
+    public record MatchupGame(
+            Integer season,
+            Integer week,
+            String seasonType,
+            Instant date,
+            boolean neutralSite,
+            String venue,
+            String homeTeam,
+            Integer homeScore,
+            String awayTeam,
+            Integer awayScore,
+            String winner) {
     }
 
     // ------------------------------------------------------------- athletes
@@ -199,7 +250,10 @@ public final class ApiDtos {
             List<MemberPick> memberPicks,
             boolean picksRevealed,
             /** Box score, leaders and venue detail from ESPN. May be null. */
-            EspnGameService.EspnGame espn) {
+            EspnGameService.EspnGame espn,
+            /** Season-long ATS record for each side, refreshed on demand. May be null. */
+            AtsSummary homeAts,
+            AtsSummary awayAts) {
     }
 
     // ----------------------------------------------------------------- picks

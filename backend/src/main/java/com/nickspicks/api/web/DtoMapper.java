@@ -9,6 +9,8 @@ import com.nickspicks.api.pick.Market;
 import com.nickspicks.api.pick.Pick;
 import com.nickspicks.api.pick.PickWindow;
 import com.nickspicks.api.team.Team;
+import com.nickspicks.api.team.TeamAts;
+import com.nickspicks.api.team.TeamRecord;
 import com.nickspicks.api.team.TeamRepository;
 import org.springframework.stereotype.Component;
 
@@ -36,6 +38,36 @@ public class DtoMapper {
 
     public ApiDtos.TeamSummary teamSummary(Team team) {
         return teamSummary(team, null);
+    }
+
+    public ApiDtos.AtsSummary atsSummary(TeamAts ats) {
+        if (ats == null) {
+            return null;
+        }
+        return new ApiDtos.AtsSummary(ats.getGames(), ats.getAtsWins(), ats.getAtsLosses(),
+                ats.getAtsPushes(), ats.getAvgCoverMargin());
+    }
+
+    public ApiDtos.RecordSummary recordSummary(TeamRecord row) {
+        if (row == null) {
+            return null;
+        }
+        return new ApiDtos.RecordSummary(
+                row.getExpectedWins(),
+                new ApiDtos.WinLossSplit(row.getTotalGames(), row.getTotalWins(),
+                        row.getTotalLosses(), row.getTotalTies()),
+                new ApiDtos.WinLossSplit(row.getConferenceGames(), row.getConferenceWins(),
+                        row.getConferenceLosses(), row.getConferenceTies()),
+                new ApiDtos.WinLossSplit(row.getHomeGames(), row.getHomeWins(),
+                        row.getHomeLosses(), row.getHomeTies()),
+                new ApiDtos.WinLossSplit(row.getAwayGames(), row.getAwayWins(),
+                        row.getAwayLosses(), row.getAwayTies()),
+                new ApiDtos.WinLossSplit(row.getNeutralGames(), row.getNeutralWins(),
+                        row.getNeutralLosses(), row.getNeutralTies()),
+                new ApiDtos.WinLossSplit(row.getRegularGames(), row.getRegularWins(),
+                        row.getRegularLosses(), row.getRegularTies()),
+                new ApiDtos.WinLossSplit(row.getPostseasonGames(), row.getPostseasonWins(),
+                        row.getPostseasonLosses(), row.getPostseasonTies()));
     }
 
     /**

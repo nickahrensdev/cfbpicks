@@ -50,12 +50,17 @@ public class TeamController {
     private final DtoMapper mapper;
     private final RankingService rankings;
     private final EspnClient espn;
+    private final TeamRecordRepository teamRecords;
+    private final TeamAtsService teamAtsService;
+    private final TeamMatchupService matchupService;
 
     public TeamController(TeamRepository teams, AthleteRepository athletes, CoachRepository coaches,
                           CoachSeasonRepository coachSeasons,
                           ReferenceIngestService referenceIngest, GameService gameService,
                           CurrentWeekResolver weeks, CurrentUserService currentUser,
-                          DtoMapper mapper, RankingService rankings, EspnClient espn) {
+                          DtoMapper mapper, RankingService rankings, EspnClient espn,
+                          TeamRecordRepository teamRecords, TeamAtsService teamAtsService,
+                          TeamMatchupService matchupService) {
         this.espn = espn;
         this.rankings = rankings;
         this.teams = teams;
@@ -67,6 +72,9 @@ public class TeamController {
         this.weeks = weeks;
         this.currentUser = currentUser;
         this.mapper = mapper;
+        this.teamRecords = teamRecords;
+        this.teamAtsService = teamAtsService;
+        this.matchupService = matchupService;
     }
 
     @GetMapping
@@ -146,6 +154,8 @@ public class TeamController {
                                 .toList()))
                 .toList();
 
+        TeamAts ats = teamAtsService.ensureFresh(id, season);
+
         return new ApiDtos.TeamDetail(team.getId(), team.getSchool(), team.getMascot(),
                 team.getAbbreviation(), team.getConference(), team.getDivision(), team.getColor(),
                 team.getAlternateColor(), team.getLogoUrl(), team.getTwitter(), team.getVenueName(),
@@ -154,7 +164,43 @@ public class TeamController {
                 headlineRank, current, history,
                 // Supplements what CFBD gives us with ESPN branding and venue
                 // detail. Optional by design - null just means a plainer page.
-                espn.team(id).orElse(null));
+                espn.team(id).orElse(null),
+                mapper.recordSummary(teamRecords.findByTeamIdAndSeason(id, season).orElse(null)),
+                mapper.atsSummary(ats));
+    }
+
+    /**
+     * All-time head-to-head history between two programs. Ordinary
+     * authenticated content, not admin-gated - the on-demand caching in
+     * {@link TeamMatchupService} is what bounds the cost, not a permission
+     * check.
+     */
+    @GetMapping("/matchup")
+    public ApiDtos.MatchupSummary matchup(@RequestParam int team1Id, @RequestParam int team2Id) {
+        TeamMatchupService.Matchup matchup = matchupService.ensureFresh(team1Id, team2Id);
+        if (matchup == null) {
+            return new ApiDtos.MatchupSummary(team1Id, schoolName(team1Id), team2Id,
+                    schoolName(team2Id), null, null, null, List.of());
+        }
+
+        // The service canonicalizes by (min id, max id); report wins back out
+        // in the order the caller actually asked for the two teams.
+        boolean requestedAFirst = team1Id <= team2Id;
+        Integer team1Wins = requestedAFirst ? matchup.teamAWins() : matchup.teamBWins();
+        Integer team2Wins = requestedAFirst ? matchup.teamBWins() : matchup.teamAWins();
+
+        List<ApiDtos.MatchupGame> games = matchup.games().stream()
+                .map(g -> new ApiDtos.MatchupGame(g.season(), g.week(), g.seasonType(), g.date(),
+                        Boolean.TRUE.equals(g.neutralSite()), g.venue(), g.homeTeam(), g.homeScore(),
+                        g.awayTeam(), g.awayScore(), g.winner()))
+                .toList();
+
+        return new ApiDtos.MatchupSummary(team1Id, schoolName(team1Id), team2Id, schoolName(team2Id),
+                team1Wins, team2Wins, matchup.ties(), games);
+    }
+
+    private String schoolName(int teamId) {
+        return teams.findById(teamId).map(Team::getSchool).orElse(null);
     }
 
     /** Orders polls the same way the rank beside a name is chosen. */

@@ -17,6 +17,8 @@ import com.nickspicks.api.ranking.PollRankingRepository;
 import com.nickspicks.api.season.SeasonWeek;
 import com.nickspicks.api.season.SeasonWeekRepository;
 import com.nickspicks.api.team.Team;
+import com.nickspicks.api.team.TeamRecord;
+import com.nickspicks.api.team.TeamRecordRepository;
 import com.nickspicks.api.team.TeamRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,14 +59,17 @@ public class ReferenceIngestService {
     private final CoachSeasonRepository coachSeasons;
     private final SeasonWeekRepository seasonWeeks;
     private final PollRankingRepository rankings;
+    private final TeamRecordRepository teamRecords;
     private final AppProperties properties;
 
     public ReferenceIngestService(CfbdClient cfbd, CfbdSyncRepository syncs, TeamRepository teams,
                                   AthleteRepository athletes, CoachRepository coaches,
                                   CoachSeasonRepository coachSeasons,
                                   SeasonWeekRepository seasonWeeks,
-                                  PollRankingRepository rankings, AppProperties properties) {
+                                  PollRankingRepository rankings, TeamRecordRepository teamRecords,
+                                  AppProperties properties) {
         this.rankings = rankings;
+        this.teamRecords = teamRecords;
         this.cfbd = cfbd;
         this.syncs = syncs;
         this.teams = teams;
@@ -349,6 +354,63 @@ public class ReferenceIngestService {
 
     public boolean teamsSynced(int season) {
         return syncs.isSynced(RESOURCE_TEAMS, String.valueOf(season));
+    }
+
+    /**
+     * Season win/loss splits for every team, in one API call. Full upsert
+     * every time this is run, same as teams/coaches - an admin decides when
+     * a fresh pull is worth it, there is no per-team staleness question.
+     */
+    @Transactional
+    public int ingestRecords(int season) {
+        List<CfbdDtos.RecordDto> dtos = cfbd.records(season);
+
+        for (CfbdDtos.RecordDto dto : dtos) {
+            if (dto.teamId() == null) {
+                continue;
+            }
+            TeamRecord row = teamRecords.findByTeamIdAndSeason(dto.teamId(), season)
+                    .orElseGet(TeamRecord::new);
+            row.setTeamId(dto.teamId());
+            row.setSeason(season);
+            row.setClassification(dto.classification());
+            row.setConference(dto.conference());
+            row.setDivision(dto.division());
+            row.setExpectedWins(dto.expectedWins());
+            applySplits(row::setTotalGames, row::setTotalWins, row::setTotalLosses,
+                    row::setTotalTies, dto.total());
+            applySplits(row::setConferenceGames, row::setConferenceWins, row::setConferenceLosses,
+                    row::setConferenceTies, dto.conferenceGames());
+            applySplits(row::setHomeGames, row::setHomeWins, row::setHomeLosses,
+                    row::setHomeTies, dto.homeGames());
+            applySplits(row::setAwayGames, row::setAwayWins, row::setAwayLosses,
+                    row::setAwayTies, dto.awayGames());
+            applySplits(row::setNeutralGames, row::setNeutralWins, row::setNeutralLosses,
+                    row::setNeutralTies, dto.neutralSiteGames());
+            applySplits(row::setRegularGames, row::setRegularWins, row::setRegularLosses,
+                    row::setRegularTies, dto.regularSeason());
+            applySplits(row::setPostseasonGames, row::setPostseasonWins, row::setPostseasonLosses,
+                    row::setPostseasonTies, dto.postseason());
+            row.setUpdatedAt(Instant.now());
+            teamRecords.save(row);
+        }
+
+        log.info("Ingested {} team records for {}", dtos.size(), season);
+        return dtos.size();
+    }
+
+    private void applySplits(java.util.function.Consumer<Integer> games,
+                             java.util.function.Consumer<Integer> wins,
+                             java.util.function.Consumer<Integer> losses,
+                             java.util.function.Consumer<Integer> ties,
+                             CfbdDtos.RecordDto.Splits splits) {
+        if (splits == null) {
+            return;
+        }
+        games.accept(splits.games());
+        wins.accept(splits.wins());
+        losses.accept(splits.losses());
+        ties.accept(splits.ties());
     }
 
     /**

@@ -36,14 +36,25 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
   const hasBall = (team) =>
     live?.possessionTeamId != null && String(live.possessionTeamId) === String(team?.id);
 
-  const marketButton = ({ selection, label, ariaLabel, selected, disabled }) => (
+  /**
+   * @param mine        true once this side already holds a pick - governs the
+   *                    click action (clear) and the aria-label wording,
+   *                    independent of whether the line has since moved
+   * @param lineMatches true when the board's current number still equals
+   *                    what was locked in - the button only reads as
+   *                    "selected" when both are true, so a moved line never
+   *                    shows a number the member did not actually take.
+   *                    Re-locking to a better line goes through the "Take X"
+   *                    button in the alert below, not this one.
+   */
+  const marketButton = ({ selection, label, ariaLabel, mine, lineMatches, disabled }) => (
     <Button
       size="sm"
-      variant={selected ? 'primary' : 'outline-secondary'}
+      variant={mine && lineMatches ? 'primary' : 'outline-secondary'}
       className="flex-shrink-0 fw-semibold pick-button"
       disabled={disabled || locked || busy}
-      onClick={() => (selected ? onClear?.(game, selection) : onPick?.(game, selection))}
-      aria-pressed={selected}
+      onClick={() => (mine ? onClear?.(game, selection) : onPick?.(game, selection))}
+      aria-pressed={mine && lineMatches}
       aria-label={ariaLabel}
     >
       {label}
@@ -53,8 +64,11 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
   /** One team row: name, its spread button, and one side of the total. */
   const sideRow = (side, team, fallbackName, totalSide) => {
     const teamName = team?.school ?? fallbackName;
-    const spreadSelected = spreadPick?.selection === side;
-    const totalSelected = totalPick?.selection === totalSide;
+    const spreadMine = spreadPick?.selection === side;
+    const spreadLineMatches =
+      spreadMine && String(spreadPick.lockedLine) === String(game.homeSpread);
+    const totalMine = totalPick?.selection === totalSide;
+    const totalLineMatches = totalMine && String(totalPick.lockedLine) === String(game.overUnder);
     const liveScore = side === 'HOME' ? live?.homeScore : live?.awayScore;
 
     return (
@@ -79,9 +93,10 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
         {marketButton({
           selection: side,
           label: formatSpread(game.homeSpread, side),
-          selected: spreadSelected,
+          mine: spreadMine,
+          lineMatches: spreadLineMatches,
           disabled: game.homeSpread == null,
-          ariaLabel: spreadSelected
+          ariaLabel: spreadMine
             ? `Remove your spread pick on ${teamName}`
             : `Pick ${teamName} at ${formatSpread(game.homeSpread, side)}`,
         })}
@@ -89,9 +104,10 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
         {marketButton({
           selection: totalSide,
           label: formatTotal(game.overUnder, totalSide),
-          selected: totalSelected,
+          mine: totalMine,
+          lineMatches: totalLineMatches,
           disabled: game.overUnder == null,
-          ariaLabel: totalSelected
+          ariaLabel: totalMine
             ? `Remove your ${totalSide.toLowerCase()} pick on ${matchup}`
             : `Pick ${totalSide.toLowerCase()} ${game.overUnder} total points in ${matchup}`,
         })}
@@ -99,18 +115,29 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
     );
   };
 
-  /** Your number against the board's, once you hold a pick and they differ. */
-  const lineNote = (pick, currentLine, improved, format) => {
-    if (!pick || currentLine == null || finished) return null;
-    if (String(pick.lockedLine) === String(currentLine)) return null;
+  /**
+   * What you're actually holding on this market, always shown once a pick
+   * exists - the buttons above only read as "selected" when the line still
+   * matches, so this is the one place the number taken is never in doubt.
+   * Appends where the board sits now, if that has since moved.
+   */
+  const pickSummary = (pick, currentLine, improved, format) => {
+    if (!pick) return null;
+    const lineMoved =
+      !finished && currentLine != null && String(pick.lockedLine) !== String(currentLine);
 
     return (
       <span className="text-body-secondary">
-        {pick.market === 'TOTAL' ? 'Total' : 'Spread'}: yours{' '}
-        <strong className="text-body">{format(pick.lockedLine, pick.selection)}</strong>, now{' '}
-        <strong className={improved ? 'text-success' : 'text-body'}>
-          {format(currentLine, pick.selection)}
-        </strong>
+        {pick.market === 'TOTAL' ? 'Total' : 'Spread'}: you took{' '}
+        <strong className="text-body">{format(pick.lockedLine, pick.selection)}</strong>
+        {lineMoved && (
+          <>
+            , now{' '}
+            <strong className={improved ? 'text-success' : 'text-body'}>
+              {format(currentLine, pick.selection)}
+            </strong>
+          </>
+        )}
       </span>
     );
   };
@@ -160,8 +187,13 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
     return `${name} ${formatSpread(game.homeSpread, side)}`;
   };
 
-  const spreadNote = lineNote(spreadPick, game.homeSpread, game.spreadLineImproved, formatSpread);
-  const totalNote = lineNote(totalPick, game.overUnder, game.totalLineImproved, formatTotal);
+  const spreadNote = pickSummary(
+    spreadPick,
+    game.homeSpread,
+    game.spreadLineImproved,
+    formatSpread,
+  );
+  const totalNote = pickSummary(totalPick, game.overUnder, game.totalLineImproved, formatTotal);
 
   const improvedPicks = [
     game.spreadLineImproved && spreadPick

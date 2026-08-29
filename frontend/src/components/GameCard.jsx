@@ -330,7 +330,12 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
           <Link to={`/games/${game.id}`} className="small text-decoration-none">
             Game details →
           </Link>
-          {busy && <Spinner animation="border" size="sm" />}
+          <div className="d-flex align-items-center gap-2">
+            {busy && <Spinner animation="border" size="sm" />}
+            <span className="small text-body-tertiary" title="Game ID">
+              #{game.id}
+            </span>
+          </div>
         </div>
       </Card.Body>
     </Card>

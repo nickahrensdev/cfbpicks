@@ -3,8 +3,11 @@ package com.nickspicks.api.web;
 import com.nickspicks.api.security.CurrentUserService;
 import com.nickspicks.api.user.AppUser;
 import com.nickspicks.api.user.AppUserRepository;
+import com.nickspicks.api.user.ColorMode;
+import com.nickspicks.api.user.ColorTheme;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -72,9 +75,24 @@ public class MeController {
         return profile(user);
     }
 
+    /** No uniqueness or format concerns here, so it stays a separate, narrowly-validated endpoint. */
+    public record ThemeRequest(@NotNull ColorTheme theme, @NotNull ColorMode colorMode) {
+    }
+
+    @PutMapping("/theme")
+    @Transactional
+    public ApiDtos.MemberProfile updateTheme(@AuthenticationPrincipal Jwt jwt,
+                                             @Valid @RequestBody ThemeRequest request) {
+        AppUser user = currentUser.resolve(jwt);
+        user.setTheme(request.theme());
+        user.setColorMode(request.colorMode());
+        users.save(user);
+        return profile(user);
+    }
+
     private ApiDtos.MemberProfile profile(AppUser user) {
         return new ApiDtos.MemberProfile(user.getId(), user.getDisplayName(), user.getEmail(),
-                user.getRole().name());
+                user.getRole().name(), user.getTheme().name(), user.getColorMode().name());
     }
 
     /** 409 rather than a validation error - the name is well-formed, just taken. */

@@ -19,6 +19,7 @@ import java.util.UUID;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -65,7 +66,28 @@ class PickApiIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/me").with(member()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(MEMBER.toString()))
-                .andExpect(jsonPath("$.displayName").value("nick"));
+                .andExpect(jsonPath("$.displayName").value("nick"))
+                .andExpect(jsonPath("$.theme").value("MIDNIGHT"))
+                .andExpect(jsonPath("$.colorMode").value("LIGHT"));
+    }
+
+    @Test
+    void persistsAThemeChoiceAndReturnsItOnTheProfile() throws Exception {
+        mockMvc.perform(get("/api/me").with(member())); // provisions the row
+
+        mockMvc.perform(put("/api/me/theme").with(member())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"theme": "OCEAN", "colorMode": "DARK"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.theme").value("OCEAN"))
+                .andExpect(jsonPath("$.colorMode").value("DARK"));
+
+        mockMvc.perform(get("/api/me").with(member()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.theme").value("OCEAN"))
+                .andExpect(jsonPath("$.colorMode").value("DARK"));
     }
 
     @Test

@@ -342,6 +342,7 @@ public final class ApiDtos {
                               Double maxSpread) {
     }
 
-    public record MemberProfile(UUID id, String displayName, String email, String role) {
+    public record MemberProfile(UUID id, String displayName, String email, String role,
+                                String theme, String colorMode) {
     }
 }

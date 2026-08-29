@@ -1,0 +1,277 @@
+/*
+ * Five selectable color schemes, each with light and dark support, chosen
+ * from Profile. Each block below overrides the Bootstrap 5.3 CSS custom
+ * properties this app actually renders through (checked by grepping every
+ * variant=/bg=/text=/utility class used across the frontend) - Bootstrap's
+ * own component CSS reads these at render time via var(), so switching the
+ * data-theme / data-bs-theme attributes on <html> re-colors the whole app
+ * instantly, with no bundle to recompile or swap.
+ *
+ * Status colors (success, danger, warning) are deliberately absent here and
+ * stay whatever theme.scss compiled them to everywhere - the win/loss button
+ * and line-box coloring depends on green always meaning win and red always
+ * meaning loss, and a theme should not get to contradict that. Only brand
+ * tokens (primary, secondary) and surface tokens (background, card,
+ * tertiary panels, borders) vary per theme.
+ *
+ * Midnight is the default palette theme.scss already compiles for light
+ * mode, so it needs no override block of its own - only its dark variant is
+ * defined here, using :root so it also covers a member who has not chosen a
+ * theme yet but has switched to dark mode.
+ */
+
+:root[data-bs-theme="dark"] {
+  --bs-primary: #6fb0b6;
+  --bs-primary-rgb: 111, 176, 182;
+  --bs-primary-bg-subtle: #1c2c2e;
+  --bs-primary-border-subtle: #38585b;
+  --bs-primary-text-emphasis: #a1ccd0;
+  --bs-secondary: #8fb3b8;
+  --bs-secondary-rgb: 143, 179, 184;
+  --bs-secondary-bg-subtle: #283234;
+  --bs-secondary-border-subtle: #4a5d60;
+  --bs-secondary-text-emphasis: #b1cacd;
+  --bs-body-bg: #0b1d26;
+  --bs-body-bg-rgb: 11, 29, 38;
+  --bs-body-color: #ede6d6;
+  --bs-body-color-rgb: 237, 230, 214;
+  --bs-secondary-color: #a9aaa1;
+  --bs-secondary-color-rgb: 169, 170, 161;
+  --bs-tertiary-bg: #223138;
+  --bs-tertiary-bg-rgb: 34, 49, 56;
+  --bs-tertiary-color: #939690;
+  --bs-border-color: #3d494d;
+  --bs-card-bg: #142b36;
+  --bs-dark: #08141b;
+  --bs-dark-rgb: 8, 20, 27;
+  --bs-light: #b4b4aa;
+  --bs-light-rgb: 180, 180, 170;
+}
+
+/* Ocean - cool blues */
+
+[data-theme="ocean"] {
+  --bs-primary: #1d6fa5;
+  --bs-primary-rgb: 29, 111, 165;
+  --bs-primary-bg-subtle: #e4eef4;
+  --bs-primary-border-subtle: #b0cde0;
+  --bs-primary-text-emphasis: #13486b;
+  --bs-secondary: #3a5a78;
+  --bs-secondary-rgb: 58, 90, 120;
+  --bs-secondary-bg-subtle: #e1e6eb;
+  --bs-secondary-border-subtle: #b0bdc9;
+  --bs-secondary-text-emphasis: #263a4e;
+  --bs-body-bg: #f3f8fb;
+  --bs-body-bg-rgb: 243, 248, 251;
+  --bs-body-color: #14263a;
+  --bs-body-color-rgb: 20, 38, 58;
+  --bs-secondary-color: #62707e;
+  --bs-secondary-color-rgb: 98, 112, 126;
+  --bs-tertiary-bg: #e6ebef;
+  --bs-tertiary-bg-rgb: 230, 235, 239;
+  --bs-tertiary-color: #788491;
+  --bs-border-color: #cbd2d8;
+  --bs-card-bg: #ffffff;
+  --bs-dark: #112031;
+  --bs-dark-rgb: 17, 32, 49;
+  --bs-light: #f8fbfd;
+  --bs-light-rgb: 248, 251, 253;
+}
+[data-theme="ocean"][data-bs-theme="dark"] {
+  --bs-primary: #6fb6e8;
+  --bs-primary-rgb: 111, 182, 232;
+  --bs-primary-bg-subtle: #1c2e3a;
+  --bs-primary-border-subtle: #385b74;
+  --bs-primary-text-emphasis: #a1d0f0;
+  --bs-secondary: #93aec6;
+  --bs-secondary-rgb: 147, 174, 198;
+  --bs-secondary-bg-subtle: #293137;
+  --bs-secondary-border-subtle: #4c5a67;
+  --bs-secondary-text-emphasis: #b3c6d7;
+  --bs-body-bg: #0b1a28;
+  --bs-body-bg-rgb: 11, 26, 40;
+  --bs-body-color: #e6eef5;
+  --bs-body-color-rgb: 230, 238, 245;
+  --bs-secondary-color: #a4aeb8;
+  --bs-secondary-color-rgb: 164, 174, 184;
+  --bs-tertiary-bg: #212f3c;
+  --bs-tertiary-bg-rgb: 33, 47, 60;
+  --bs-tertiary-color: #8e99a3;
+  --bs-border-color: #3b4955;
+  --bs-card-bg: #10233a;
+  --bs-dark: #08121c;
+  --bs-dark-rgb: 8, 18, 28;
+  --bs-light: #afb9c2;
+  --bs-light-rgb: 175, 185, 194;
+}
+
+/* Ember - warm rust/amber, kept distinct from the danger red */
+
+[data-theme="ember"] {
+  --bs-primary: #b5651d;
+  --bs-primary-rgb: 181, 101, 29;
+  --bs-primary-bg-subtle: #f6ede4;
+  --bs-primary-border-subtle: #e5c9b0;
+  --bs-primary-text-emphasis: #764213;
+  --bs-secondary: #7a5236;
+  --bs-secondary-rgb: 122, 82, 54;
+  --bs-secondary-bg-subtle: #ebe5e1;
+  --bs-secondary-border-subtle: #cabaaf;
+  --bs-secondary-text-emphasis: #4f3523;
+  --bs-body-bg: #fbf4ec;
+  --bs-body-bg-rgb: 251, 244, 236;
+  --bs-body-color: #3a2416;
+  --bs-body-color-rgb: 58, 36, 22;
+  --bs-secondary-color: #7e6d61;
+  --bs-secondary-color-rgb: 126, 109, 97;
+  --bs-tertiary-bg: #efe8df;
+  --bs-tertiary-bg-rgb: 239, 232, 223;
+  --bs-tertiary-color: #918276;
+  --bs-border-color: #d8cfc5;
+  --bs-card-bg: #fffdf9;
+  --bs-dark: #311f13;
+  --bs-dark-rgb: 49, 31, 19;
+  --bs-light: #fdf8f4;
+  --bs-light-rgb: 253, 248, 244;
+}
+[data-theme="ember"][data-bs-theme="dark"] {
+  --bs-primary: #e2a55c;
+  --bs-primary-rgb: 226, 165, 92;
+  --bs-primary-bg-subtle: #382917;
+  --bs-primary-border-subtle: #71522e;
+  --bs-primary-text-emphasis: #ecc495;
+  --bs-secondary: #c4a086;
+  --bs-secondary-rgb: 196, 160, 134;
+  --bs-secondary-bg-subtle: #372d26;
+  --bs-secondary-border-subtle: #665346;
+  --bs-secondary-text-emphasis: #d6bcaa;
+  --bs-body-bg: #201209;
+  --bs-body-bg-rgb: 32, 18, 9;
+  --bs-body-color: #f2e3d2;
+  --bs-body-color-rgb: 242, 227, 210;
+  --bs-secondary-color: #b3a496;
+  --bs-secondary-color-rgb: 179, 164, 150;
+  --bs-tertiary-bg: #35271d;
+  --bs-tertiary-bg-rgb: 53, 39, 29;
+  --bs-tertiary-color: #9e8f82;
+  --bs-border-color: #4e4035;
+  --bs-card-bg: #2c1b0e;
+  --bs-dark: #160d06;
+  --bs-dark-rgb: 22, 13, 6;
+  --bs-light: #beafa0;
+  --bs-light-rgb: 190, 175, 160;
+}
+
+/* Forest - deep greens, kept distinct from the success green */
+
+[data-theme="forest"] {
+  --bs-primary: #2f6b3a;
+  --bs-primary-rgb: 47, 107, 58;
+  --bs-primary-bg-subtle: #e6ede7;
+  --bs-primary-border-subtle: #b6cbba;
+  --bs-primary-text-emphasis: #1f4626;
+  --bs-secondary: #556b45;
+  --bs-secondary-rgb: 85, 107, 69;
+  --bs-secondary-bg-subtle: #e6e9e3;
+  --bs-secondary-border-subtle: #bbc4b5;
+  --bs-secondary-text-emphasis: #37462d;
+  --bs-body-bg: #f3f7ee;
+  --bs-body-bg-rgb: 243, 247, 238;
+  --bs-body-color: #1c2a1a;
+  --bs-body-color-rgb: 28, 42, 26;
+  --bs-secondary-color: #677264;
+  --bs-secondary-color-rgb: 103, 114, 100;
+  --bs-tertiary-bg: #e6ebe1;
+  --bs-tertiary-bg-rgb: 230, 235, 225;
+  --bs-tertiary-color: #7d8679;
+  --bs-border-color: #ccd2c8;
+  --bs-card-bg: #fffffa;
+  --bs-dark: #182416;
+  --bs-dark-rgb: 24, 36, 22;
+  --bs-light: #f8faf5;
+  --bs-light-rgb: 248, 250, 245;
+}
+[data-theme="forest"][data-bs-theme="dark"] {
+  --bs-primary: #6fb877;
+  --bs-primary-rgb: 111, 184, 119;
+  --bs-primary-bg-subtle: #1c2e1e;
+  --bs-primary-border-subtle: #385c3c;
+  --bs-primary-text-emphasis: #a1d1a7;
+  --bs-secondary: #9fb28c;
+  --bs-secondary-rgb: 159, 178, 140;
+  --bs-secondary-bg-subtle: #2d3227;
+  --bs-secondary-border-subtle: #535d49;
+  --bs-secondary-text-emphasis: #bcc9ae;
+  --bs-body-bg: #0e1a0c;
+  --bs-body-bg-rgb: 14, 26, 12;
+  --bs-body-color: #e4eee0;
+  --bs-body-color-rgb: 228, 238, 224;
+  --bs-secondary-color: #a4aea0;
+  --bs-secondary-color-rgb: 164, 174, 160;
+  --bs-tertiary-bg: #232f21;
+  --bs-tertiary-bg-rgb: 35, 47, 33;
+  --bs-tertiary-color: #8e998b;
+  --bs-border-color: #3d493b;
+  --bs-card-bg: #16260f;
+  --bs-dark: #0a1208;
+  --bs-dark-rgb: 10, 18, 8;
+  --bs-light: #aeb9ab;
+  --bs-light-rgb: 174, 185, 171;
+}
+
+/* Slate - muted greyscale with one restrained blue-grey accent */
+
+[data-theme="slate"] {
+  --bs-primary: #4a5a6a;
+  --bs-primary-rgb: 74, 90, 106;
+  --bs-primary-bg-subtle: #e9ebed;
+  --bs-primary-border-subtle: #c0c5cb;
+  --bs-primary-text-emphasis: #303a45;
+  --bs-secondary: #6b7280;
+  --bs-secondary-rgb: 107, 114, 128;
+  --bs-secondary-bg-subtle: #e9eaec;
+  --bs-secondary-border-subtle: #c4c7cc;
+  --bs-secondary-text-emphasis: #464a53;
+  --bs-body-bg: #f5f5f4;
+  --bs-body-bg-rgb: 245, 245, 244;
+  --bs-body-color: #23262b;
+  --bs-body-color-rgb: 35, 38, 43;
+  --bs-secondary-color: #6c6e71;
+  --bs-secondary-color-rgb: 108, 110, 113;
+  --bs-tertiary-bg: #e8e9e8;
+  --bs-tertiary-bg-rgb: 232, 233, 232;
+  --bs-tertiary-color: #828385;
+  --bs-border-color: #cfd0d0;
+  --bs-card-bg: #ffffff;
+  --bs-dark: #1e2025;
+  --bs-dark-rgb: 30, 32, 37;
+  --bs-light: #f9f9f8;
+  --bs-light-rgb: 249, 249, 248;
+}
+[data-theme="slate"][data-bs-theme="dark"] {
+  --bs-primary: #8fa3b5;
+  --bs-primary-rgb: 143, 163, 181;
+  --bs-primary-bg-subtle: #24292d;
+  --bs-primary-border-subtle: #48525a;
+  --bs-primary-text-emphasis: #b6c3cf;
+  --bs-secondary: #a3aab8;
+  --bs-secondary-rgb: 163, 170, 184;
+  --bs-secondary-bg-subtle: #2e3034;
+  --bs-secondary-border-subtle: #555860;
+  --bs-secondary-text-emphasis: #bfc4cd;
+  --bs-body-bg: #17181a;
+  --bs-body-bg-rgb: 23, 24, 26;
+  --bs-body-color: #e6e6e6;
+  --bs-body-color-rgb: 230, 230, 230;
+  --bs-secondary-color: #a8a8a9;
+  --bs-secondary-color-rgb: 168, 168, 169;
+  --bs-tertiary-bg: #2c2d2e;
+  --bs-tertiary-bg-rgb: 44, 45, 46;
+  --bs-tertiary-color: #939494;
+  --bs-border-color: #454547;
+  --bs-card-bg: #1f2124;
+  --bs-dark: #101112;
+  --bs-dark-rgb: 16, 17, 18;
+  --bs-light: #b2b2b3;
+  --bs-light-rgb: 178, 178, 179;
+}

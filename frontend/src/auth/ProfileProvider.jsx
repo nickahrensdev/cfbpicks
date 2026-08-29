@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 import { useAuth } from './AuthProvider.jsx';
 import { api } from '../api/client.js';
+import { applyTheme } from '../lib/theme.js';
 
 const ProfileContext = createContext(null);
 
@@ -25,6 +26,10 @@ export function ProfileProvider({ children }) {
     try {
       const next = await api.me();
       setProfile(next);
+      // Reconciles with the account's actual preference - the cached value
+      // main.jsx applied on boot might be from a different browser/device,
+      // or this might be the very first sign-in with nothing cached at all.
+      applyTheme(next.theme, next.colorMode);
       return next;
     } catch {
       // A failed profile load should not blank the app; pages surface their

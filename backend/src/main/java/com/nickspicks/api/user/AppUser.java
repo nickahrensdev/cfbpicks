@@ -31,6 +31,14 @@ public class AppUser {
     @Column(nullable = false)
     private Role role = Role.MEMBER;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ColorTheme theme = ColorTheme.MIDNIGHT;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "color_mode", nullable = false)
+    private ColorMode colorMode = ColorMode.LIGHT;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -69,6 +77,22 @@ public class AppUser {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public ColorTheme getTheme() {
+        return theme;
+    }
+
+    public void setTheme(ColorTheme theme) {
+        this.theme = theme;
+    }
+
+    public ColorMode getColorMode() {
+        return colorMode;
+    }
+
+    public void setColorMode(ColorMode colorMode) {
+        this.colorMode = colorMode;
     }
 
     public Instant getCreatedAt() {

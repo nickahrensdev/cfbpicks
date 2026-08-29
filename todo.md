@@ -17,6 +17,13 @@
     band from both ends (e.g. only games between 3 and 10 points).
 - [x] Picks-made bar like My picks, pinned to the top on scroll
   - Sticky beneath the navbar, showing used / max and remaining.
+- [x] Pick buttons no longer solid-highlight a selection
+  - Disabled already says "this is picked" - a solid primary fill on top was redundant. A picked
+    button now stays plain grey except: a light-blue tint while the pick is live and its line
+    still matches what was locked in, and green/red once the game is graded (matching the
+    win/loss coloring already used on the team schedule table). A line that has moved is left
+    plain on the button itself either way — the **My picks** panel already shows the new number as
+    text, and a move against the user has nothing actionable to highlight (left as-is, on purpose).
 
 ## Leaderboard
 - [x] Show all signed-up users, whether or not they have picked
@@ -38,6 +45,10 @@
   - **Admin → Members**: grant/revoke admin, delete a member
   - **Admin → Activity log**: every pick action
 - [x] Restrict Data to the admin role — enforced server-side, not just hidden in the UI
+- [x] Backend redeploy button on **Admin → Data**
+  - Calls Render's deploy hook directly from the server, behind a confirm step. The hook's key
+    lives only as a backend env var (`RENDER_DEPLOY_HOOK_URL`) — never in git, never in the
+    frontend bundle.
 
 ## Logs
 - [x] Running activity of all user changes (picks made, cancelled, line updated)
@@ -65,6 +76,25 @@
     **postgame** figures — null until a game finishes — so they show on the game detail page only
     once it is final.
 - [x] Show the venue on the games tab
+- [x] Team season records from `/records?year=`
+  - Admin-triggered, wired into the existing Calendar/Teams/Coaches checkbox group on
+    **Admin → Data** as a fourth option. One call, every team.
+- [x] Team ATS record from `/teams/ats?year=`
+  - Refreshed on demand rather than on a schedule: viewing a team or game page checks whether a
+    game that team played has gone final since the cached row was fetched, and only then spends a
+    call — which refreshes every team's row at once, not just the one being viewed. Shown on the
+    team page and on the game detail page ("Season ATS").
+- [x] Head-to-head history from `/teams/matchup`
+  - Cached per team pair, refreshed only when the cache is from a prior calendar year or a game
+    *between those two specific teams* has gone final since the last fetch — both checked against
+    our own `game` table, at zero CFBD cost. Shown as a "Head-to-head" card on the game detail page.
+- [x] Real quota numbers from `/info`, replacing the hardcoded 1,000/month assumption
+  - The account is actually Tier 1 at 5,000/month — confirmed live. Refreshed server-side at most
+    once a day, tracked in a database row rather than memory so the throttle survives a Render
+    cold start. Shown on **Admin → Data**.
+- [x] Turn off scheduled/cron ingest — all loads manual for now
+  - `app.cfbd.enabled=false`. Only gates the cron jobs (schedule sync, line sync, score poll); the
+    manual admin buttons and the on-demand ATS/matchup fetches above are unaffected.
 
 ## Over/under picks
 - [x] Second market: over/under on the game total
@@ -95,6 +125,13 @@
 Danger and warning stay outside the palette deliberately — destructive and time-critical states
 need to read as different in kind, not just a different hue.
 
+> Superseded by the theme system below once that ships — this table describes the single fixed
+> palette live today.
+
+## Theming (in progress)
+- [ ] Five selectable color-scheme themes, each with light and dark support, chosen from **Profile**
+  - Replaces the single fixed palette above. Being planned as its own design pass before code.
+
 ---
 
 ## Known limitations (not bugs)
@@ -104,16 +141,3 @@ need to read as different in kind, not just a different hue.
   FCS *rosters* do work.
 - **Grading unproven on a real game** — the logic is covered by tests, but no real game has
   finished yet. Week 1 kicks off 29 Aug 2026.
-
-
-
-
-
-# Games
-## Dont highlight selected lines in the 4 box grid. they should just be disabled if picked.
-## for a pick that has been made that doenst have an updated line, make the gray a light blue instead
-## I want to apply a similar but reverse scenario of line changing in a users favor. if a line moves
-
-## when a game completes. the pick of a user should be either green or red depending on the outcome
-
-## i want to implement a different color scheme throughout the app. remove the colors that i had before and add a theme selection option in a users profile. Create 5 different color scheme themes that users can choose from. Make sure there is support for light and dark modes

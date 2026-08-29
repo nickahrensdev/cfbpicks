@@ -88,8 +88,11 @@ body {
   flex: 1 0 auto;
 }
 
+// Reads var(--bs-dark)/var(--bs-primary) rather than the Sass variables
+// directly - those are baked in at compile time and would not respond when
+// a theme is switched at runtime via the data-theme attribute (see themes.css).
 .hero {
-  background: linear-gradient(140deg, $midnight 0%, $teal 100%);
+  background: linear-gradient(140deg, var(--bs-dark) 0%, var(--bs-primary) 100%);
   color: $white;
 }
 
@@ -111,8 +114,10 @@ body {
 }
 
 // The banner across the top of a team page, tinted with that team's colour.
+// Falls back to the theme's own gradient (same var()s as .hero) when a team
+// has no colour on file.
 .team-banner {
-  background: linear-gradient(140deg, $midnight 0%, $teal 100%);
+  background: linear-gradient(140deg, var(--bs-dark) 0%, var(--bs-primary) 100%);
   color: $white;
 }
 
@@ -124,7 +129,7 @@ body {
   // navbar's height at its default padding and brand size.
   top: 3.5rem;
   z-index: 1019; // just under Bootstrap's sticky navbar (1020)
-  background: rgba($cream, 0.97);
+  background: rgba(var(--bs-body-bg-rgb), 0.97);
   backdrop-filter: blur(6px);
 }
 
@@ -146,11 +151,11 @@ body {
   &__track {
     left: 0;
     right: 0;
-    background: rgba($midnight, 0.15);
+    background: rgba(var(--bs-body-color-rgb, 3, 25, 38), 0.15);
   }
 
   &__fill {
-    background: $primary;
+    background: var(--bs-primary);
   }
 
   &__input {
@@ -174,9 +179,9 @@ body {
       width: 1.15rem;
       height: 1.15rem;
       border-radius: 50%;
-      background: $primary;
+      background: var(--bs-primary);
       border: 2px solid #fff;
-      box-shadow: 0 1px 3px rgba($midnight, 0.4);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
       cursor: pointer;
     }
 
@@ -185,18 +190,18 @@ body {
       width: 1.15rem;
       height: 1.15rem;
       border-radius: 50%;
-      background: $primary;
+      background: var(--bs-primary);
       border: 2px solid #fff;
-      box-shadow: 0 1px 3px rgba($midnight, 0.4);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
       cursor: pointer;
     }
 
     &:focus-visible::-webkit-slider-thumb {
-      box-shadow: 0 0 0 0.2rem rgba($primary, 0.4);
+      box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.4);
     }
 
     &:focus-visible::-moz-range-thumb {
-      box-shadow: 0 0 0 0.2rem rgba($primary, 0.4);
+      box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.4);
     }
 
     // Firefox paints a track on the input itself; hide it so only ours shows.
@@ -313,12 +318,12 @@ body {
 .team-rank {
   font-size: 0.8em;
   font-weight: 700;
-  color: $teal;
+  color: var(--bs-primary);
   vertical-align: baseline;
 }
 
 .stat-tile {
-  background: rgba($sage, 0.16);
+  background: rgba(var(--bs-primary-rgb), 0.14);
   border-radius: $border-radius;
   padding: 0.75rem 1rem;
 }

@@ -53,6 +53,8 @@ export const api = {
   me: () => request('/api/me'),
   updateDisplayName: (displayName) =>
     request('/api/me', { method: 'PUT', body: JSON.stringify({ displayName }) }),
+  updateTheme: (theme, colorMode) =>
+    request('/api/me/theme', { method: 'PUT', body: JSON.stringify({ theme, colorMode }) }),
   meta: () => request('/api/meta'),
 
   currentWeek: () => request('/api/weeks/current'),

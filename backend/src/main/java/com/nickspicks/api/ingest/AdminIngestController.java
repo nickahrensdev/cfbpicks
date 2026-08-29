@@ -135,6 +135,26 @@ public class AdminIngestController {
     }
 
     /**
+     * Every team's against-the-spread record for the season, run in the
+     * background. One API call.
+     *
+     * <p>The provider reports these as cumulative season-to-date totals with
+     * no per-week breakdown, so this refreshes the whole season each time -
+     * press it once a week as games finish. Nothing fetches ATS on demand any
+     * more (see {@code TeamAtsService}); pages show whatever this last stored.
+     */
+    @PostMapping("/ingest/ats")
+    public ResponseEntity<Map<String, Object>> ingestAts(
+            @AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) Integer season) {
+        AppUser admin = currentUser.requireAdmin(jwt);
+        int year = season == null ? weeks.currentSeason() : season;
+
+        DataLoadLog started = dataLoadLogs.start(DataLoadLog.Kind.ATS, year, null, null, admin);
+        asyncIngest.runAts(started.getId(), year);
+        return queued(started);
+    }
+
+    /**
      * Re-fetch one team's roster, ignoring the "already asked" marker, run
      * in the background. One API call. For a team whose first fetch failed,
      * or whose data the provider has since corrected.

@@ -226,7 +226,7 @@ public class GameService {
     }
 
     private ApiDtos.AtsSummary atsSummary(Integer teamId, int season) {
-        return teamId == null ? null : mapper.atsSummary(teamAtsService.ensureFresh(teamId, season));
+        return teamId == null ? null : mapper.atsSummary(teamAtsService.find(teamId, season));
     }
 
     @Transactional(readOnly = true)

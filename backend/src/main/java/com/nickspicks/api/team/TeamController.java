@@ -154,7 +154,7 @@ public class TeamController {
                                 .toList()))
                 .toList();
 
-        TeamAts ats = teamAtsService.ensureFresh(id, season);
+        TeamAts ats = teamAtsService.find(id, season);
 
         return new ApiDtos.TeamDetail(team.getId(), team.getSchool(), team.getMascot(),
                 team.getAbbreviation(), team.getConference(), team.getDivision(), team.getColor(),

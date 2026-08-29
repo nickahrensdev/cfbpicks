@@ -10,6 +10,7 @@ const KIND_LABELS = {
   SCORES: 'Scores & grading',
   RANKINGS: 'Poll rankings',
   ROSTER: 'Team roster',
+  ATS: 'Against the spread',
 };
 
 const STATUS_VARIANTS = {

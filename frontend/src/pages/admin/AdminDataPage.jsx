@@ -62,6 +62,7 @@ export default function AdminPage() {
     games: '',
     scores: '',
     rankings: '',
+    ats: '',
   });
   const [parts, setParts] = useState(['calendar', 'teams', 'coaches']);
 
@@ -81,6 +82,7 @@ export default function AdminPage() {
           games: season,
           scores: season,
           rankings: season,
+          ats: season,
         });
       })
       .catch(() => setMeta(null));
@@ -334,6 +336,34 @@ export default function AdminPage() {
                 }
               >
                 {busy === 'Rankings ingest' ? 'Loading…' : 'Load'}
+              </Button>
+            </div>
+          </Card.Body>
+        </Card>
+
+        <Card className="shadow-sm">
+          <Card.Body className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+            <div>
+              <div className="fw-semibold">Against the spread</div>
+              <div className="small text-body-secondary">
+                Every team&apos;s ATS record in 1 API call. The provider reports these as
+                season-to-date totals with no weekly breakdown, so this refreshes the whole
+                season — run it weekly once that week&apos;s games are final. Team and game
+                pages show whatever this last stored; nothing fetches ATS on its own.
+              </div>
+            </div>
+            <div className="d-flex gap-2 align-items-center flex-shrink-0">
+              <YearInput
+                id="year-ats"
+                value={years.ats}
+                onChange={setYear('ats')}
+                disabled={busy !== null}
+              />
+              <Button
+                disabled={busy !== null}
+                onClick={() => run('ATS ingest', () => api.ingestAts({ season: season('ats') }))}
+              >
+                {busy === 'ATS ingest' ? 'Loading…' : 'Load'}
               </Button>
             </div>
           </Card.Body>

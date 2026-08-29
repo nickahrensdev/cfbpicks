@@ -38,18 +38,10 @@ public interface GameRepository extends JpaRepository<Game, Long> {
     List<Integer> findWeeks(@Param("season") Integer season);
 
     /**
-     * The moment we last knew this team had a game conclude - the signal
-     * {@code TeamAtsService} uses to decide whether a cached ATS row is
-     * stale, without spending any CFBD quota to find out.
+     * The moment we last knew these two teams had a game conclude - the signal
+     * {@code TeamMatchupService} uses to decide whether a cached head-to-head
+     * row is stale, without spending any CFBD quota to find out.
      */
-    @Query("""
-            select max(g.updatedAt) from Game g
-            where g.status = com.nickspicks.api.game.GameStatus.FINAL
-              and (g.homeTeamId = :teamId or g.awayTeamId = :teamId)
-            """)
-    Instant findLastFinalAt(@Param("teamId") Integer teamId);
-
-    /** Same as {@link #findLastFinalAt}, but for games between these two teams specifically. */
     @Query("""
             select max(g.updatedAt) from Game g
             where g.status = com.nickspicks.api.game.GameStatus.FINAL

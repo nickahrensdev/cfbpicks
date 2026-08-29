@@ -1,6 +1,7 @@
 package com.nickspicks.api.ingest;
 
 import com.nickspicks.api.team.Team;
+import com.nickspicks.api.team.TeamAtsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -26,12 +27,14 @@ public class AsyncIngestService {
 
     private final GameIngestService gameIngest;
     private final ReferenceIngestService referenceIngest;
+    private final TeamAtsService teamAts;
     private final DataLoadLogService logs;
 
     public AsyncIngestService(GameIngestService gameIngest, ReferenceIngestService referenceIngest,
-                              DataLoadLogService logs) {
+                              TeamAtsService teamAts, DataLoadLogService logs) {
         this.gameIngest = gameIngest;
         this.referenceIngest = referenceIngest;
+        this.teamAts = teamAts;
         this.logs = logs;
     }
 
@@ -88,6 +91,17 @@ public class AsyncIngestService {
             logs.succeed(logId, "%d ranking rows".formatted(rows));
         } catch (Exception ex) {
             log.warn("Rankings ingest {} failed", logId, ex);
+            logs.fail(logId, ex.getMessage());
+        }
+    }
+
+    @Async
+    public void runAts(Long logId, int season) {
+        try {
+            int rows = teamAts.refreshSeason(season);
+            logs.succeed(logId, "%d team ATS rows".formatted(rows));
+        } catch (Exception ex) {
+            log.warn("ATS ingest {} failed", logId, ex);
             logs.fail(logId, ex.getMessage());
         }
     }

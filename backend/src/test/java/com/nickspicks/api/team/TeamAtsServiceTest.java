@@ -3,27 +3,30 @@ package com.nickspicks.api.team;
 import com.nickspicks.api.cfbd.CfbdClient;
 import com.nickspicks.api.cfbd.CfbdDtos;
 import com.nickspicks.api.cfbd.CfbdUnavailableException;
-import com.nickspicks.api.game.GameRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
+import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * The whole point of {@link TeamAtsService} is spending a CFBD call only when
- * one is actually warranted - these pin down exactly when that is, using a
- * mocked {@link GameRepository} standing in for "has a game of theirs
- * concluded since we last asked".
+ * Reads must never reach the provider. This used to refresh on demand keyed
+ * off whether the asked-for team had a row, which could not terminate:
+ * {@code /teams/ats} only returns teams that have played, so a team it has no
+ * data for stayed row-less however many times the league was re-fetched, and
+ * every game-details view burned two 10-second-timeout calls re-learning it.
+ * {@link TeamAtsService#find} making zero provider calls is the regression
+ * these guard.
  */
 class TeamAtsServiceTest {
 
@@ -31,100 +34,107 @@ class TeamAtsServiceTest {
 
     private CfbdClient cfbd;
     private TeamAtsRepository repo;
-    private GameRepository games;
     private TeamAtsService service;
 
     private void setUp() {
         cfbd = mock(CfbdClient.class);
         repo = mock(TeamAtsRepository.class);
-        games = mock(GameRepository.class);
-        service = new TeamAtsService(cfbd, repo, games);
+        service = new TeamAtsService(cfbd, repo);
     }
 
     @Test
-    void fetchesWhenNothingIsCachedYet() {
+    void findReturnsTheStoredRowWithoutCallingTheProvider() {
+        setUp();
+        TeamAts stored = row(333, 7, 3);
+        when(repo.findByTeamIdAndSeason(333, SEASON)).thenReturn(Optional.of(stored));
+
+        assertThat(service.find(333, SEASON)).isSameAs(stored);
+        verifyNoInteractions(cfbd);
+    }
+
+    /**
+     * The case that caused the bug: a team the provider has no ATS data for
+     * yet. Null is the correct answer and must stay cheap - fetching here is
+     * what looped forever, since the fetch could never produce the row.
+     */
+    @Test
+    void findReturnsNullForATeamWithNoRowWithoutCallingTheProvider() {
         setUp();
         when(repo.findByTeamIdAndSeason(333, SEASON)).thenReturn(Optional.empty());
-        when(games.findLastFinalAt(333)).thenReturn(null);
-        when(cfbd.teamAts(SEASON)).thenReturn(List.of(atsDto(333)));
 
-        service.ensureFresh(333, SEASON);
-
-        verify(cfbd).teamAts(SEASON);
+        assertThat(service.find(333, SEASON)).isNull();
+        verifyNoInteractions(cfbd);
     }
 
     @Test
-    void skipsTheCallWhenCachedRowIsStillCurrent() {
+    void findToleratesATeamWithNoIdAtAll() {
         setUp();
-        TeamAts cached = atsRow(333, Instant.now().minus(1, ChronoUnit.HOURS));
-        when(repo.findByTeamIdAndSeason(333, SEASON)).thenReturn(Optional.of(cached));
-        // Their last final game concluded before the cache was written.
-        when(games.findLastFinalAt(333)).thenReturn(cached.getFetchedAt().minus(1, ChronoUnit.DAYS));
 
-        TeamAts result = service.ensureFresh(333, SEASON);
-
-        verify(cfbd, never()).teamAts(anyInt());
-        assertThat(result).isSameAs(cached);
+        assertThat(service.find(null, SEASON)).isNull();
+        verifyNoInteractions(cfbd);
     }
 
     @Test
-    void refetchesOnceAGameHasConcludedSinceTheCacheWasWritten() {
+    void refreshSeasonUpsertsEveryTeamTheProviderReturns() {
         setUp();
-        TeamAts cached = atsRow(333, Instant.now().minus(1, ChronoUnit.DAYS));
-        when(repo.findByTeamIdAndSeason(333, SEASON))
-                .thenReturn(Optional.of(cached))
-                .thenReturn(Optional.of(atsRow(333, Instant.now())));
-        // Their game concluded AFTER the cached row was fetched.
-        when(games.findLastFinalAt(333)).thenReturn(Instant.now().minus(1, ChronoUnit.HOURS));
-        when(cfbd.teamAts(SEASON)).thenReturn(List.of(atsDto(333), atsDto(334)));
+        // 333 already has a row and must be updated in place rather than
+        // duplicated; 444 is new.
+        TeamAts existing = row(333, 1, 1);
+        when(repo.findAllBySeason(SEASON)).thenReturn(List.of(existing));
+        when(cfbd.teamAts(SEASON)).thenReturn(List.of(ats(333, 7, 3), ats(444, 2, 8)));
 
-        service.ensureFresh(333, SEASON);
+        assertThat(service.refreshSeason(SEASON)).isEqualTo(2);
 
-        verify(cfbd).teamAts(SEASON);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<TeamAts>> saved = ArgumentCaptor.forClass(List.class);
+        verify(repo).saveAll(saved.capture());
+
+        assertThat(saved.getValue()).hasSize(2);
+        assertThat(saved.getValue().get(0)).isSameAs(existing);
+        assertThat(existing.getAtsWins()).isEqualTo(7);
+        assertThat(existing.getAtsLosses()).isEqualTo(3);
+        assertThat(saved.getValue().get(1).getTeamId()).isEqualTo(444);
     }
 
+    /** A row with no team id cannot be keyed, so it is skipped rather than saved. */
     @Test
-    void aRefreshUpsertsEveryTeamNotJustTheOneAsked() {
+    void refreshSeasonSkipsRowsWithNoTeamId() {
         setUp();
-        when(repo.findByTeamIdAndSeason(any(), any())).thenReturn(Optional.empty());
-        when(games.findLastFinalAt(any())).thenReturn(null);
-        when(cfbd.teamAts(SEASON)).thenReturn(List.of(atsDto(333), atsDto(334), atsDto(335)));
+        when(repo.findAllBySeason(SEASON)).thenReturn(List.of());
+        when(cfbd.teamAts(SEASON)).thenReturn(List.of(ats(null, 1, 0), ats(444, 2, 8)));
 
-        service.ensureFresh(333, SEASON);
-
-        verify(repo).save(argThatTeamId(333));
-        verify(repo).save(argThatTeamId(334));
-        verify(repo).save(argThatTeamId(335));
+        assertThat(service.refreshSeason(SEASON)).isEqualTo(1);
     }
 
+    /**
+     * Propagated, not swallowed - the background job that calls this records a
+     * FAILURE row, which would otherwise report a load that stored nothing as
+     * a success.
+     */
     @Test
-    void aProviderFailureFallsBackToWhateverWasCachedRatherThanThrowing() {
+    void refreshSeasonPropagatesAProviderOutage() {
         setUp();
-        TeamAts cached = atsRow(333, Instant.now().minus(30, ChronoUnit.DAYS));
-        when(repo.findByTeamIdAndSeason(333, SEASON)).thenReturn(Optional.of(cached));
-        when(games.findLastFinalAt(333)).thenReturn(Instant.now());
-        when(cfbd.teamAts(SEASON)).thenThrow(new CfbdUnavailableException("down"));
+        when(repo.findAllBySeason(SEASON)).thenReturn(List.of());
+        when(cfbd.teamAts(anyInt())).thenThrow(new CfbdUnavailableException("down"));
 
-        TeamAts result = service.ensureFresh(333, SEASON);
-
-        assertThat(result).isSameAs(cached);
+        assertThatThrownBy(() -> service.refreshSeason(SEASON))
+                .isInstanceOf(CfbdUnavailableException.class);
     }
 
-    private TeamAts argThatTeamId(int teamId) {
-        return org.mockito.ArgumentMatchers.argThat(row -> row != null
-                && teamId == (row.getTeamId() == null ? -1 : row.getTeamId()));
-    }
+    // ------------------------------------------------------------- fixtures
 
-    private TeamAts atsRow(int teamId, Instant fetchedAt) {
+    private TeamAts row(int teamId, int wins, int losses) {
         TeamAts row = new TeamAts();
         row.setTeamId(teamId);
         row.setSeason(SEASON);
-        row.setFetchedAt(fetchedAt);
+        row.setAtsWins(wins);
+        row.setAtsLosses(losses);
+        row.setFetchedAt(Instant.now());
         return row;
     }
 
-    private CfbdDtos.AtsDto atsDto(int teamId) {
-        return new CfbdDtos.AtsDto(SEASON, teamId, "Team " + teamId, "SEC", 5, 3, 2, 0,
-                java.math.BigDecimal.ONE);
+    private CfbdDtos.AtsDto ats(Integer teamId, int wins, int losses) {
+        return new CfbdDtos.AtsDto(SEASON, teamId, "Team " + teamId, "Conf",
+                wins + losses, wins, losses, 0, new BigDecimal("1.5"));
     }
 }

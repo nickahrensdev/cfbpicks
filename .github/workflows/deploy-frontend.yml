@@ -1,0 +1,71 @@
+name: Deploy frontend to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy-frontend.yml"
+  # Lets you trigger a redeploy by hand without pushing a commit - useful
+  # after changing a repo secret, which does not itself trigger the workflow.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deploy at a time, and a queued one is dropped rather than run -
+# only the latest push to main should ever end up live.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run build
+        env:
+          # This repo's project-page URL. Both vite.config.js (asset paths)
+          # and main.jsx (react-router's basename) key off this one variable.
+          VITE_BASE_PATH: /cfbpicks/
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+
+      # GitHub Pages has no server-side rewrites. A direct visit or refresh on
+      # a route react-router owns (e.g. /teams/5) has to fall back to the app
+      # shell, and this - copying index.html to 404.html - is the standard
+      # way to get that: GitHub serves 404.html for any unmatched path, the
+      # bundle loads anyway, and react-router reads the real URL from the
+      # browser and renders it. The response is a literal 404 status
+      # underneath, which is cosmetic - no user-visible effect.
+      - run: cp dist/index.html dist/404.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

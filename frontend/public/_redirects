@@ -1,5 +1,0 @@
-# Cloudflare Pages serves static files by default, so a deep link like
-# /games or /teams/5 - a route react-router owns, not a real file - 404s on
-# refresh without this. Every unmatched path falls through to index.html and
-# react-router takes it from there.
-/*    /index.html   200

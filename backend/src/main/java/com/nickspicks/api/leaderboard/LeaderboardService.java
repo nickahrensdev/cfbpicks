@@ -9,12 +9,18 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Standings for the leaderboard page.
+ * Standings for the leaderboard page, and the only place ranking is decided.
  *
  * <p>Starts from app_user rather than pick, so every member appears - a
- * 0-0 row with zero picks is a valid standing, not an absence. The optional
+ * 0-0-0 row with zero picks is a valid standing, not an absence. The optional
  * week narrows both the record and the pick count to that week; without it
  * the whole season counts.
+ *
+ * <p>Ranked by points, then most wins, then fewest losses. Ties cannot serve
+ * as a tiebreak of their own: points are {@code wins + 0.5 * ties}, so two
+ * members level on points and wins necessarily hold the same number of ties.
+ * Fewest losses is what actually separates them - the member who reached
+ * those points across fewer decided picks.
  */
 @Service
 public class LeaderboardService {
@@ -25,7 +31,8 @@ public class LeaderboardService {
                    coalesce(s.total, 0)  as total_picks,
                    coalesce(s.wins, 0)   as wins,
                    coalesce(s.losses, 0) as losses,
-                   coalesce(s.pushes, 0) as pushes
+                   coalesce(s.pushes, 0) as pushes,
+                   coalesce(s.wins, 0) + 0.5 * coalesce(s.pushes, 0) as points
             from app_user u
             left join (
                 select p.user_id,
@@ -39,7 +46,8 @@ public class LeaderboardService {
                   and (?::int is null or g.week = ?::int)
                 group by p.user_id
             ) s on s.user_id = u.id
-            order by coalesce(s.wins, 0) desc,
+            order by coalesce(s.wins, 0) + 0.5 * coalesce(s.pushes, 0) desc,
+                     coalesce(s.wins, 0) desc,
                      coalesce(s.losses, 0) asc,
                      lower(u.display_name)
             """;
@@ -58,11 +66,13 @@ public class LeaderboardService {
                         rs.getLong("total_picks"),
                         rs.getLong("wins"),
                         rs.getLong("losses"),
-                        rs.getLong("pushes")),
+                        rs.getLong("pushes"),
+                        rs.getDouble("points")),
                 season, week, week);
 
         List<ApiDtos.StandingsRow> ranked = new ArrayList<>(rows.size());
         int rank = 0;
+        double previousPoints = -1;
         long previousWins = -1;
         long previousLosses = -1;
 
@@ -70,23 +80,30 @@ public class LeaderboardService {
             Row row = rows.get(i);
 
             // Standard competition ranking: identical records share a rank,
-            // and the next distinct record skips ahead.
-            if (row.wins != previousWins || row.losses != previousLosses) {
+            // and the next distinct record skips ahead. Compares the whole
+            // sort tuple, not just the record - two members level on points
+            // but split by the wins tiebreak are ranked apart, not together.
+            if (row.points != previousPoints
+                    || row.wins != previousWins
+                    || row.losses != previousLosses) {
                 rank = i + 1;
+                previousPoints = row.points;
                 previousWins = row.wins;
                 previousLosses = row.losses;
             }
 
+            // Ties sit out of the denominator, so this stays "of the picks
+            // that were decided, how many did they win".
             long decided = row.wins + row.losses;
             Double winPct = decided == 0 ? null : (double) row.wins / decided;
 
             ranked.add(new ApiDtos.StandingsRow(rank, row.userId, row.displayName,
-                    row.totalPicks, row.wins, row.losses, row.pushes, winPct));
+                    row.totalPicks, row.wins, row.losses, row.pushes, row.points, winPct));
         }
         return ranked;
     }
 
     private record Row(UUID userId, String displayName, long totalPicks,
-                       long wins, long losses, long pushes) {
+                       long wins, long losses, long pushes, double points) {
     }
 }

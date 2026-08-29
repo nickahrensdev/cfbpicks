@@ -102,7 +102,12 @@ export default function LeaderboardPage() {
                   <th scope="col" style={{ width: '3.5rem' }}>#</th>
                   <th scope="col">Member</th>
                   <th scope="col" className="text-center">Picks</th>
-                  <th scope="col" className="text-center">Record</th>
+                  <th scope="col" className="text-center" title="Wins-losses-ties">
+                    W-L-T
+                  </th>
+                  <th scope="col" className="text-end" title="A win is 1, a tie is 0.5">
+                    Pts
+                  </th>
                   <th scope="col" className="text-end">Win %</th>
                 </tr>
               </thead>
@@ -128,12 +133,15 @@ export default function LeaderboardPage() {
                         )}
                       </td>
                       <td className="text-center text-body-secondary">{row.totalPicks}</td>
+                      {/* Always all three segments, ties included - a column
+                          that changes shape row to row is harder to scan than
+                          one that reads the same way every time. */}
                       <td className="text-center fw-semibold">
-                        {row.wins}-{row.losses}
-                        {row.pushes > 0 && (
-                          <span className="fw-normal text-body-secondary">-{row.pushes}</span>
-                        )}
+                        {row.wins}-{row.losses}-{row.pushes}
                       </td>
+                      {/* One decimal always, so the halves line up in a column
+                          whose whole point is half-points. */}
+                      <td className="text-end fw-semibold">{row.points.toFixed(1)}</td>
                       <td className="text-end text-body-secondary">
                         {row.winPercentage == null
                           ? '-'

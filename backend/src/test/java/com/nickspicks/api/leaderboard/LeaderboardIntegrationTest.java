@@ -13,6 +13,7 @@ import com.nickspicks.api.pick.Selection;
 import com.nickspicks.api.pick.WeeklyEntryRepository;
 import com.nickspicks.api.user.AppUser;
 import com.nickspicks.api.user.AppUserRepository;
+import com.nickspicks.api.web.ApiDtos;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -46,7 +47,7 @@ class LeaderboardIntegrationTest extends IntegrationTest {
     private GradingService grading;
 
     @Autowired
-    private StandingsRepository standings;
+    private LeaderboardService standings;
 
     @Override
     protected void cleanUp() {
@@ -56,55 +57,112 @@ class LeaderboardIntegrationTest extends IntegrationTest {
         users.deleteAll();
     }
 
+    /**
+     * Ranking is points first, then most wins, then fewest losses. The three
+     * members below are built so that each key in turn is the one doing the
+     * work - an ordering that only the full rule produces.
+     */
     @Test
-    void gradesPicksAndRanksMembersByWinsThenFewestLosses() {
-        UUID winner = member("winner");
-        UUID middle = member("middle");
-        UUID loser = member("loser");
+    void ranksByPointsThenWinsThenFewestLosses() {
+        UUID tieBroken = member("a-tiebroken");   // 2W 1L 0T -> 2.0 pts
+        UUID topDog = member("b-topdog");         // 2W 0L 1T -> 2.5 pts
+        UUID grinder = member("c-grinder");       // 1W 0L 2T -> 2.0 pts
 
-        // Home favored by 7.5 in all three.
+        // Every game is home -7.5. Home covers in game one (31-20) and fails
+        // to cover in game two (24-20), so HOME and AWAY split them.
         Game one = game(1L);
         Game two = game(2L);
         Game three = game(3L);
+        Game four = game(4L);
+        Game five = game(5L);
 
-        // Both games are home -7.5:
-        //   game one finishes 31-20, so home covers  -> HOME wins, AWAY loses
-        //   game two finishes 24-20, home wins but does not cover the 7.5
-        //                            -> HOME loses,  AWAY wins
-        //
-        // winner 2-0, middle 1-1, loser 0-2.
-        picks.create(winner, one.getId(), Selection.HOME);
-        picks.create(winner, two.getId(), Selection.AWAY);
-        picks.create(middle, one.getId(), Selection.HOME);
-        picks.create(middle, two.getId(), Selection.HOME);
-        picks.create(loser, one.getId(), Selection.AWAY);
-        picks.create(loser, two.getId(), Selection.HOME);
+        // topdog: wins both, then ties the third.
+        picks.create(topDog, one.getId(), Selection.HOME);
+        picks.create(topDog, two.getId(), Selection.AWAY);
+        picks.create(topDog, three.getId(), Selection.HOME);
 
-        // A push for everyone on game three - must not count either way.
-        picks.create(winner, three.getId(), Selection.HOME);
-        picks.create(middle, three.getId(), Selection.AWAY);
+        // tiebroken: same two wins, but takes the losing side of game four
+        // instead of tying - level on wins with topdog, half a point behind.
+        picks.create(tieBroken, one.getId(), Selection.HOME);
+        picks.create(tieBroken, two.getId(), Selection.AWAY);
+        picks.create(tieBroken, four.getId(), Selection.AWAY);
+
+        // grinder: one win and two ties. Same 2.0 points as tiebroken, but
+        // fewer wins, so the second key puts them below.
+        picks.create(grinder, one.getId(), Selection.HOME);
+        picks.create(grinder, three.getId(), Selection.AWAY);
+        picks.create(grinder, five.getId(), Selection.HOME);
 
         finish(one, 31, 20);    // home covers -7.5
         finish(two, 24, 20);    // home wins but fails to cover
-        finishExact(three, 27, 20, new BigDecimal("-7.0")); // exactly 7 - push
+        finishExact(three, 27, 20, new BigDecimal("-7.0")); // lands on 7 - tie
+        finish(four, 31, 20);   // home covers, so AWAY loses
+        finishExact(five, 27, 20, new BigDecimal("-7.0"));  // lands on 7 - tie
 
-        assertThat(grading.gradeGame(games.findById(1L).orElseThrow())).isEqualTo(3);
-        assertThat(grading.gradeGame(games.findById(2L).orElseThrow())).isEqualTo(3);
-        assertThat(grading.gradeGame(games.findById(3L).orElseThrow())).isEqualTo(2);
+        List.of(1L, 2L, 3L, 4L, 5L).forEach(id ->
+                grading.gradeGame(games.findById(id).orElseThrow()));
 
-        List<StandingsView> table = standings.leaderboard(2026);
-        assertThat(table).extracting(StandingsView::getDisplayName)
-                .containsExactly("winner", "middle", "loser");
+        List<ApiDtos.StandingsRow> table = standings.standings(2026, null);
 
-        StandingsView top = table.get(0);
-        assertThat(top.getWins()).isEqualTo(2);
-        assertThat(top.getLosses()).isZero();
-        assertThat(top.getPushes()).isEqualTo(1);
-        // Pushes are counted but do not affect the ranking.
-        assertThat(top.getGamesGraded()).isEqualTo(3);
+        assertThat(table).extracting(ApiDtos.StandingsRow::displayName)
+                .containsExactly("b-topdog", "a-tiebroken", "c-grinder");
 
-        assertThat(table.get(2).getWins()).isZero();
-        assertThat(table.get(2).getLosses()).isEqualTo(2);
+        // Points carry the halves: a win is 1, a tie is 0.5, a loss is 0.
+        assertThat(table).extracting(ApiDtos.StandingsRow::points)
+                .containsExactly(2.5, 2.0, 2.0);
+
+        ApiDtos.StandingsRow top = table.get(0);
+        assertThat(top.wins()).isEqualTo(2);
+        assertThat(top.losses()).isZero();
+        assertThat(top.pushes()).isEqualTo(1);
+
+        // Level on points, split by wins - so they are ranked apart, not
+        // sharing a rank the way an identical record would.
+        assertThat(table.get(1).points()).isEqualTo(table.get(2).points());
+        assertThat(table.get(1).wins()).isEqualTo(2);
+        assertThat(table.get(2).wins()).isEqualTo(1);
+        assertThat(table.get(1).rank()).isEqualTo(2);
+        assertThat(table.get(2).rank()).isEqualTo(3);
+
+        // Names are deliberately alphabetical against the expected order, so
+        // this could not pass on the display-name fallback alone.
+        assertThat(top.displayName()).isEqualTo("b-topdog");
+    }
+
+    /**
+     * A tie is worth half a point and shows in the record, where a loss is
+     * worth none - the distinction the W-L-T column exists to make.
+     */
+    @Test
+    void aTieIsWorthHalfAPointAndALossNone() {
+        UUID tier = member("tier");
+        UUID loser = member("loser");
+
+        Game tie = game(20L);
+        Game lost = game(21L);
+
+        picks.create(tier, tie.getId(), Selection.HOME);
+        picks.create(loser, lost.getId(), Selection.AWAY);
+
+        finishExact(tie, 27, 20, new BigDecimal("-7.0")); // lands on 7 - tie
+        finish(lost, 31, 20);                            // home covers, AWAY loses
+
+        grading.gradeGame(games.findById(20L).orElseThrow());
+        grading.gradeGame(games.findById(21L).orElseThrow());
+
+        List<ApiDtos.StandingsRow> table = standings.standings(2026, null);
+
+        ApiDtos.StandingsRow tierRow = row(table, "tier");
+        assertThat(tierRow.pushes()).isEqualTo(1);
+        assertThat(tierRow.losses()).isZero();
+        assertThat(tierRow.points()).isEqualTo(0.5);
+
+        ApiDtos.StandingsRow loserRow = row(table, "loser");
+        assertThat(loserRow.losses()).isEqualTo(1);
+        assertThat(loserRow.pushes()).isZero();
+        assertThat(loserRow.points()).isZero();
+
+        assertThat(tierRow.rank()).isLessThan(loserRow.rank());
     }
 
     @Test
@@ -121,9 +179,15 @@ class LeaderboardIntegrationTest extends IntegrationTest {
                 .extracting(Pick::getResult)
                 .containsExactly(PickResult.VOID);
 
-        // A voided pick keeps the member off the standings entirely rather
-        // than showing an 0-0 row.
-        assertThat(standings.leaderboard(2026)).isEmpty();
+        // The member still stands, on an empty record - a canceled game is
+        // not a loss for anyone, and it earns no points either.
+        ApiDtos.StandingsRow unlucky = row(standings.standings(2026, null), "unlucky");
+        assertThat(unlucky.wins()).isZero();
+        assertThat(unlucky.losses()).isZero();
+        assertThat(unlucky.pushes()).isZero();
+        assertThat(unlucky.points()).isZero();
+        // The pick is still theirs, it just decided nothing.
+        assertThat(unlucky.totalPicks()).isEqualTo(1);
     }
 
     /**
@@ -162,6 +226,15 @@ class LeaderboardIntegrationTest extends IntegrationTest {
     }
 
     // ------------------------------------------------------------- fixtures
+
+    /** One member's standing by name, so an assertion does not depend on position. */
+    private ApiDtos.StandingsRow row(List<ApiDtos.StandingsRow> table, String displayName) {
+        return table.stream()
+                .filter(row -> displayName.equals(row.displayName()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(
+                        "No standings row for " + displayName + " in " + table));
+    }
 
     private UUID member(String name) {
         UUID id = UUID.randomUUID();

@@ -342,7 +342,10 @@ public final class ApiDtos {
             long totalPicks,
             long wins,
             long losses,
+            /** Ties. A pick that landed exactly on its number. */
             long pushes,
+            /** A win is 1, a tie is 0.5, a loss is 0. The primary ranking key. */
+            double points,
             Double winPercentage) {
     }
 

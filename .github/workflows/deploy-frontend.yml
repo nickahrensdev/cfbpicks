@@ -46,6 +46,16 @@ jobs:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # Render's redeploy hook, called straight from the admin page.
+          #
+          # NOTE: unlike a backend env var, anything injected here is compiled
+          # into the published bundle and is readable by anyone who views the
+          # site's JavaScript. That is accepted deliberately: this hook can
+          # only trigger a redeploy - it cannot read data or reach any other
+          # secret - so the exposure is an availability risk (someone could
+          # spam restarts), not a breach. Rotate the hook in Render if it is
+          # ever abused.
+          VITE_RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
 
       # GitHub Pages has no server-side rewrites. A direct visit or refresh on
       # a route react-router owns (e.g. /teams/5) has to fall back to the app

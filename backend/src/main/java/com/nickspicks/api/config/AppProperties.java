@@ -34,19 +34,8 @@ public class AppProperties {
     /** CollegeFootballData API settings. */
     private Cfbd cfbd = new Cfbd();
 
-    /** Backend redeploy trigger, routed through a GitHub Actions workflow. */
-    private Deploy deploy = new Deploy();
-
     /** Shared-secret auth for the externally-triggered (Supabase pg_cron) endpoints. */
     private Cron cron = new Cron();
-
-    public Deploy getDeploy() {
-        return deploy;
-    }
-
-    public void setDeploy(Deploy deploy) {
-        this.deploy = deploy;
-    }
 
     public Cron getCron() {
         return cron;
@@ -216,25 +205,6 @@ public class AppProperties {
 
         public void setTeamClassifications(List<String> teamClassifications) {
             this.teamClassifications = teamClassifications;
-        }
-    }
-
-    public static class Deploy {
-
-        /**
-         * Render's deploy hook URL. The key is embedded in the URL itself as a
-         * query parameter - nothing else to configure, but also nothing else
-         * protecting it, so it lives only here (an env var on this server)
-         * and never in git or the frontend bundle.
-         */
-        private String renderHookUrl = "";
-
-        public String getRenderHookUrl() {
-            return renderHookUrl;
-        }
-
-        public void setRenderHookUrl(String renderHookUrl) {
-            this.renderHookUrl = renderHookUrl;
         }
     }
 

@@ -78,7 +78,5 @@ app:
     team-classifications:
       - fbs
       - fcs
-  deploy:
-    render-hook-url: ${RENDER_DEPLOY_HOOK_URL:}
   cron:
     secret: ${CRON_SECRET:}

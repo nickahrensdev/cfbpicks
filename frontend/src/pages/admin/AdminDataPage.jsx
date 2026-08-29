@@ -53,8 +53,12 @@ export default function AdminPage() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null);
-  const [deployConfigured, setDeployConfigured] = useState(null);
   const [confirmingDeploy, setConfirmingDeploy] = useState(false);
+
+  // Baked into the bundle by the deploy workflow from a GitHub secret, so the
+  // button below calls Render directly and the backend is not involved at all.
+  const deployHookUrl = import.meta.env.VITE_RENDER_DEPLOY_HOOK_URL ?? '';
+  const deployConfigured = deployHookUrl !== '';
 
   // One year per load, plus which reference feeds to include.
   const [years, setYears] = useState({
@@ -86,7 +90,6 @@ export default function AdminPage() {
         });
       })
       .catch(() => setMeta(null));
-    api.deployBackendStatus().then((data) => setDeployConfigured(data.configured)).catch(() => {});
   }, []);
 
   // Each load runs in the background on the server and returns immediately -
@@ -106,15 +109,24 @@ export default function AdminPage() {
     }
   };
 
-  // Deploying is a fire-and-forget hit on Render's own hook, not a data load
-  // - it has no log row, so it gets its own message instead of pointing at
-  // Data log.
+  /**
+   * Hits Render's deploy hook straight from the browser.
+   *
+   * <p>`no-cors` because the hook returns no Access-Control-Allow-Origin
+   * header. The request is still delivered and the deploy still runs - this
+   * is a plain POST with no custom headers, so it is a "simple" request the
+   * browser sends without a preflight - but the response is opaque. Without
+   * `no-cors` the fetch would reject on the unreadable response and report a
+   * failure for a deploy that actually started. The trade is that success
+   * cannot be confirmed here, which is why the message below says triggered
+   * rather than succeeded.
+   */
   const runDeploy = async () => {
     setBusy('Deploy');
     setError(null);
     setResult(null);
     try {
-      await api.deployBackend();
+      await fetch(deployHookUrl, { method: 'POST', mode: 'no-cors' });
       setResult({ label: 'Deploy', queued: false });
     } catch (err) {
       setError(err);
@@ -202,7 +214,10 @@ export default function AdminPage() {
               for the result.
             </>
           ) : (
-            <strong>{result.label} triggered.</strong>
+            <>
+              <strong>{result.label} requested.</strong> Render does not report back to the
+              browser - check the Render dashboard to confirm it started.
+            </>
           )}
         </Alert>
       )}
@@ -376,10 +391,13 @@ export default function AdminPage() {
               <div className="small text-body-secondary">
                 Triggers a fresh deploy of the live API on Render. Members lose their connection
                 for a few minutes while it restarts - use it for a real deploy, not by habit.
+                Render gives no readable answer to a browser, so this can confirm the request
+                was sent but not that the deploy succeeded - watch Render for that.
               </div>
-              {deployConfigured === false && (
+              {!deployConfigured && (
                 <div className="small text-warning-emphasis mt-1">
-                  Not configured - set <code>RENDER_DEPLOY_HOOK_URL</code> on the backend.
+                  Not configured - set the <code>RENDER_DEPLOY_HOOK_URL</code> repository secret
+                  in GitHub, then re-run the frontend deploy workflow so it is picked up.
                 </div>
               )}
             </div>
@@ -406,7 +424,7 @@ export default function AdminPage() {
             ) : (
               <Button
                 variant="outline-danger"
-                disabled={busy !== null || deployConfigured === false}
+                disabled={busy !== null || !deployConfigured}
                 onClick={() => setConfirmingDeploy(true)}
                 className="flex-shrink-0"
               >

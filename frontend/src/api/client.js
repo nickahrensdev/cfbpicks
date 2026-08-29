@@ -119,6 +119,4 @@ export const api = {
   // the actual result from.
   dataLoads: () => request('/api/admin/data-loads'),
 
-  deployBackendStatus: () => request('/api/admin/deploy-backend/status'),
-  deployBackend: () => request('/api/admin/deploy-backend', { method: 'POST' }),
 };

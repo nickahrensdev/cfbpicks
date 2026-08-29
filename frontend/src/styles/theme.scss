@@ -43,7 +43,11 @@ $line-height-base: 1.6;
 $border-radius:    0.65rem;
 $border-radius-sm: 0.4rem;
 $border-radius-lg: 1rem;
-$card-border-width: 0;
+// A real border rather than relying on shadow-sm alone - the box-shadow
+// below is a fixed dark rgba tint, which reads fine on a light page but
+// is invisible against a dark theme's own dark background.
+$card-border-width: 1px;
+$card-border-color: var(--bs-border-color);
 // Left at Bootstrap's default (var(--bs-card-bg), themed at runtime in
 // themes.css) rather than a literal color - a literal here would compile
 // straight into `.card { --bs-card-bg: <color>; }`, which sits on the

@@ -336,25 +336,33 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
             touching the other, and update to a better line only where one
             actually moved that way. */}
         {(spreadRow || totalRow) && (
-          <div className="d-grid gap-1 gap-sm-2">
-            {spreadRow && (
-              <div
-                className={`rounded-3 p-1 p-sm-2 ${
-                  game.spreadLineImproved ? 'bg-warning-subtle' : 'bg-body-tertiary'
-                }`}
-              >
-                {spreadRow}
-              </div>
-            )}
-            {totalRow && (
-              <div
-                className={`rounded-3 p-1 p-sm-2 ${
-                  game.totalLineImproved ? 'bg-warning-subtle' : 'bg-body-tertiary'
-                }`}
-              >
-                {totalRow}
-              </div>
-            )}
+          <div className="d-flex align-items-stretch gap-2">
+            <div
+              className="flex-shrink-0 small fw-semibold text-uppercase text-body-tertiary text-center"
+              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+            >
+              Picks
+            </div>
+            <div className="d-grid gap-1 gap-sm-2 flex-grow-1">
+              {spreadRow && (
+                <div
+                  className={`rounded-3 p-1 p-sm-2 ${
+                    game.spreadLineImproved ? 'bg-warning-subtle' : 'bg-body-tertiary'
+                  }`}
+                >
+                  {spreadRow}
+                </div>
+              )}
+              {totalRow && (
+                <div
+                  className={`rounded-3 p-1 p-sm-2 ${
+                    game.totalLineImproved ? 'bg-warning-subtle' : 'bg-body-tertiary'
+                  }`}
+                >
+                  {totalRow}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

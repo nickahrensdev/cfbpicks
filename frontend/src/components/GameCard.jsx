@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Card, Spinner } from 'react-bootstrap';
+import { Badge, Button, Card, Spinner } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
 import { TeamLink } from './links.jsx';
@@ -269,32 +269,45 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
           {sideRow('HOME', game.homeTeam, game.homeTeamName, 'UNDER')}
         </div>
 
+        {/* One box for everything about the picks held on this game: the
+            locked-in lines always, and - only when the board has since moved
+            in the member's favor - the call-out and the button to take it.
+            Yellow flags something actionable; grey means there is nothing to
+            do but the picks are still worth seeing. */}
         {(spreadNote || totalNote) && (
-          <div className="d-grid gap-1 small">
-            {spreadNote}
-            {totalNote}
-          </div>
-        )}
+          <div
+            className={`rounded-3 p-3 d-flex flex-column gap-2 ${
+              improvedPicks.length > 0 ? 'bg-warning-subtle' : 'bg-body-tertiary'
+            }`}
+          >
+            <div className="d-grid gap-1 small">
+              {spreadNote}
+              {totalNote}
+            </div>
 
-        {improvedPicks.length > 0 && (
-          <Alert variant="success" className="py-2 px-3 mb-0 d-flex flex-column gap-2">
-            <span className="small">
-              {improvedPicks.length > 1
-                ? 'Both lines moved your way.'
-                : 'The line moved your way.'}
-            </span>
-            {improvedPicks.map(({ pick, label }) => (
-              <Button
-                key={pick.id}
-                size="sm"
-                variant="success"
-                disabled={busy}
-                onClick={() => onRelock?.(game, pick)}
-              >
-                Take {label}
-              </Button>
-            ))}
-          </Alert>
+            {improvedPicks.length > 0 && (
+              <>
+                <span className="small fw-semibold">
+                  {improvedPicks.length > 1
+                    ? 'Both lines moved in your favor'
+                    : 'The line moved in your favor'}
+                </span>
+                <div className="d-flex flex-column gap-2">
+                  {improvedPicks.map(({ pick, label }) => (
+                    <Button
+                      key={pick.id}
+                      size="sm"
+                      variant="warning"
+                      disabled={busy}
+                      onClick={() => onRelock?.(game, pick)}
+                    >
+                      Take {label}
+                    </Button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         {finished && (

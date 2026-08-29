@@ -18,8 +18,15 @@ RUN ./mvnw -B clean package -DskipTests
 FROM eclipse-temurin:21-jre AS run
 WORKDIR /app
 
+# openssl is only here for docker-entrypoint.sh's TLS probe - remove both
+# once the Supabase connection issue is diagnosed.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Render (and most PaaS) inject PORT at runtime; application.yml already
 # reads server.port from it.
 COPY --from=build /app/target/*.jar app.jar
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["./docker-entrypoint.sh"]

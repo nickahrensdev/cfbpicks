@@ -150,15 +150,32 @@ export default function GamesPage() {
   const applyPick = async (game, action, delta) => {
     setBusyGameId(game.id);
     setNotice(null);
+    // Tracks whether the write itself (as opposed to the refresh fetched
+    // right after it) is what failed - a dropped connection on that
+    // follow-up GET must not be reported as the pick having failed when it
+    // actually went through.
+    let actionSucceeded = false;
     try {
       await action();
+      actionSucceeded = true;
       const refreshed = await api.game(game.id);
       setGames((current) =>
         current.map((row) => (row.id === game.id ? refreshed.game : row)),
       );
       setPicksUsed((current) => current + delta);
     } catch (err) {
-      if (err.code === 'LINE_MOVED') {
+      if (actionSucceeded) {
+        // The pick already committed - only the refresh afterward failed.
+        // Trust the write, apply the count change, and quietly retry the
+        // refresh once rather than alarming the user over an unrelated GET.
+        setPicksUsed((current) => current + delta);
+        const refreshed = await api.game(game.id).catch(() => null);
+        if (refreshed) {
+          setGames((current) =>
+            current.map((row) => (row.id === game.id ? refreshed.game : row)),
+          );
+        }
+      } else if (err.code === 'LINE_MOVED') {
         // The board was stale. Pull the real number in and let them decide
         // rather than committing them to a line they never saw.
         setNotice({

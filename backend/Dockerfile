@@ -7,7 +7,10 @@ WORKDIR /app
 # Dependencies first, so a source-only change doesn't re-download the world.
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
-RUN ./mvnw -B dependency:go-offline
+# Belt and suspenders: mvnw is tracked as executable in git, but chmod it
+# again here in case a checkout ever loses that bit (Windows Git clients
+# don't track it by default).
+RUN chmod +x mvnw && ./mvnw -B dependency:go-offline
 
 COPY src/ src/
 RUN ./mvnw -B clean package -DskipTests

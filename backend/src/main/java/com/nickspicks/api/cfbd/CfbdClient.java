@@ -4,10 +4,12 @@ import com.nickspicks.api.config.AppProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -30,6 +32,14 @@ public class CfbdClient {
     /** Leaves headroom under the real 5,000/month Tier 1 allowance. */
     private static final long MONTHLY_CALL_CEILING = 4500;
 
+    // Unbounded by default (RestClient sets neither a connect nor a read
+    // timeout on its own) - a slow or hanging CFBD response would otherwise
+    // block whatever request triggered it (e.g. a game detail page view via
+    // TeamAtsService.ensureFresh) indefinitely, well past the point a
+    // browser or Render's own proxy gives up and reports it as failed, even
+    // though the write this call was making may still complete afterwards.
+    private static final Duration TIMEOUT = Duration.ofSeconds(10);
+
     private final RestClient restClient;
     private final AppProperties properties;
     private final CfbdCallLogRepository callLog;
@@ -40,8 +50,14 @@ public class CfbdClient {
         this.properties = properties;
         this.callLog = callLog;
         this.recorder = recorder;
+
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout((int) TIMEOUT.toMillis());
+        requestFactory.setReadTimeout((int) TIMEOUT.toMillis());
+
         this.restClient = RestClient.builder()
                 .baseUrl(properties.getCfbd().getBaseUrl())
+                .requestFactory(requestFactory)
                 .defaultHeader("Authorization", "Bearer " + properties.getCfbd().getApiKey())
                 .defaultHeader("Accept", "application/json")
                 .build();

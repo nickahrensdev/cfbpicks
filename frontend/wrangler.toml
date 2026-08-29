@@ -1,6 +1,0 @@
-# Cloudflare Pages config. `pages_build_output_dir` is what lets a plain
-# `npx wrangler deploy` know this is a static-asset Pages project rather than
-# a Worker - without it, Cloudflare's build UI has to be told the output
-# directory by hand.
-name = "cfbpicks-frontend"
-pages_build_output_dir = "dist"

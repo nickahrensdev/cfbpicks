@@ -232,6 +232,32 @@ body {
 .pick-button {
   @extend .pick-col;
   font-variant-numeric: tabular-nums;
+
+  // Disabled already says "this is picked" - color is reserved for two
+  // things: a light-blue tint while the pick is live and its line has not
+  // moved, and green/red once the game is graded. Opacity is forced back to
+  // 1 because a disabled button is otherwise washed out by Bootstrap's
+  // default, which would mute these colors into illegibility.
+  &--mine {
+    background-color: #cfe2ff;
+    border-color: #9ec5fe;
+    color: #052c65;
+    opacity: 1 !important;
+  }
+
+  &--win {
+    background-color: rgba($success, 0.18);
+    border-color: $success;
+    color: shade-color($success, 15%);
+    opacity: 1 !important;
+  }
+
+  &--loss {
+    background-color: rgba($danger, 0.15);
+    border-color: $danger;
+    color: shade-color($danger, 15%);
+    opacity: 1 !important;
+  }
 }
 
 // The dot on a live badge. Pulses so a glance at the board tells you which

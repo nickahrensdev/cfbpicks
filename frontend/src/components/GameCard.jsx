@@ -38,32 +38,52 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
 
   /**
    * @param mine        true once this side already holds a pick - governs
-   *                    the aria-label wording, independent of whether the
-   *                    line has since moved
+   *                    the aria-label wording and the coloring below,
+   *                    independent of whether the line has since moved
    * @param lineMatches true when the board's current number still equals
-   *                    what was locked in - the button only reads as
-   *                    "selected" when both are true, so a moved line never
-   *                    shows a number the member did not actually take
+   *                    what was locked in
    * @param marketTaken true once *either* side of this market holds a pick.
    *                    The button is disabled whenever this is true,
    *                    matching side included - modifying a pick now goes
    *                    through the cancel button in the picks panel rather
    *                    than clicking a button here, so there is one place
    *                    that does it instead of two different ones.
+   * @param result      this pick's graded outcome, once the game is final
+   *
+   * <p>No solid highlight for "this is picked" - being disabled already says
+   * that. The only color a button carries is: a light-blue tint while the
+   * pick is live and its line has not moved, or green/red once the game has
+   * been graded. A side nobody holds, or one whose line has moved, stays the
+   * plain disabled grey.
    */
-  const marketButton = ({ selection, label, ariaLabel, mine, lineMatches, marketTaken, disabled }) => (
-    <Button
-      size="sm"
-      variant={mine && lineMatches ? 'primary' : 'outline-secondary'}
-      className="flex-shrink-0 fw-semibold pick-button"
-      disabled={disabled || marketTaken || locked || busy}
-      onClick={() => onPick?.(game, selection)}
-      aria-pressed={mine && lineMatches}
-      aria-label={ariaLabel}
-    >
-      {label}
-    </Button>
-  );
+  const marketButton = ({ selection, label, ariaLabel, mine, lineMatches, marketTaken, disabled,
+                          result }) => {
+    const stateClass = !mine
+      ? ''
+      : finished
+        ? result === 'WIN'
+          ? 'pick-button--win'
+          : result === 'LOSS'
+            ? 'pick-button--loss'
+            : ''
+        : lineMatches
+          ? 'pick-button--mine'
+          : '';
+
+    return (
+      <Button
+        size="sm"
+        variant="outline-secondary"
+        className={`flex-shrink-0 fw-semibold pick-button ${stateClass}`}
+        disabled={disabled || marketTaken || locked || busy}
+        onClick={() => onPick?.(game, selection)}
+        aria-pressed={mine}
+        aria-label={ariaLabel}
+      >
+        {label}
+      </Button>
+    );
+  };
 
   /** One team row: name, its spread button, and one side of the total. */
   const sideRow = (side, team, fallbackName, totalSide) => {
@@ -101,6 +121,7 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
           lineMatches: spreadLineMatches,
           marketTaken: Boolean(spreadPick),
           disabled: game.homeSpread == null,
+          result: spreadPick?.result,
           ariaLabel: spreadMine
             ? `Your spread pick: ${teamName} ${formatSpread(game.homeSpread, side)}`
             : spreadPick
@@ -115,6 +136,7 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
           lineMatches: totalLineMatches,
           marketTaken: Boolean(totalPick),
           disabled: game.overUnder == null,
+          result: totalPick?.result,
           ariaLabel: totalMine
             ? `Your total pick: ${formatTotal(game.overUnder, totalSide)}`
             : totalPick

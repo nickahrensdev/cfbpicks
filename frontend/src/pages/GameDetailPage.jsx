@@ -504,11 +504,19 @@ export default function GameDetailPage() {
             <div className="table-responsive" style={{ maxHeight: '20rem' }}>
               <Table hover size="sm" className="align-middle mb-0 text-center">
                 <thead>
+                  {/* Logos, matching the ATS table above - see the note there
+                      on why, and on the title/visually-hidden pairing. */}
                   <tr>
                     <th scope="col" className="text-start">Season</th>
-                    <th scope="col">{game.awayTeamName}</th>
+                    <th scope="col" title={game.awayTeamName}>
+                      <TeamLogo team={game.awayTeam} size={28} />
+                      <span className="visually-hidden">{game.awayTeamName}</span>
+                    </th>
                     <th scope="col" />
-                    <th scope="col">{game.homeTeamName}</th>
+                    <th scope="col" title={game.homeTeamName}>
+                      <TeamLogo team={game.homeTeam} size={28} />
+                      <span className="visually-hidden">{game.homeTeamName}</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

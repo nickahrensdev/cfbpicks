@@ -79,6 +79,16 @@ export function formatTotal(overUnder, side) {
   return `${side === 'OVER' ? 'O' : 'U'} ${Number(overUnder)}`;
 }
 
+/**
+ * "Over 44.5" rather than "O 44.5", for the places with room to spell it -
+ * a held pick reads as a sentence, where the pick buttons are a fixed narrow
+ * column and have to stay abbreviated.
+ */
+export function formatTotalLong(overUnder, side) {
+  if (overUnder === null || overUnder === undefined) return 'No line';
+  return `${side === 'OVER' ? 'Over' : 'Under'} ${Number(overUnder)}`;
+}
+
 /** Formats whichever line a pick was made against. */
 export function formatLine(line, selection) {
   return selection === 'OVER' || selection === 'UNDER'

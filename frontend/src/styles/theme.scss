@@ -242,6 +242,24 @@ body {
   min-width: 4.5rem;
 }
 
+// A held pick's row in the card's picks panel. Blue rather than the neutral
+// grey it used to be, matching .pick-button--mine so "this is yours" is the
+// same colour wherever it appears.
+//
+// Pinned to blue instead of using --bs-primary-bg-subtle, which follows the
+// selected theme and would come out orange under Ember or green under
+// Forest. Only the surface is set: the badge and buttons nested inside are
+// theme-aware already, so the dark-mode shade is a deep blue rather than a
+// literal light blue - that keeps body text and those nested controls
+// readable instead of forcing a colour onto each of them.
+.pick-row--mine {
+  background-color: #cfe2ff;
+}
+
+:root[data-bs-theme="dark"] .pick-row--mine {
+  background-color: #14304f;
+}
+
 .pick-button {
   @extend .pick-col;
   font-variant-numeric: tabular-nums;

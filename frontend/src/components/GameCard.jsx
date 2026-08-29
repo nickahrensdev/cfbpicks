@@ -8,6 +8,7 @@ import {
   formatKickoff,
   formatSpread,
   formatTotal,
+  formatTotalLong,
 } from './common.jsx';
 
 /**
@@ -226,18 +227,19 @@ export default function GameCard({
     );
   };
 
-  /**
+   /**
    * The tint on a held pick's row. Carries the pick's state now that the
    * chips beside the clock are gone:
    *
-   * <p>graded - green won, red lost, neutral for a push or a void; live -
-   * the same primary the chips used, so a glance says "this one is riding";
-   * otherwise neutral, or warning while the board has moved somewhere better
-   * and there is an Update button to press.
+   * <p>graded - green won, red lost, neutral for a push or a void; warning
+   * while the board has moved somewhere better and there is an Update button
+   * to press; otherwise the blue that says "this one is yours", the same
+   * blue the pick buttons use.
    *
-   * <p>Subtle variants rather than solid: these sit behind body text and a
-   * badge, and the -subtle/-emphasis pairs are the ones Bootstrap keeps
-   * legible in both light and dark.
+   * <p>The greens and reds are Bootstrap's -subtle variants, which stay
+   * legible in both light and dark. The blue is ours (see .pick-row--mine in
+   * theme.scss) because Bootstrap's equivalent follows the selected theme and
+   * would not be blue under Ember or Forest.
    */
   const pickTint = (pick, improved) => {
     if (finished) {
@@ -245,8 +247,9 @@ export default function GameCard({
       if (pick?.result === 'LOSS') return 'bg-danger-subtle';
       return 'bg-body-tertiary';
     }
-    if (inProgress) return 'bg-primary-subtle';
-    return improved ? 'bg-warning-subtle' : 'bg-body-tertiary';
+    // Warning wins over the blue while a better number is on the board -
+    // that row has an Update button on it and needs to draw the eye.
+    return improved ? 'bg-warning-subtle' : 'pick-row--mine';
   };
 
   const spreadRow = pickRow({
@@ -262,7 +265,8 @@ export default function GameCard({
     pick: totalPick,
     currentLine: game.overUnder,
     improved: game.totalLineImproved,
-    format: formatTotal,
+    // Spelled out here, unlike the buttons above - this row has the room.
+    format: formatTotalLong,
     withTeamName: false,
   });
 

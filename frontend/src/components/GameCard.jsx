@@ -37,23 +37,27 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
     live?.possessionTeamId != null && String(live.possessionTeamId) === String(team?.id);
 
   /**
-   * @param mine        true once this side already holds a pick - governs the
-   *                    click action (clear) and the aria-label wording,
-   *                    independent of whether the line has since moved
+   * @param mine        true once this side already holds a pick - governs
+   *                    the aria-label wording, independent of whether the
+   *                    line has since moved
    * @param lineMatches true when the board's current number still equals
    *                    what was locked in - the button only reads as
    *                    "selected" when both are true, so a moved line never
-   *                    shows a number the member did not actually take.
-   *                    Re-locking to a better line goes through the "Take X"
-   *                    button in the alert below, not this one.
+   *                    shows a number the member did not actually take
+   * @param marketTaken true once *either* side of this market holds a pick.
+   *                    The button is disabled whenever this is true,
+   *                    matching side included - modifying a pick now goes
+   *                    through the cancel button in the picks panel rather
+   *                    than clicking a button here, so there is one place
+   *                    that does it instead of two different ones.
    */
-  const marketButton = ({ selection, label, ariaLabel, mine, lineMatches, disabled }) => (
+  const marketButton = ({ selection, label, ariaLabel, mine, lineMatches, marketTaken, disabled }) => (
     <Button
       size="sm"
       variant={mine && lineMatches ? 'primary' : 'outline-secondary'}
       className="flex-shrink-0 fw-semibold pick-button"
-      disabled={disabled || locked || busy}
-      onClick={() => (mine ? onClear?.(game, selection) : onPick?.(game, selection))}
+      disabled={disabled || marketTaken || locked || busy}
+      onClick={() => onPick?.(game, selection)}
       aria-pressed={mine && lineMatches}
       aria-label={ariaLabel}
     >
@@ -95,10 +99,13 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
           label: formatSpread(game.homeSpread, side),
           mine: spreadMine,
           lineMatches: spreadLineMatches,
+          marketTaken: Boolean(spreadPick),
           disabled: game.homeSpread == null,
           ariaLabel: spreadMine
-            ? `Remove your spread pick on ${teamName}`
-            : `Pick ${teamName} at ${formatSpread(game.homeSpread, side)}`,
+            ? `Your spread pick: ${teamName} ${formatSpread(game.homeSpread, side)}`
+            : spreadPick
+              ? `${teamName} at ${formatSpread(game.homeSpread, side)} - cancel your current spread pick first`
+              : `Pick ${teamName} at ${formatSpread(game.homeSpread, side)}`,
         })}
 
         {marketButton({
@@ -106,21 +113,24 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
           label: formatTotal(game.overUnder, totalSide),
           mine: totalMine,
           lineMatches: totalLineMatches,
+          marketTaken: Boolean(totalPick),
           disabled: game.overUnder == null,
           ariaLabel: totalMine
-            ? `Remove your ${totalSide.toLowerCase()} pick on ${matchup}`
-            : `Pick ${totalSide.toLowerCase()} ${game.overUnder} total points in ${matchup}`,
+            ? `Your total pick: ${formatTotal(game.overUnder, totalSide)}`
+            : totalPick
+              ? `${totalSide.toLowerCase()} ${game.overUnder} - cancel your current total pick first`
+              : `Pick ${totalSide.toLowerCase()} ${game.overUnder} total points in ${matchup}`,
         })}
       </div>
     );
   };
 
   /**
-   * One market's row in the "Your picks" panel: what you took, where the
-   * board sits now if that has moved, and the two things you can do about
-   * it - cancel outright, or (only when the move is in your favor) update
-   * to the better number. Spread and total each get their own row so one
-   * can be changed without touching the other.
+   * One market's row in the "Your picks" panel: what you took, and the two
+   * things you can do about it - cancel outright, or (only when the board
+   * has since moved in your favor) update to the better number. Spread and
+   * total each get their own row so one can be changed without touching the
+   * other.
    */
   const pickRow = ({ marketLabel, pick, currentLine, improved, format, withTeamName }) => {
     if (!pick) return null;
@@ -129,27 +139,17 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
       ? `${pick.selection === 'HOME' ? game.homeTeamName : game.awayTeamName} ${format(pick.lockedLine, pick.selection)}`
       : format(pick.lockedLine, pick.selection);
 
-    const lineMoved =
-      !finished && currentLine != null && String(pick.lockedLine) !== String(currentLine);
-
     return (
       <div className="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-        <div className="min-width-0">
-          <div className="d-flex align-items-center gap-2">
-            <Badge
-              bg="secondary-subtle"
-              text="secondary-emphasis"
-              className="text-uppercase fw-semibold"
-            >
-              {marketLabel}
-            </Badge>
-            <span className="fw-semibold text-truncate">{yourLabel}</span>
-          </div>
-          {lineMoved && (
-            <div className="small text-body-tertiary mt-1">
-              Board now {format(currentLine, pick.selection)}
-            </div>
-          )}
+        <div className="d-flex align-items-center gap-2 min-width-0">
+          <Badge
+            bg="secondary-subtle"
+            text="secondary-emphasis"
+            className="text-uppercase fw-semibold"
+          >
+            {marketLabel}
+          </Badge>
+          <span className="fw-semibold text-truncate">{yourLabel}</span>
         </div>
 
         {finished ? (
@@ -246,15 +246,15 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
 
   return (
     <Card className={`pick-card h-100 shadow-sm${locked && !finished ? ' is-locked' : ''}`}>
-      <Card.Body className="d-flex flex-column gap-3">
+      <Card.Body className="d-flex flex-column gap-2 gap-sm-3 p-2 p-sm-3">
         {/* Game details on the left, state on the right. While the game is
             being played the right-hand column also carries what this member
             is holding, so the clock and the stake read together. */}
         <div className="d-flex justify-content-between align-items-start gap-2">
-          <div className="small text-body-secondary">
+          <div className="small text-body-secondary lh-sm">
             <div>{formatKickoff(game.kickoff, game.startTimeTbd)}</div>
             {game.venue && (
-              <div className="text-body-tertiary text-truncate" title={game.venue}>
+              <div className="text-body-tertiary text-truncate d-none d-sm-block" title={game.venue}>
                 {game.venue}
               </div>
             )}
@@ -314,10 +314,10 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
             touching the other, and update to a better line only where one
             actually moved that way. */}
         {(spreadRow || totalRow) && (
-          <div className="d-grid gap-2">
+          <div className="d-grid gap-1 gap-sm-2">
             {spreadRow && (
               <div
-                className={`rounded-3 p-2 ${
+                className={`rounded-3 p-1 p-sm-2 ${
                   game.spreadLineImproved ? 'bg-warning-subtle' : 'bg-body-tertiary'
                 }`}
               >
@@ -326,7 +326,7 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
             )}
             {totalRow && (
               <div
-                className={`rounded-3 p-2 ${
+                className={`rounded-3 p-1 p-sm-2 ${
                   game.totalLineImproved ? 'bg-warning-subtle' : 'bg-body-tertiary'
                 }`}
               >
@@ -346,7 +346,7 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
           <div className="small text-body-tertiary">No lines posted yet - not pickable.</div>
         )}
 
-        <div className="d-flex justify-content-between align-items-center mt-auto pt-1">
+        <div className="d-flex justify-content-between align-items-center mt-auto">
           <Link to={`/games/${game.id}`} className="small text-decoration-none">
             Game details →
           </Link>

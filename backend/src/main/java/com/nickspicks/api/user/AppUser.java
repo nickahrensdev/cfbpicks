@@ -37,7 +37,7 @@ public class AppUser {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "color_mode", nullable = false)
-    private ColorMode colorMode = ColorMode.LIGHT;
+    private ColorMode colorMode = ColorMode.DARK;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();

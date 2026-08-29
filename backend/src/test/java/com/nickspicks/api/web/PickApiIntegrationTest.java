@@ -68,7 +68,7 @@ class PickApiIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.id").value(MEMBER.toString()))
                 .andExpect(jsonPath("$.displayName").value("nick"))
                 .andExpect(jsonPath("$.theme").value("MIDNIGHT"))
-                .andExpect(jsonPath("$.colorMode").value("LIGHT"));
+                .andExpect(jsonPath("$.colorMode").value("DARK"));
     }
 
     @Test

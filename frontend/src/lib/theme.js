@@ -14,7 +14,7 @@ export const MODES = ['LIGHT', 'DARK'];
  */
 export function applyTheme(theme, mode) {
   const safeTheme = THEMES.includes(theme) ? theme : 'MIDNIGHT';
-  const safeMode = MODES.includes(mode) ? mode : 'LIGHT';
+  const safeMode = MODES.includes(mode) ? mode : 'DARK';
 
   document.documentElement.dataset.theme = safeTheme.toLowerCase();
   document.documentElement.dataset.bsTheme = safeMode.toLowerCase();

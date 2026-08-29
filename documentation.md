@@ -512,7 +512,7 @@ java -jar target\nickspicks-api-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
 | Variable | Example |
 | --- | --- |
 | `SPRING_PROFILES_ACTIVE` | `prod` |
-| `SUPABASE_DB_URL` | `jdbc:postgresql://<host>:6543/postgres?sslmode=require` (transaction pooler) |
+| `SUPABASE_DB_URL` | `jdbc:postgresql://<host>:6543/postgres?sslmode=require&gssEncMode=disable` (transaction pooler) |
 | `SUPABASE_MIGRATION_URL` | same host on **5432** (session pooler) — see below |
 | `SUPABASE_DB_USER` / `SUPABASE_DB_PASSWORD` | *(secret)* |
 | `SUPABASE_URL` | `https://<ref>.supabase.co` — also the JWKS source |
@@ -595,6 +595,7 @@ described in §5.
 | `Found non-empty schema(s) "public" but no schema history table` | Adopting Flyway on an existing DB. `baseline-on-migrate: true` is already set. |
 | `prepared statement "S_1" already exists` | Transaction pooler without `prepareThreshold=0`. |
 | Flyway hangs or lock errors | It is pointed at 6543. Use `SUPABASE_MIGRATION_URL` on 5432. |
+| `SSL error: Remote host terminated the handshake` (works locally, fails on a host like Render) | pgjdbc's GSS encryption negotiation step confuses Supabase's pooler in some container environments. Add `&gssEncMode=disable` to every `jdbc:postgresql://...` URL. |
 | `violates foreign key constraint "game_..._team_id_fkey"` | A pre-V2 database. Run migrations. |
 | Games list is empty | Nothing ingested yet — run the Data page steps in order. |
 | Team page has no roster | Roster fetch failed or quota is exhausted. Check `/api/admin/quota`. |

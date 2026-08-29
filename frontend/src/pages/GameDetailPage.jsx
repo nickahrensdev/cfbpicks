@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Badge, Card, Col, Container, Row, Table } from 'react-bootstrap';
+import { Alert, Card, Col, Container, Row, Table } from 'react-bootstrap';
 import { Link, useParams } from 'react-router-dom';
 
-import { TeamLink, TeamLogo } from '../components/links.jsx';
+import GameCard from '../components/GameCard.jsx';
 import WinProbabilityDonut from '../components/WinProbabilityDonut.jsx';
 import {
   BackButton,
   ErrorNotice,
-  LockCountdown,
   Loading,
   ResultBadge,
-  formatKickoff,
   formatLine,
   formatSpread,
   formatTotal,
@@ -68,6 +66,8 @@ export default function GameDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [matchup, setMatchup] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,6 +84,65 @@ export default function GameDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Which of the caller's picks and which line a selection belongs to -
+  // same logic GamesPage uses for its own cards.
+  const marketOf = (selection) =>
+    selection === 'OVER' || selection === 'UNDER' ? 'TOTAL' : 'SPREAD';
+  const pickFor = (g, selection) =>
+    marketOf(selection) === 'TOTAL' ? g.myTotalPick : g.mySpreadPick;
+  const lineFor = (g, selection) =>
+    marketOf(selection) === 'TOTAL' ? g.overUnder : g.homeSpread;
+
+  /**
+   * Applies a pick from this page's own card. `action` resolves straight to
+   * the mutation's updated GameSummary (see PickController), so only the
+   * `game` slice of `detail` needs replacing - everything else on the page
+   * (lines, ATS, ESPN box score, head-to-head) is untouched.
+   */
+  const applyPick = async (action) => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const updatedGame = await action();
+      setDetail((current) => ({ ...current, game: updatedGame }));
+    } catch (err) {
+      if (err.code === 'LINE_MOVED') {
+        setNotice({
+          variant: 'warning',
+          text: `${err.message}. The card now shows the current line - pick again if you still want it.`,
+        });
+        await load();
+      } else {
+        setNotice({
+          variant: err.code === 'WEEKLY_LIMIT_REACHED' ? 'warning' : 'danger',
+          text: err.message,
+        });
+        if (err.code === 'PICK_WINDOW_CLOSED' || err.code === 'WEEKLY_LIMIT_REACHED') {
+          await load();
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePick = (g, selection) => {
+    const existing = pickFor(g, selection);
+    const line = lineFor(g, selection);
+    return applyPick(() =>
+      (existing
+        ? api.updatePick(existing.id, selection, line)
+        : api.createPick(g.id, selection, line)
+      ).then((response) => response.game),
+    );
+  };
+
+  const handleClear = (g, selection) =>
+    applyPick(() => api.deletePick(pickFor(g, selection).id));
+
+  const handleRelock = (g, pick) =>
+    applyPick(() => api.relockPick(pick.id).then((response) => response.game));
 
   // Head-to-head history. Fetched once the two team ids are known - a
   // non-FBS opponent with no team id just means no section, not an error.
@@ -124,14 +183,8 @@ export default function GameDetailPage() {
   if (!detail) return null;
 
   const { game } = detail;
-  const final = game.status === 'FINAL';
   const live = game.live;
   const espn = detail.espn;
-
-  // The live score supersedes the stored one while a game is on; afterwards
-  // the stored score is the graded one and wins.
-  const homeScore = final ? game.homeScore : live?.homeScore ?? game.homeScore;
-  const awayScore = final ? game.awayScore : live?.awayScore ?? game.awayScore;
 
   // ESPN's in-game model while the game is on, our stored postgame figure
   // once it is over. Both are "home team's chance of winning", 0..1.
@@ -152,68 +205,24 @@ export default function GameDetailPage() {
     <Container className="py-4 py-md-5">
       <BackButton className="mb-3" />
 
-      <Card className="shadow-sm mb-4">
-        <Card.Body>
-          <div className="d-flex justify-content-between align-items-start gap-2 mb-3">
-            <div className="small text-body-secondary">
-              Week {game.week} · {formatKickoff(game.kickoff, game.startTimeTbd)}
-              {game.venue && <> · {game.venue}</>}
-              {espn?.broadcast && <> · {espn.broadcast}</>}
-              {live?.downDistance && (
-                <div className={live.redZone ? 'text-danger fw-semibold' : ''}>
-                  {live.downDistance}
-                </div>
-              )}
-            </div>
-            {live ? (
-              <Badge bg="danger" className="d-inline-flex align-items-center gap-1">
-                <span className="live-dot" aria-hidden="true" />
-                {[live.periodLabel, live.clock].filter(Boolean).join(' · ')
-                  || live.detail
-                  || 'Live'}
-              </Badge>
-            ) : final ? (
-              <Badge bg="dark">Final</Badge>
-            ) : (
-              <LockCountdown locksAt={game.locksAt} locked={game.locked} />
-            )}
-          </div>
+      {notice && (
+        <Alert variant={notice.variant} dismissible onClose={() => setNotice(null)} className="mb-3">
+          {notice.text}
+        </Alert>
+      )}
 
-          <Row className="g-3 align-items-center">
-            {[
-              ['AWAY', game.awayTeam, game.awayTeamName, awayScore, detail.awayConference],
-              ['HOME', game.homeTeam, game.homeTeamName, homeScore, detail.homeConference],
-            ].map(([side, team, name, score, conference]) => (
-              <Col xs={12} md={6} key={side}>
-                <div className="d-flex align-items-center gap-3">
-                  <TeamLogo team={team} size={48} />
-                  <div className="flex-grow-1">
-                    <div className="small text-body-secondary">
-                      {side === 'HOME' ? 'Home' : 'Away'}
-                      {conference && <> · {conference}</>}
-                    </div>
-                    <div className="h5 mb-0 d-flex align-items-center gap-2">
-                      <TeamLink team={team} name={name} logo={false} />
-                      {live?.possessionTeamId != null
-                        && String(live.possessionTeamId) === String(team?.id) && (
-                          <span aria-hidden="true" title="Has possession">
-                            🏈
-                          </span>
-                        )}
-                    </div>
-                    <div className="small text-body-secondary">
-                      {formatSpread(game.homeSpread, side)}
-                    </div>
-                  </div>
-                  {score != null && (final || live) && (
-                    <div className="display-6 fw-bold">{score}</div>
-                  )}
-                </div>
-              </Col>
-            ))}
-          </Row>
-        </Card.Body>
-      </Card>
+      {/* The same card the games board uses, so a pick made or changed here
+          is the identical action, not a second implementation of it. */}
+      <div className="mb-4">
+        <GameCard
+          game={game}
+          busy={busy}
+          onPick={handlePick}
+          onClear={handleClear}
+          onRelock={handleRelock}
+          showDetailsLink={false}
+        />
+      </div>
 
       <Card className="shadow-sm mb-4">
         <Card.Body>
@@ -431,28 +440,41 @@ export default function GameDetailPage() {
               )}
             </div>
             <div className="table-responsive" style={{ maxHeight: '20rem' }}>
-              <Table hover size="sm" className="align-middle mb-0">
+              <Table hover size="sm" className="align-middle mb-0 text-center">
                 <thead>
                   <tr>
-                    <th scope="col">Season</th>
-                    <th scope="col">Matchup</th>
-                    <th scope="col">Result</th>
+                    <th scope="col" className="text-start">Season</th>
+                    <th scope="col">{game.awayTeamName}</th>
+                    <th scope="col" />
+                    <th scope="col">{game.homeTeamName}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...matchup.games].reverse().map((meeting, index) => (
-                    <tr key={`${meeting.season}-${index}`}>
-                      <td>{meeting.season}</td>
-                      <td>
-                        {meeting.awayTeam} at {meeting.homeTeam}
-                      </td>
-                      <td>
-                        {meeting.homeScore != null && meeting.awayScore != null
-                          ? `${meeting.awayTeam} ${meeting.awayScore} · ${meeting.homeTeam} ${meeting.homeScore}`
-                          : '-'}
-                      </td>
-                    </tr>
-                  ))}
+                  {/* Scores stay fixed under this game's away/home columns
+                      regardless of which side actually hosted that year -
+                      the middle symbol carries which one it really was. */}
+                  {[...matchup.games].reverse().map((meeting, index) => {
+                    const sameOrientation = meeting.awayTeam === game.awayTeamName;
+                    const awayColScore = sameOrientation ? meeting.awayScore : meeting.homeScore;
+                    const homeColScore = sameOrientation ? meeting.homeScore : meeting.awayScore;
+                    const awayColWon = meeting.winner != null
+                      && meeting.winner === (sameOrientation ? meeting.awayTeam : meeting.homeTeam);
+                    const homeColWon = meeting.winner != null
+                      && meeting.winner === (sameOrientation ? meeting.homeTeam : meeting.awayTeam);
+
+                    return (
+                      <tr key={`${meeting.season}-${index}`}>
+                        <td className="text-start">{meeting.season}</td>
+                        <td className={awayColWon ? 'fw-bold' : undefined}>
+                          {awayColScore ?? '-'}
+                        </td>
+                        <td className="text-body-tertiary">{sameOrientation ? '@' : 'vs.'}</td>
+                        <td className={homeColWon ? 'fw-bold' : undefined}>
+                          {homeColScore ?? '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </Table>
             </div>

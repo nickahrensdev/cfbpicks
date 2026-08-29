@@ -22,7 +22,16 @@ import {
  * purely for layout. The buttons carry an `O`/`U` prefix and a market-naming
  * aria-label so nothing implies the total belongs to a particular team.
  */
-export default function GameCard({ game, onPick, onClear, onRelock, busy = false }) {
+export default function GameCard({
+  game,
+  onPick,
+  onClear,
+  onRelock,
+  busy = false,
+  // Hidden on the game details page itself, where the link would just
+  // point back to the page already on screen.
+  showDetailsLink = true,
+}) {
   const spreadPick = game.mySpreadPick;
   const totalPick = game.myTotalPick;
   const locked = game.locked;
@@ -377,9 +386,13 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
         )}
 
         <div className="d-flex justify-content-between align-items-center mt-auto">
-          <Link to={`/games/${game.id}`} className="small text-decoration-none">
-            Game details →
-          </Link>
+          {showDetailsLink ? (
+            <Link to={`/games/${game.id}`} className="small text-decoration-none">
+              Game details →
+            </Link>
+          ) : (
+            <span />
+          )}
           <div className="d-flex align-items-center gap-2">
             {busy && <Spinner animation="border" size="sm" />}
             <span className="small text-body-tertiary" title="Game ID">

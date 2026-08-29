@@ -303,7 +303,7 @@ export default function AdminPage() {
               </div>
               {deployConfigured === false && (
                 <div className="small text-warning-emphasis mt-1">
-                  Not configured - set <code>GITHUB_DISPATCH_TOKEN</code> on the backend.
+                  Not configured - set <code>RENDER_DEPLOY_HOOK_URL</code> on the backend.
                 </div>
               )}
             </div>

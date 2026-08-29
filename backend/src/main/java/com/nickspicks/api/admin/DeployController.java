@@ -10,34 +10,30 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/**
- * Redeploys the backend, by way of a GitHub Actions workflow rather than
- * calling Render directly. Keeps the Render deploy hook's key out of every
- * layer this server touches - see {@link GithubActionsClient}.
- */
+/** Redeploys the backend by hitting Render's own deploy hook. */
 @RestController
 @RequestMapping("/api/admin")
 public class DeployController {
 
     private final CurrentUserService currentUser;
-    private final GithubActionsClient github;
+    private final RenderDeployClient render;
 
-    public DeployController(CurrentUserService currentUser, GithubActionsClient github) {
+    public DeployController(CurrentUserService currentUser, RenderDeployClient render) {
         this.currentUser = currentUser;
-        this.github = github;
+        this.render = render;
     }
 
     @PostMapping("/deploy-backend")
     public Map<String, Object> deployBackend(@AuthenticationPrincipal Jwt jwt) {
         currentUser.requireAdmin(jwt);
-        github.dispatchDeploy();
+        render.triggerDeploy();
         return Map.of("triggered", true);
     }
 
-    /** Whether a dispatch token is configured, so the UI can explain a missing one. */
+    /** Whether the deploy hook is configured, so the UI can explain a missing one. */
     @GetMapping("/deploy-backend/status")
     public Map<String, Object> status(@AuthenticationPrincipal Jwt jwt) {
         currentUser.requireAdmin(jwt);
-        return Map.of("configured", github.isConfigured());
+        return Map.of("configured", render.isConfigured());
     }
 }

@@ -76,9 +76,4 @@ app:
       - fbs
       - fcs
   deploy:
-    # Scoped only to triggering the deploy-backend.yml workflow - never the
-    # Render deploy hook's own key, which lives solely as a GitHub Actions
-    # secret and never reaches this server.
-    github-token: ${GITHUB_DISPATCH_TOKEN:}
-    github-repo: ${GITHUB_REPO:nickahrensdev/cfbpicks}
-    workflow-file: ${GITHUB_DEPLOY_WORKFLOW:deploy-backend.yml}
+    render-hook-url: ${RENDER_DEPLOY_HOOK_URL:}

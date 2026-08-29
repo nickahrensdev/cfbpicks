@@ -211,40 +211,19 @@ public class AppProperties {
     public static class Deploy {
 
         /**
-         * A token scoped only to dispatching Actions workflows on this repo -
-         * never the Render deploy hook's own key. That key lives solely as a
-         * GitHub Actions secret, decrypted only for the seconds the workflow
-         * runs; this server never sees it.
+         * Render's deploy hook URL. The key is embedded in the URL itself as a
+         * query parameter - nothing else to configure, but also nothing else
+         * protecting it, so it lives only here (an env var on this server)
+         * and never in git or the frontend bundle.
          */
-        private String githubToken = "";
+        private String renderHookUrl = "";
 
-        private String githubRepo = "nickahrensdev/cfbpicks";
-
-        /** The workflow file that actually calls Render's deploy hook. */
-        private String workflowFile = "deploy-backend.yml";
-
-        public String getGithubToken() {
-            return githubToken;
+        public String getRenderHookUrl() {
+            return renderHookUrl;
         }
 
-        public void setGithubToken(String githubToken) {
-            this.githubToken = githubToken;
-        }
-
-        public String getGithubRepo() {
-            return githubRepo;
-        }
-
-        public void setGithubRepo(String githubRepo) {
-            this.githubRepo = githubRepo;
-        }
-
-        public String getWorkflowFile() {
-            return workflowFile;
-        }
-
-        public void setWorkflowFile(String workflowFile) {
-            this.workflowFile = workflowFile;
+        public void setRenderHookUrl(String renderHookUrl) {
+            this.renderHookUrl = renderHookUrl;
         }
     }
 }

@@ -1,5 +1,5 @@
 import { Badge, Button, Card, Spinner } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { TeamLink } from './links.jsx';
 import {
@@ -32,6 +32,8 @@ export default function GameCard({
   // point back to the page already on screen.
   showDetailsLink = true,
 }) {
+  const navigate = useNavigate();
+
   const spreadPick = game.mySpreadPick;
   const totalPick = game.myTotalPick;
   const locked = game.locked;
@@ -270,8 +272,30 @@ export default function GameCard({
     withTeamName: false,
   });
 
+  /**
+   * The whole card goes to game details, except the controls that do their
+   * own thing - team links, pick buttons, cancel/update, the details link.
+   * One capture-phase check on the click's actual target beats wiring
+   * stopPropagation onto every control and forgetting the next one added:
+   * anything interactive (a link or a button, wherever it sits in the card)
+   * simply keeps its own behaviour, and dead space navigates. Skipped on the
+   * details page itself, where navigating to the page on screen would just
+   * scroll-jump.
+   */
+  const handleCardClick = (event) => {
+    if (!showDetailsLink) return;
+    if (event.target.closest('a, button')) return;
+    // Respect text selection - a drag to copy a team name is not a click.
+    if (window.getSelection?.()?.toString()) return;
+    navigate(`/games/${game.id}`);
+  };
+
   return (
-    <Card className={`pick-card h-100 shadow-sm${locked && !finished ? ' is-locked' : ''}`}>
+    <Card
+      className={`pick-card h-100 shadow-sm${locked && !finished ? ' is-locked' : ''}`}
+      onClick={handleCardClick}
+      style={showDetailsLink ? { cursor: 'pointer' } : undefined}
+    >
       <Card.Body className="d-flex flex-column gap-2 gap-sm-3 p-2 p-sm-3">
         {/* Game details on the left, state on the right. While the game is
             being played the right-hand column also carries what this member
@@ -373,19 +397,17 @@ export default function GameCard({
         )}
 
         <div className="d-flex justify-content-between align-items-center mt-auto">
-          {showDetailsLink ? (
-            <Link to={`/games/${game.id}`} className="small text-decoration-none">
-              Game details →
-            </Link>
-          ) : (
-            <span />
-          )}
           <div className="d-flex align-items-center gap-2">
-            {busy && <Spinner animation="border" size="sm" />}
             <span className="small text-body-tertiary" title="Game ID">
               #{game.id}
             </span>
+            {busy && <Spinner animation="border" size="sm" />}
           </div>
+          {showDetailsLink && (
+            <Link to={`/games/${game.id}`} className="small text-decoration-none">
+              Game details →
+            </Link>
+          )}
         </div>
       </Card.Body>
     </Card>

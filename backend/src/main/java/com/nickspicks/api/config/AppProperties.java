@@ -37,12 +37,23 @@ public class AppProperties {
     /** Backend redeploy trigger, routed through a GitHub Actions workflow. */
     private Deploy deploy = new Deploy();
 
+    /** Shared-secret auth for the externally-triggered (Supabase pg_cron) endpoints. */
+    private Cron cron = new Cron();
+
     public Deploy getDeploy() {
         return deploy;
     }
 
     public void setDeploy(Deploy deploy) {
         this.deploy = deploy;
+    }
+
+    public Cron getCron() {
+        return cron;
+    }
+
+    public void setCron(Cron cron) {
+        this.cron = cron;
     }
 
     public String getEnvironment() {
@@ -224,6 +235,25 @@ public class AppProperties {
 
         public void setRenderHookUrl(String renderHookUrl) {
             this.renderHookUrl = renderHookUrl;
+        }
+    }
+
+    public static class Cron {
+
+        /**
+         * Compared against the caller's X-Cron-Secret header. Blank means
+         * "reject everything" - an unset secret must never accidentally
+         * match an empty header, which is why the check in CronController
+         * rejects a blank configured value before ever comparing.
+         */
+        private String secret = "";
+
+        public String getSecret() {
+            return secret;
+        }
+
+        public void setSecret(String secret) {
+            this.secret = secret;
         }
     }
 }

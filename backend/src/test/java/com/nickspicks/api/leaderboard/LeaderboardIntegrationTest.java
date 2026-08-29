@@ -126,6 +126,41 @@ class LeaderboardIntegrationTest extends IntegrationTest {
         assertThat(standings.leaderboard(2026)).isEmpty();
     }
 
+    /**
+     * gradeGame is idempotent-on-PENDING by design: once a source (ESPN,
+     * CFBD) has settled a pick, a later gradeGame call can never touch it
+     * again, correct or not. regradeGame is the deliberate way around
+     * that - the same math, but applied unconditionally.
+     */
+    @Test
+    void regradeGameOverwritesAnAlreadySettledPickWhenTheScoreIsCorrected() {
+        UUID member = member("bettor");
+        Game game = game(20L);
+        picks.create(member, game.getId(), Selection.HOME);
+
+        finish(game, 31, 20); // covers -7.5 -> WIN
+        grading.gradeGame(game);
+        assertThat(pickRepository.findAllByGameId(20L))
+                .extracting(Pick::getResult)
+                .containsExactly(PickResult.WIN);
+
+        // A later correction to the score - gradeGame would no-op here since
+        // the pick is no longer PENDING.
+        Game corrected = games.findById(20L).orElseThrow();
+        corrected.setHomeScore(24); // no longer covers -7.5 -> LOSS
+        games.save(corrected);
+
+        assertThat(grading.gradeGame(corrected)).isZero();
+        assertThat(pickRepository.findAllByGameId(20L))
+                .extracting(Pick::getResult)
+                .containsExactly(PickResult.WIN); // unchanged - proves the no-op
+
+        assertThat(grading.regradeGame(corrected)).isEqualTo(1);
+        assertThat(pickRepository.findAllByGameId(20L))
+                .extracting(Pick::getResult)
+                .containsExactly(PickResult.LOSS); // regradeGame actually fixed it
+    }
+
     // ------------------------------------------------------------- fixtures
 
     private UUID member(String name) {

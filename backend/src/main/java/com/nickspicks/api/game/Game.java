@@ -114,6 +114,17 @@ public class Game {
     @Column(nullable = false)
     private GameStatus status = GameStatus.SCHEDULED;
 
+    /**
+     * Written only by the ESPN minute-by-minute poller ({@code
+     * EspnScoreIngestService}), for display while a game is in progress -
+     * null once the game is final (a finished game has no clock to show).
+     */
+    @Column(name = "espn_period")
+    private Integer espnPeriod;
+
+    @Column(name = "espn_clock")
+    private String espnClock;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
@@ -363,6 +374,22 @@ public class Game {
 
     public void setStatus(GameStatus status) {
         this.status = status;
+    }
+
+    public Integer getEspnPeriod() {
+        return espnPeriod;
+    }
+
+    public void setEspnPeriod(Integer espnPeriod) {
+        this.espnPeriod = espnPeriod;
+    }
+
+    public String getEspnClock() {
+        return espnClock;
+    }
+
+    public void setEspnClock(String espnClock) {
+        this.espnClock = espnClock;
     }
 
     public Instant getUpdatedAt() {

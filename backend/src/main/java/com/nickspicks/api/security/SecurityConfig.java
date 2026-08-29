@@ -44,6 +44,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/meta", "/actuator/health", "/actuator/info").permitAll()
+                        // Called by Supabase pg_cron, which carries no Supabase user session -
+                        // CronController authenticates the caller itself via a shared-secret
+                        // header instead of a JWT.
+                        .requestMatchers("/api/cron/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
                 .build();

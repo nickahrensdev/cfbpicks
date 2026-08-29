@@ -3,6 +3,9 @@ package com.nickspicks.api.ingest;
 import com.nickspicks.api.cfbd.CfbdClient;
 import com.nickspicks.api.cfbd.CfbdQuotaService;
 import com.nickspicks.api.cfbd.CfbdQuotaSnapshot;
+import com.nickspicks.api.game.Game;
+import com.nickspicks.api.game.GameRepository;
+import com.nickspicks.api.game.GameStatus;
 import com.nickspicks.api.season.CurrentWeekResolver;
 import com.nickspicks.api.security.CurrentUserService;
 import com.nickspicks.api.team.Team;
@@ -12,6 +15,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,13 +41,18 @@ public class AdminIngestController {
     private final CfbdQuotaService quotaService;
     private final CurrentUserService currentUser;
     private final TeamRepository teams;
+    private final GameRepository games;
+    private final GradingService grading;
 
     public AdminIngestController(GameIngestService gameIngest,
                                  ReferenceIngestService referenceIngest,
                                  CurrentWeekResolver weeks, CfbdClient cfbd,
                                  CfbdQuotaService quotaService,
-                                 CurrentUserService currentUser, TeamRepository teams) {
+                                 CurrentUserService currentUser, TeamRepository teams,
+                                 GameRepository games, GradingService grading) {
         this.teams = teams;
+        this.games = games;
+        this.grading = grading;
         this.gameIngest = gameIngest;
         this.referenceIngest = referenceIngest;
         this.weeks = weeks;
@@ -186,6 +195,37 @@ public class AdminIngestController {
                 result.put("fetchedAt", snapshot.getFetchedAt());
             }
         }
+        return result;
+    }
+
+    /**
+     * Force-regrades every pick on a game against its currently stored
+     * score - including ones already settled. This is the one grading path
+     * in the app that is not idempotent-on-PENDING: it exists specifically
+     * to correct a pick the ESPN minute-by-minute poller ({@code
+     * EspnScoreIngestService}, an unofficial data source) may have settled
+     * incorrectly, since {@link GradingService#gradeGame} used everywhere
+     * else can never touch an already-graded pick.
+     *
+     * <p>{@code gameId} is CFBD's id, which is also ESPN's own event id -
+     * the same id space this whole app already keys games by.
+     */
+    @PostMapping("/games/{gameId}/regrade")
+    public Map<String, Object> regradeGame(@AuthenticationPrincipal Jwt jwt,
+                                           @PathVariable long gameId) {
+        currentUser.requireAdmin(jwt);
+
+        Game game = games.findById(gameId)
+                .orElseThrow(() -> new NotFoundException("Game %d not found".formatted(gameId)));
+
+        if (game.getStatus() != GameStatus.FINAL && game.getStatus() != GameStatus.CANCELED) {
+            throw new GameNotGradableException(
+                    "Game %d is not final or canceled yet".formatted(gameId));
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("gameId", gameId);
+        result.put("picksRegraded", grading.regradeGame(game));
         return result;
     }
 }

@@ -83,28 +83,55 @@ public class GradingService {
                 : lockedLine.compareTo(total);
     }
 
-    /** Grades every pending pick on a finished game. Returns how many. */
+    /**
+     * Grades every pending pick on a finished game. Returns how many.
+     *
+     * <p>Only ever touches {@code PENDING} picks, which is what makes this
+     * safe to call repeatedly from more than one ingest source (CFBD's
+     * scheduled poll and ESPN's minute-by-minute poll both call this) -
+     * whichever source reports the game final first settles it, and the
+     * other's later call is a no-op. That same property means this method
+     * can never correct an already-settled pick; {@link #regradeGame} is the
+     * deliberate escape hatch for that.
+     */
     @Transactional
     public int gradeGame(Game game) {
         List<Pick> pending = picks.findAllByGameId(game.getId()).stream()
                 .filter(pick -> pick.getResult() == PickResult.PENDING)
                 .toList();
 
-        if (pending.isEmpty()) {
+        return applyResults(game, pending);
+    }
+
+    /**
+     * Force-regrades every pick on a game - including ones already settled -
+     * against its current stored score. The deliberate way to fix a pick
+     * that {@link #gradeGame} settled from a source that later turned out to
+     * be wrong (ESPN is not an official provider the way CFBD is); an admin
+     * action, not something any automatic poll calls.
+     */
+    @Transactional
+    public int regradeGame(Game game) {
+        List<Pick> all = picks.findAllByGameId(game.getId());
+        return applyResults(game, all);
+    }
+
+    private int applyResults(Game game, List<Pick> targets) {
+        if (targets.isEmpty()) {
             return 0;
         }
 
         if (game.getStatus() == GameStatus.CANCELED) {
             // Void rather than settle - a canceled game is not a loss for
             // anyone, and voided picks are excluded from the standings.
-            pending.forEach(pick -> {
+            targets.forEach(pick -> {
                 pick.setResult(PickResult.VOID);
                 pick.setGradedAt(Instant.now());
                 pick.setUpdatedAt(Instant.now());
             });
-            picks.saveAll(pending);
-            log.info("Voided {} picks on canceled game {}", pending.size(), game.getId());
-            return pending.size();
+            picks.saveAll(targets);
+            log.info("Voided {} picks on canceled game {}", targets.size(), game.getId());
+            return targets.size();
         }
 
         if (game.getStatus() != GameStatus.FINAL
@@ -112,16 +139,16 @@ public class GradingService {
             return 0;
         }
 
-        for (Pick pick : pending) {
+        for (Pick pick : targets) {
             pick.setResult(grade(pick.getSelection(), pick.getLockedLine(),
                     game.getHomeScore(), game.getAwayScore()));
             pick.setGradedAt(Instant.now());
             pick.setUpdatedAt(Instant.now());
         }
-        picks.saveAll(pending);
+        picks.saveAll(targets);
 
-        log.info("Graded {} picks on game {} ({} {} - {} {})", pending.size(), game.getId(),
+        log.info("Graded {} picks on game {} ({} {} - {} {})", targets.size(), game.getId(),
                 game.getAwayTeam(), game.getAwayScore(), game.getHomeTeam(), game.getHomeScore());
-        return pending.size();
+        return targets.size();
     }
 }

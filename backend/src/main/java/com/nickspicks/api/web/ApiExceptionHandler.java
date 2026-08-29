@@ -2,6 +2,7 @@ package com.nickspicks.api.web;
 
 import com.nickspicks.api.admin.DeployUnavailableException;
 import com.nickspicks.api.cfbd.CfbdUnavailableException;
+import com.nickspicks.api.ingest.GameNotGradableException;
 import com.nickspicks.api.pick.PickExceptions;
 import com.nickspicks.api.pick.PickExceptions.InvalidPickException;
 import com.nickspicks.api.pick.PickExceptions.PickWindowClosedException;
@@ -69,6 +70,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(DeployUnavailableException.class)
     public ProblemDetail handleDeployUnavailable(DeployUnavailableException ex) {
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "DEPLOY_UNAVAILABLE", ex.getMessage());
+    }
+
+    @ExceptionHandler(GameNotGradableException.class)
+    public ProblemDetail handleGameNotGradable(GameNotGradableException ex) {
+        return problem(HttpStatus.CONFLICT, "GAME_NOT_GRADABLE", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

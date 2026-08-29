@@ -39,6 +39,7 @@ export default function GameCard({
   // Present only while ESPN has the game in progress, so its presence is the
   // liveness test - there is no separate flag to keep in step with it.
   const live = game.live;
+  const inProgress = Boolean(live);
 
   const matchup = `${game.awayTeamName} at ${game.homeTeamName}`;
 
@@ -123,35 +124,44 @@ export default function GameCard({
           </span>
         )}
 
-        {marketButton({
-          selection: side,
-          label: formatSpread(game.homeSpread, side),
-          mine: spreadMine,
-          lineMatches: spreadLineMatches,
-          marketTaken: Boolean(spreadPick),
-          disabled: game.homeSpread == null,
-          result: spreadPick?.result,
-          ariaLabel: spreadMine
-            ? `Your spread pick: ${teamName} ${formatSpread(game.homeSpread, side)}`
-            : spreadPick
-              ? `${teamName} at ${formatSpread(game.homeSpread, side)} - cancel your current spread pick first`
-              : `Pick ${teamName} at ${formatSpread(game.homeSpread, side)}`,
-        })}
+        {/* Once the game is on, nothing here is actionable - the lines are
+            long since locked. Dropping the buttons entirely lets the live
+            score sit at the right edge, where the eye goes for a scoreboard,
+            instead of squeezed between the name and two dead controls. What
+            this member actually holds is shown by the chips up in the header. */}
+        {!inProgress && (
+          <>
+            {marketButton({
+              selection: side,
+              label: formatSpread(game.homeSpread, side),
+              mine: spreadMine,
+              lineMatches: spreadLineMatches,
+              marketTaken: Boolean(spreadPick),
+              disabled: game.homeSpread == null,
+              result: spreadPick?.result,
+              ariaLabel: spreadMine
+                ? `Your spread pick: ${teamName} ${formatSpread(game.homeSpread, side)}`
+                : spreadPick
+                  ? `${teamName} at ${formatSpread(game.homeSpread, side)} - cancel your current spread pick first`
+                  : `Pick ${teamName} at ${formatSpread(game.homeSpread, side)}`,
+            })}
 
-        {marketButton({
-          selection: totalSide,
-          label: formatTotal(game.overUnder, totalSide),
-          mine: totalMine,
-          lineMatches: totalLineMatches,
-          marketTaken: Boolean(totalPick),
-          disabled: game.overUnder == null,
-          result: totalPick?.result,
-          ariaLabel: totalMine
-            ? `Your total pick: ${formatTotal(game.overUnder, totalSide)}`
-            : totalPick
-              ? `${totalSide.toLowerCase()} ${game.overUnder} - cancel your current total pick first`
-              : `Pick ${totalSide.toLowerCase()} ${game.overUnder} total points in ${matchup}`,
-        })}
+            {marketButton({
+              selection: totalSide,
+              label: formatTotal(game.overUnder, totalSide),
+              mine: totalMine,
+              lineMatches: totalLineMatches,
+              marketTaken: Boolean(totalPick),
+              disabled: game.overUnder == null,
+              result: totalPick?.result,
+              ariaLabel: totalMine
+                ? `Your total pick: ${formatTotal(game.overUnder, totalSide)}`
+                : totalPick
+                  ? `${totalSide.toLowerCase()} ${game.overUnder} - cancel your current total pick first`
+                  : `Pick ${totalSide.toLowerCase()} ${game.overUnder} total points in ${matchup}`,
+            })}
+          </>
+        )}
       </div>
     );
   };
@@ -183,9 +193,13 @@ export default function GameCard({
           <span className="fw-semibold text-truncate">{yourLabel}</span>
         </div>
 
+        {/* Once locked, neither cancelling nor re-locking is possible - the
+            server rejects both - so the controls go rather than sitting there
+            greyed out. The pick itself stays on show; it is just no longer
+            something you can act on. */}
         {finished ? (
           <ResultBadge result={pick.result} />
-        ) : (
+        ) : locked ? null : (
           <div className="d-flex gap-2 flex-shrink-0">
             {improved && (
               <Button
@@ -200,7 +214,7 @@ export default function GameCard({
             <Button
               size="sm"
               variant="outline-danger"
-              disabled={locked || busy}
+              disabled={busy}
               onClick={() => onClear?.(game, pick.selection)}
               aria-label={`Cancel your ${marketLabel === 'SPR' ? 'spread' : 'total'} pick`}
               title="Cancel this pick"
@@ -325,16 +339,19 @@ export default function GameCard({
 
         <div className="d-grid gap-2">
           {/* Column headings. aria-hidden because each button already names
-              its own market and number. */}
-          <div className="d-flex align-items-center gap-2" aria-hidden="true">
-            <div className="flex-grow-1" />
-            <div className="pick-col text-center small fw-semibold text-body-tertiary text-uppercase lh-1">
-              SPR
+              its own market and number. Gone once the game is on, along with
+              the columns they label. */}
+          {!inProgress && (
+            <div className="d-flex align-items-center gap-2" aria-hidden="true">
+              <div className="flex-grow-1" />
+              <div className="pick-col text-center small fw-semibold text-body-tertiary text-uppercase lh-1">
+                SPR
+              </div>
+              <div className="pick-col text-center small fw-semibold text-body-tertiary text-uppercase lh-1">
+                O/U
+              </div>
             </div>
-            <div className="pick-col text-center small fw-semibold text-body-tertiary text-uppercase lh-1">
-              O/U
-            </div>
-          </div>
+          )}
 
           {sideRow('AWAY', game.awayTeam, game.awayTeamName, 'OVER')}
           {sideRow('HOME', game.homeTeam, game.homeTeamName, 'UNDER')}

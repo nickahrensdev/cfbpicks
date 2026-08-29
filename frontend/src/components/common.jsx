@@ -122,6 +122,23 @@ export function ResultBadge({ result }) {
   return <Badge bg={variant}>{label}</Badge>;
 }
 
+/** Padlock. Decorative - the badge it sits in carries the accessible name via title. */
+function LockIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="12"
+      height="12"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+    </svg>
+  );
+}
+
 /**
  * Live "locks in 2h 14m" countdown.
  *
@@ -138,7 +155,11 @@ export function LockCountdown({ locksAt, locked }) {
   }, [locked]);
 
   if (locked) {
-    return <Badge bg="secondary">Locked</Badge>;
+    return (
+      <Badge bg="secondary" title="Locked" aria-label="Locked">
+        <LockIcon />
+      </Badge>
+    );
   }
 
   const remaining = new Date(locksAt).getTime() - now;
@@ -157,7 +178,10 @@ export function LockCountdown({ locksAt, locked }) {
   else text = `${mins}m`;
 
   return (
-    <Badge bg={minutes < 60 ? 'warning' : 'light'} text={minutes < 60 ? 'dark' : 'secondary'}>
+    <Badge
+      bg={minutes < 60 ? 'warning' : 'secondary-subtle'}
+      text={minutes < 60 ? 'dark' : 'secondary-emphasis'}
+    >
       Locks in {text}
     </Badge>
   );

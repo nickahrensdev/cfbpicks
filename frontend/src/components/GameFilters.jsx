@@ -21,6 +21,28 @@ function FunnelIcon() {
 }
 
 /**
+ * Checkmark, shown only while "My picks" is active. Solid vs. outline alone
+ * is too subtle a difference to read at a glance in every color theme -
+ * this makes the on state unmistakable regardless of palette or contrast.
+ */
+function CheckIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+      className="me-1"
+    >
+      <path d="M13.485 1.929a1 1 0 0 1 .143 1.407l-7 8.5a1 1 0 0 1-1.49.083L2.153 8.933a1 1 0 1 1 1.394-1.433l2.21 2.152 6.34-7.7a1 1 0 0 1 1.388-.023z" />
+    </svg>
+  );
+}
+
+/**
  * Conference / team / spread-size filters, collapsed by default so the board
  * is the first thing on screen.
  *
@@ -54,7 +76,8 @@ export default function GameFilters({
     (value.conference ? 1 : 0)
     + (value.teamId ? 1 : 0)
     + (spreadNarrowed ? 1 : 0)
-    + (value.pickableOnly ? 1 : 0);
+    + (value.pickableOnly ? 1 : 0)
+    + (value.todayOnly ? 1 : 0);
   const filtered = activeCount > 0 || value.mine;
 
   return (
@@ -73,6 +96,7 @@ export default function GameFilters({
             onClick={() => update({ mine: !value.mine })}
             aria-pressed={value.mine}
           >
+            {value.mine && <CheckIcon />}
             My picks
           </Button>
 
@@ -117,6 +141,7 @@ export default function GameFilters({
                 maxSpread: null,
                 mine: false,
                 pickableOnly: false,
+                todayOnly: false,
               })
             }
           >
@@ -205,6 +230,19 @@ export default function GameFilters({
               />
               <div className="small text-body-tertiary">
                 Hides games that have locked, kicked off or have no line posted.
+              </div>
+            </Col>
+
+            <Col xs={12}>
+              <Form.Check
+                type="switch"
+                id="filter-today"
+                checked={Boolean(value.todayOnly)}
+                onChange={(e) => update({ todayOnly: e.target.checked })}
+                label="Today's games"
+              />
+              <div className="small text-body-tertiary">
+                Only games kicking off today, your local time.
               </div>
             </Col>
           </Row>

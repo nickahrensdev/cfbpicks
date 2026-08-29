@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, Card, Container, Form, ProgressBar } from 'react-bootstrap';
+import { Link } from 'react-router-dom';
 
 import { ErrorNotice } from '../../components/common.jsx';
 import { api } from '../../api/client.js';
@@ -86,15 +87,33 @@ export default function AdminPage() {
     api.deployBackendStatus().then((data) => setDeployConfigured(data.configured)).catch(() => {});
   }, []);
 
+  // Each load runs in the background on the server and returns immediately -
+  // this just confirms it was queued. The Data log tab has the actual
+  // result once it finishes.
   const run = async (label, action) => {
     setBusy(label);
     setError(null);
     setResult(null);
     try {
-      setResult({ label, data: await action() });
-      await refreshQuota();
-      // Newly-ingested weeks change what the week selector should offer.
-      api.currentWeek().then(setMeta).catch(() => {});
+      await action();
+      setResult({ label, queued: true });
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Deploying is a fire-and-forget hit on Render's own hook, not a data load
+  // - it has no log row, so it gets its own message instead of pointing at
+  // Data log.
+  const runDeploy = async () => {
+    setBusy('Deploy');
+    setError(null);
+    setResult(null);
+    try {
+      await api.deployBackend();
+      setResult({ label: 'Deploy', queued: false });
     } catch (err) {
       setError(err);
     } finally {
@@ -172,8 +191,17 @@ export default function AdminPage() {
 
       {result && (
         <Alert variant="success" dismissible onClose={() => setResult(null)}>
-          <strong>{result.label} complete.</strong>
-          <pre className="mb-0 mt-2 small">{JSON.stringify(result.data, null, 2)}</pre>
+          {result.queued ? (
+            <>
+              <strong>{result.label} queued.</strong> It is running in the background - see{' '}
+              <Alert.Link as={Link} to="/admin/data-log">
+                Data log
+              </Alert.Link>{' '}
+              for the result.
+            </>
+          ) : (
+            <strong>{result.label} triggered.</strong>
+          )}
         </Alert>
       )}
 
@@ -339,7 +367,7 @@ export default function AdminPage() {
                   disabled={busy !== null}
                   onClick={() => {
                     setConfirmingDeploy(false);
-                    run('Deploy', () => api.deployBackend());
+                    runDeploy();
                   }}
                 >
                   {busy === 'Deploy' ? 'Triggering…' : 'Confirm redeploy'}

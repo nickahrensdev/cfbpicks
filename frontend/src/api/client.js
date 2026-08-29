@@ -112,6 +112,10 @@ export const api = {
     request(`/api/admin/ingest/scores${query({ season })}`, { method: 'POST' }),
   ingestRankings: ({ season } = {}) =>
     request(`/api/admin/ingest/rankings${query({ season })}`, { method: 'POST' }),
+  // Every load above returns immediately (202, {logId, status: "RUNNING"})
+  // and finishes in the background - this is where the Data log tab reads
+  // the actual result from.
+  dataLoads: () => request('/api/admin/data-loads'),
 
   deployBackendStatus: () => request('/api/admin/deploy-backend/status'),
   deployBackend: () => request('/api/admin/deploy-backend', { method: 'POST' }),

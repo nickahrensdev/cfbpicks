@@ -15,6 +15,7 @@ import AthletePage from './pages/AthletePage.jsx';
 import CoachPage from './pages/CoachPage.jsx';
 import AdminUsersPage from './pages/admin/AdminUsersPage.jsx';
 import AdminDataPage from './pages/admin/AdminDataPage.jsx';
+import DataLogPage from './pages/admin/DataLogPage.jsx';
 import ActivityLogPage from './pages/admin/ActivityLogPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 
@@ -49,6 +50,7 @@ export default function App() {
 
           <Route path="/admin/members" element={adminOnly(<AdminUsersPage />)} />
           <Route path="/admin/data" element={adminOnly(<AdminDataPage />)} />
+          <Route path="/admin/data-log" element={adminOnly(<DataLogPage />)} />
           <Route path="/admin/activity" element={adminOnly(<ActivityLogPage />)} />
 
           <Route path="*" element={<NotFoundPage />} />

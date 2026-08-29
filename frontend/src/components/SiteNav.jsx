@@ -16,6 +16,7 @@ const LINKS = [
 const ADMIN_LINKS = [
   { to: '/admin/members', label: 'Members' },
   { to: '/admin/data', label: 'Data' },
+  { to: '/admin/data-log', label: 'Data log' },
   { to: '/admin/activity', label: 'Activity log' },
 ];
 

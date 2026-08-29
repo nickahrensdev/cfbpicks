@@ -15,10 +15,16 @@
  * tertiary panels, borders) vary per theme.
  *
  * Midnight is the default palette theme.scss already compiles for light
- * mode, so it needs no override block of its own - only its dark variant is
- * defined here, using :root so it also covers a member who has not chosen a
- * theme yet but has switched to dark mode.
+ * mode, so only --bs-card-bg needs setting here (a shade lifted off the
+ * body background so cards still read as raised) - everything else comes
+ * from theme.scss's own Sass variables. Its dark variant is defined right
+ * after, using :root so both also cover a member who has not chosen a
+ * theme yet.
  */
+
+:root {
+  --bs-card-bg: #FFFDF7;
+}
 
 :root[data-bs-theme="dark"] {
   --bs-primary: #6fb0b6;

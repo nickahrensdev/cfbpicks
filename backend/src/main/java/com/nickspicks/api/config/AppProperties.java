@@ -84,14 +84,11 @@ public class AppProperties {
 
     public static class Supabase {
 
-        /** https://<project-ref>.supabase.co */
+        /**
+         * https://<project-ref>.supabase.co. Drives the JWT issuer check in
+         * SecurityConfig and the "is Supabase configured" flag on /api/meta.
+         */
         private String url = "";
-
-        /** Anon key. Safe to expose to browsers; used only for REST calls. */
-        private String anonKey = "";
-
-        /** Service role key. Never log or return this value. */
-        private String serviceKey = "";
 
         public String getUrl() {
             return url;
@@ -99,22 +96,6 @@ public class AppProperties {
 
         public void setUrl(String url) {
             this.url = url;
-        }
-
-        public String getAnonKey() {
-            return anonKey;
-        }
-
-        public void setAnonKey(String anonKey) {
-            this.anonKey = anonKey;
-        }
-
-        public String getServiceKey() {
-            return serviceKey;
-        }
-
-        public void setServiceKey(String serviceKey) {
-            this.serviceKey = serviceKey;
         }
     }
 

@@ -20,9 +20,14 @@ spring:
       maximum-pool-size: 5
       data-source-properties:
         prepareThreshold: 0
+  # Flyway takes a session-level advisory lock, which PgBouncer's transaction
+  # mode (port 6543) does not hold reliably. Migrate over the session pooler
+  # (5432) while the app's own pool stays on 6543.
+  flyway:
+    url: ${SUPABASE_MIGRATION_URL:jdbc:postgresql://<region>.pooler.supabase.com:5432/postgres?sslmode=require}
+    user: ${SUPABASE_DB_USER:postgres.<project-ref>}
+    password: ${SUPABASE_DB_PASSWORD:PASTE_YOUR_DATABASE_PASSWORD_HERE}
   jpa:
-    hibernate:
-      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
@@ -50,7 +55,4 @@ app:
   supabase:
     # Not secret - safe to keep here.
     url: ${SUPABASE_URL:https://<project-ref>.supabase.co}
-    # Only needed if you call the Supabase REST/Auth/Storage API.
-    anon-key: ${SUPABASE_ANON_KEY:}
-    service-key: ${SUPABASE_SERVICE_KEY:}
 

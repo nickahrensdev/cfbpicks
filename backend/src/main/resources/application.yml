@@ -59,8 +59,6 @@ app:
   admin-emails: ${ADMIN_EMAILS:}
   supabase:
     url: ${SUPABASE_URL:}
-    anon-key: ${SUPABASE_ANON_KEY:}
-    service-key: ${SUPABASE_SERVICE_KEY:}
   pickem:
     season: 2026
     max-picks-per-week: 10

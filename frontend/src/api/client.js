@@ -107,4 +107,7 @@ export const api = {
     request(`/api/admin/ingest/scores${query({ season })}`, { method: 'POST' }),
   ingestRankings: ({ season } = {}) =>
     request(`/api/admin/ingest/rankings${query({ season })}`, { method: 'POST' }),
+
+  deployBackendStatus: () => request('/api/admin/deploy-backend/status'),
+  deployBackend: () => request('/api/admin/deploy-backend', { method: 'POST' }),
 };

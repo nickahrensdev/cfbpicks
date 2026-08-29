@@ -116,29 +116,69 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
   };
 
   /**
-   * What you're actually holding on this market, always shown once a pick
-   * exists - the buttons above only read as "selected" when the line still
-   * matches, so this is the one place the number taken is never in doubt.
-   * Appends where the board sits now, if that has since moved.
+   * One market's row in the "Your picks" panel: what you took, where the
+   * board sits now if that has moved, and the two things you can do about
+   * it - cancel outright, or (only when the move is in your favor) update
+   * to the better number. Spread and total each get their own row so one
+   * can be changed without touching the other.
    */
-  const pickSummary = (pick, currentLine, improved, format) => {
+  const pickRow = ({ marketLabel, pick, currentLine, improved, format, withTeamName }) => {
     if (!pick) return null;
+
+    const yourLabel = withTeamName
+      ? `${pick.selection === 'HOME' ? game.homeTeamName : game.awayTeamName} ${format(pick.lockedLine, pick.selection)}`
+      : format(pick.lockedLine, pick.selection);
+
     const lineMoved =
       !finished && currentLine != null && String(pick.lockedLine) !== String(currentLine);
 
     return (
-      <span className="text-body-secondary">
-        {pick.market === 'TOTAL' ? 'Total' : 'Spread'}: you took{' '}
-        <strong className="text-body">{format(pick.lockedLine, pick.selection)}</strong>
-        {lineMoved && (
-          <>
-            , now{' '}
-            <strong className={improved ? 'text-success' : 'text-body'}>
-              {format(currentLine, pick.selection)}
-            </strong>
-          </>
+      <div className="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+        <div className="min-width-0">
+          <div className="d-flex align-items-center gap-2">
+            <Badge
+              bg="secondary-subtle"
+              text="secondary-emphasis"
+              className="text-uppercase fw-semibold"
+            >
+              {marketLabel}
+            </Badge>
+            <span className="fw-semibold text-truncate">{yourLabel}</span>
+          </div>
+          {lineMoved && (
+            <div className="small text-body-tertiary mt-1">
+              Board now {format(currentLine, pick.selection)}
+            </div>
+          )}
+        </div>
+
+        {finished ? (
+          <ResultBadge result={pick.result} />
+        ) : (
+          <div className="d-flex gap-2 flex-shrink-0">
+            {improved && (
+              <Button
+                size="sm"
+                variant="warning"
+                disabled={busy}
+                onClick={() => onRelock?.(game, pick)}
+              >
+                Update to {format(currentLine, pick.selection)}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline-danger"
+              disabled={locked || busy}
+              onClick={() => onClear?.(game, pick.selection)}
+              aria-label={`Cancel your ${marketLabel === 'SPR' ? 'spread' : 'total'} pick`}
+              title="Cancel this pick"
+            >
+              ✕
+            </Button>
+          </div>
         )}
-      </span>
+      </div>
     );
   };
 
@@ -187,22 +227,22 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
     return `${name} ${formatSpread(game.homeSpread, side)}`;
   };
 
-  const spreadNote = pickSummary(
-    spreadPick,
-    game.homeSpread,
-    game.spreadLineImproved,
-    formatSpread,
-  );
-  const totalNote = pickSummary(totalPick, game.overUnder, game.totalLineImproved, formatTotal);
-
-  const improvedPicks = [
-    game.spreadLineImproved && spreadPick
-      ? { pick: spreadPick, label: formatSpread(game.homeSpread, spreadPick.selection) }
-      : null,
-    game.totalLineImproved && totalPick
-      ? { pick: totalPick, label: formatTotal(game.overUnder, totalPick.selection) }
-      : null,
-  ].filter(Boolean);
+  const spreadRow = pickRow({
+    marketLabel: 'SPR',
+    pick: spreadPick,
+    currentLine: game.homeSpread,
+    improved: game.spreadLineImproved,
+    format: formatSpread,
+    withTeamName: true,
+  });
+  const totalRow = pickRow({
+    marketLabel: 'O/U',
+    pick: totalPick,
+    currentLine: game.overUnder,
+    improved: game.totalLineImproved,
+    format: formatTotal,
+    withTeamName: false,
+  });
 
   return (
     <Card className={`pick-card h-100 shadow-sm${locked && !finished ? ' is-locked' : ''}`}>
@@ -269,56 +309,36 @@ export default function GameCard({ game, onPick, onClear, onRelock, busy = false
           {sideRow('HOME', game.homeTeam, game.homeTeamName, 'UNDER')}
         </div>
 
-        {/* One box for everything about the picks held on this game: the
-            locked-in lines always, and - only when the board has since moved
-            in the member's favor - the call-out and the button to take it.
-            Yellow flags something actionable; grey means there is nothing to
-            do but the picks are still worth seeing. */}
-        {(spreadNote || totalNote) && (
-          <div
-            className={`rounded-3 p-3 d-flex flex-column gap-2 ${
-              improvedPicks.length > 0 ? 'bg-warning-subtle' : 'bg-body-tertiary'
-            }`}
-          >
-            <div className="d-grid gap-1 small">
-              {spreadNote}
-              {totalNote}
-            </div>
-
-            {improvedPicks.length > 0 && (
-              <>
-                <span className="small fw-semibold">
-                  {improvedPicks.length > 1
-                    ? 'Both lines moved in your favor'
-                    : 'The line moved in your favor'}
-                </span>
-                <div className="d-flex flex-column gap-2">
-                  {improvedPicks.map(({ pick, label }) => (
-                    <Button
-                      key={pick.id}
-                      size="sm"
-                      variant="warning"
-                      disabled={busy}
-                      onClick={() => onRelock?.(game, pick)}
-                    >
-                      Take {label}
-                    </Button>
-                  ))}
-                </div>
-              </>
+        {/* "Your picks" - one row per market held on this game. Each row
+            manages its own market independently: cancel either pick without
+            touching the other, and update to a better line only where one
+            actually moved that way. */}
+        {(spreadRow || totalRow) && (
+          <div className="d-grid gap-2">
+            {spreadRow && (
+              <div
+                className={`rounded-3 p-2 ${
+                  game.spreadLineImproved ? 'bg-warning-subtle' : 'bg-body-tertiary'
+                }`}
+              >
+                {spreadRow}
+              </div>
+            )}
+            {totalRow && (
+              <div
+                className={`rounded-3 p-2 ${
+                  game.totalLineImproved ? 'bg-warning-subtle' : 'bg-body-tertiary'
+                }`}
+              >
+                {totalRow}
+              </div>
             )}
           </div>
         )}
 
         {finished && (
-          <div className="d-flex justify-content-between align-items-center small gap-2">
-            <span>
-              {game.awayTeamName} {game.awayScore} · {game.homeTeamName} {game.homeScore}
-            </span>
-            <span className="d-flex gap-1">
-              {spreadPick && <ResultBadge result={spreadPick.result} />}
-              {totalPick && <ResultBadge result={totalPick.result} />}
-            </span>
+          <div className="small text-body-secondary">
+            {game.awayTeamName} {game.awayScore} · {game.homeTeamName} {game.homeScore}
           </div>
         )}
 

@@ -34,6 +34,17 @@ public class AppProperties {
     /** CollegeFootballData API settings. */
     private Cfbd cfbd = new Cfbd();
 
+    /** Backend redeploy trigger, routed through a GitHub Actions workflow. */
+    private Deploy deploy = new Deploy();
+
+    public Deploy getDeploy() {
+        return deploy;
+    }
+
+    public void setDeploy(Deploy deploy) {
+        this.deploy = deploy;
+    }
+
     public String getEnvironment() {
         return environment;
     }
@@ -194,6 +205,46 @@ public class AppProperties {
 
         public void setTeamClassifications(List<String> teamClassifications) {
             this.teamClassifications = teamClassifications;
+        }
+    }
+
+    public static class Deploy {
+
+        /**
+         * A token scoped only to dispatching Actions workflows on this repo -
+         * never the Render deploy hook's own key. That key lives solely as a
+         * GitHub Actions secret, decrypted only for the seconds the workflow
+         * runs; this server never sees it.
+         */
+        private String githubToken = "";
+
+        private String githubRepo = "nickahrensdev/cfbpicks";
+
+        /** The workflow file that actually calls Render's deploy hook. */
+        private String workflowFile = "deploy-backend.yml";
+
+        public String getGithubToken() {
+            return githubToken;
+        }
+
+        public void setGithubToken(String githubToken) {
+            this.githubToken = githubToken;
+        }
+
+        public String getGithubRepo() {
+            return githubRepo;
+        }
+
+        public void setGithubRepo(String githubRepo) {
+            this.githubRepo = githubRepo;
+        }
+
+        public String getWorkflowFile() {
+            return workflowFile;
+        }
+
+        public void setWorkflowFile(String workflowFile) {
+            this.workflowFile = workflowFile;
         }
     }
 }

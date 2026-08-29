@@ -51,6 +51,8 @@ export default function AdminPage() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null);
+  const [deployConfigured, setDeployConfigured] = useState(null);
+  const [confirmingDeploy, setConfirmingDeploy] = useState(false);
 
   // One year per load, plus which reference feeds to include.
   const [years, setYears] = useState({
@@ -80,6 +82,7 @@ export default function AdminPage() {
         });
       })
       .catch(() => setMeta(null));
+    api.deployBackendStatus().then((data) => setDeployConfigured(data.configured)).catch(() => {});
   }, []);
 
   const run = async (label, action) => {
@@ -287,6 +290,53 @@ export default function AdminPage() {
                 {busy === 'Rankings ingest' ? 'Loading…' : 'Load'}
               </Button>
             </div>
+          </Card.Body>
+        </Card>
+
+        <Card className="shadow-sm border-danger-subtle">
+          <Card.Body className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+            <div>
+              <div className="fw-semibold">Redeploy backend</div>
+              <div className="small text-body-secondary">
+                Triggers a fresh deploy of the live API on Render. Members lose their connection
+                for a few minutes while it restarts - use it for a real deploy, not by habit.
+              </div>
+              {deployConfigured === false && (
+                <div className="small text-warning-emphasis mt-1">
+                  Not configured - set <code>GITHUB_DISPATCH_TOKEN</code> on the backend.
+                </div>
+              )}
+            </div>
+            {confirmingDeploy ? (
+              <div className="d-flex gap-2 flex-shrink-0">
+                <Button
+                  variant="outline-secondary"
+                  disabled={busy !== null}
+                  onClick={() => setConfirmingDeploy(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  disabled={busy !== null}
+                  onClick={() => {
+                    setConfirmingDeploy(false);
+                    run('Deploy', () => api.deployBackend());
+                  }}
+                >
+                  {busy === 'Deploy' ? 'Triggering…' : 'Confirm redeploy'}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline-danger"
+                disabled={busy !== null || deployConfigured === false}
+                onClick={() => setConfirmingDeploy(true)}
+                className="flex-shrink-0"
+              >
+                Redeploy backend
+              </Button>
+            )}
           </Card.Body>
         </Card>
       </div>

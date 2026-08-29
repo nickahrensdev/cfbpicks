@@ -1,5 +1,6 @@
 package com.nickspicks.api.web;
 
+import com.nickspicks.api.admin.DeployUnavailableException;
 import com.nickspicks.api.cfbd.CfbdUnavailableException;
 import com.nickspicks.api.pick.PickExceptions;
 import com.nickspicks.api.pick.PickExceptions.InvalidPickException;
@@ -63,6 +64,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(CfbdUnavailableException.class)
     public ProblemDetail handleUpstream(CfbdUnavailableException ex) {
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "UPSTREAM_UNAVAILABLE", ex.getMessage());
+    }
+
+    @ExceptionHandler(DeployUnavailableException.class)
+    public ProblemDetail handleDeployUnavailable(DeployUnavailableException ex) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "DEPLOY_UNAVAILABLE", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

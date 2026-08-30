@@ -42,6 +42,10 @@ export default function GameCard({
   // liveness test - there is no separate flag to keep in step with it.
   const live = game.live;
   const inProgress = Boolean(live);
+  // A game being played and a game already played read the same way: no
+  // buttons, a score at the right edge of each team's row. The only thing
+  // final adds is a bolder score on whoever won.
+  const scoreboard = inProgress || finished;
 
   const matchup = `${game.awayTeamName} at ${game.homeTeamName}`;
 
@@ -60,27 +64,17 @@ export default function GameCard({
    *                    through the cancel button in the picks panel rather
    *                    than clicking a button here, so there is one place
    *                    that does it instead of two different ones.
-   * @param result      this pick's graded outcome, once the game is final
    *
    * <p>No solid highlight for "this is picked" - being disabled already says
-   * that. The only color a button carries is: a light-blue tint while the
-   * pick is live and its line has not moved, or green/red once the game has
-   * been graded. A side nobody holds, or one whose line has moved, stays the
-   * plain disabled grey.
+   * that. The only color a button carries is a light-blue tint while the pick
+   * is live and its line has not moved. A side nobody holds, or one whose line
+   * has moved, stays the plain disabled grey. Graded outcomes never show here:
+   * once the game is on these buttons are gone, and the picks panel carries
+   * the win/loss.
    */
-  const marketButton = ({ selection, label, ariaLabel, mine, lineMatches, marketTaken, disabled,
-                          result }) => {
-    const stateClass = !mine
-      ? ''
-      : finished
-        ? result === 'WIN'
-          ? 'pick-button--win'
-          : result === 'LOSS'
-            ? 'pick-button--loss'
-            : ''
-        : lineMatches
-          ? 'pick-button--mine'
-          : '';
+  const marketButton = ({ selection, label, ariaLabel, mine, lineMatches, marketTaken,
+                          disabled }) => {
+    const stateClass = mine && lineMatches ? 'pick-button--mine' : '';
 
     return (
       <Button
@@ -105,7 +99,17 @@ export default function GameCard({
       spreadMine && String(spreadPick.lockedLine) === String(game.homeSpread);
     const totalMine = totalPick?.selection === totalSide;
     const totalLineMatches = totalMine && String(totalPick.lockedLine) === String(game.overUnder);
-    const liveScore = side === 'HOME' ? live?.homeScore : live?.awayScore;
+    // Live scores come off the in-progress feed; once the game is final the
+    // game itself carries them.
+    const score = side === 'HOME'
+      ? (live ? live.homeScore : game.homeScore)
+      : (live ? live.awayScore : game.awayScore);
+    // Only the winner of a finished game is bolded. A tie bolds neither, and
+    // a game still being played bolds both - nobody has won it yet.
+    const otherScore = side === 'HOME'
+      ? (live ? live.awayScore : game.awayScore)
+      : (live ? live.homeScore : game.homeScore);
+    const boldScore = !finished || (score != null && otherScore != null && score > otherScore);
 
     return (
       <div className="d-flex align-items-center gap-2">
@@ -120,18 +124,21 @@ export default function GameCard({
           )}
         </div>
 
-        {liveScore != null && (
-          <span className="fw-bold fs-5 lh-1" style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {liveScore}
+        {scoreboard && score != null && (
+          <span
+            className={`fs-5 lh-1 ${boldScore ? 'fw-bold' : 'fw-normal text-body-secondary'}`}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+          >
+            {score}
           </span>
         )}
 
-        {/* Once the game is on, nothing here is actionable - the lines are
-            long since locked. Dropping the buttons entirely lets the live
+        {/* Once the game has kicked off, nothing here is actionable - the
+            lines are long since locked. Dropping the buttons entirely lets the
             score sit at the right edge, where the eye goes for a scoreboard,
             instead of squeezed between the name and two dead controls. What
-            this member actually holds is shown by the chips up in the header. */}
-        {!inProgress && (
+            this member actually holds is shown by the picks panel below. */}
+        {!scoreboard && (
           <>
             {marketButton({
               selection: side,
@@ -140,7 +147,6 @@ export default function GameCard({
               lineMatches: spreadLineMatches,
               marketTaken: Boolean(spreadPick),
               disabled: game.homeSpread == null,
-              result: spreadPick?.result,
               ariaLabel: spreadMine
                 ? `Your spread pick: ${teamName} ${formatSpread(game.homeSpread, side)}`
                 : spreadPick
@@ -155,7 +161,6 @@ export default function GameCard({
               lineMatches: totalLineMatches,
               marketTaken: Boolean(totalPick),
               disabled: game.overUnder == null,
-              result: totalPick?.result,
               ariaLabel: totalMine
                 ? `Your total pick: ${formatTotal(game.overUnder, totalSide)}`
                 : totalPick
@@ -333,9 +338,9 @@ export default function GameCard({
 
         <div className="d-grid gap-2">
           {/* Column headings. aria-hidden because each button already names
-              its own market and number. Gone once the game is on, along with
-              the columns they label. */}
-          {!inProgress && (
+              its own market and number. Gone once the game has kicked off,
+              along with the columns they label. */}
+          {!scoreboard && (
             <div className="d-flex align-items-center gap-2" aria-hidden="true">
               <div className="flex-grow-1" />
               <div className="pick-col text-center small fw-semibold text-body-tertiary text-uppercase lh-1">
@@ -383,12 +388,6 @@ export default function GameCard({
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {finished && (
-          <div className="small text-body-secondary">
-            {game.awayTeamName} {game.awayScore} · {game.homeTeamName} {game.homeScore}
           </div>
         )}
 

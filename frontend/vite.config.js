@@ -7,6 +7,11 @@ import react from '@vitejs/plugin-react';
 // for a custom-domain deploy, where the app really does live at "/".
 const base = process.env.VITE_BASE_PATH || '/';
 
+// Where the dev server forwards /api. localhost is right when both halves run
+// on the machine; in Docker the backend is a sibling container, so compose
+// sets this to its service name.
+const proxyTarget = process.env.VITE_PROXY_TARGET || 'http://localhost:8080';
+
 export default defineConfig({
   base,
   plugins: [react()],
@@ -16,7 +21,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: proxyTarget,
         changeOrigin: true,
       },
     },

@@ -176,6 +176,8 @@ public class DtoMapper {
                 game.getVenue(),
                 game.getHomeSpread(),
                 game.getOverUnder(),
+                game.getHomeMoneyline(),
+                game.getAwayMoneyline(),
                 game.getStatus().name(),
                 game.getHomeScore(),
                 game.getAwayScore(),

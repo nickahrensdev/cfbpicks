@@ -211,6 +211,17 @@ public final class ApiDtos {
             BigDecimal homeSpread,
             /** Null when no total is posted, which is independent of the spread. */
             BigDecimal overUnder,
+            /**
+             * American odds for each side, when a book has posted them.
+             *
+             * <p>Shown on the moneyline buttons, and shown only - a moneyline
+             * pick is played against the result, so nothing here is ever locked
+             * onto the pick and a movement cannot invalidate one. The market
+             * stays pickable when these are null, which is why the button falls
+             * back to naming itself rather than going disabled.
+             */
+            Integer homeMoneyline,
+            Integer awayMoneyline,
             String status,
             Integer homeScore,
             Integer awayScore,

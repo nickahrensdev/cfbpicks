@@ -7,6 +7,7 @@ import {
   LockCountdown,
   ResultBadge,
   formatKickoff,
+  formatMoneyline,
   formatSpread,
   formatTotal,
   formatTotalLong,
@@ -105,6 +106,12 @@ export default function GameCard({
   const sideRow = (side, team, fallbackName, totalSide) => {
     const teamName = team?.school ?? fallbackName;
     const moneylineSide = side === 'HOME' ? 'HOME_ML' : 'AWAY_ML';
+    // Shown, never locked: a moneyline pick is played against the result, so
+    // these odds are information beside the button rather than a number the
+    // pick commits to. Null whenever no book posted one, which is common.
+    const moneylineOdds = formatMoneyline(
+      side === 'HOME' ? game.homeMoneyline : game.awayMoneyline,
+    );
     const spreadMine = spreadPick?.selection === side;
     const spreadLineMatches =
       spreadMine && String(spreadPick.lockedLine) === String(game.homeSpread);
@@ -160,22 +167,23 @@ export default function GameCard({
             this member actually holds is shown by the picks panel below. */}
         {!scoreboard && (
           <>
-            {/* Only when the group plays moneylines. There is no line to show, so
-                the button says what it does rather than a number - and it is
-                never disabled for a missing line, because there is none. */}
+            {/* Only when the group plays moneylines. The odds are shown when a
+                book has posted them, and the market names itself when none has -
+                unlike the other two, this one stays pickable either way, so a
+                missing number must not read as an unavailable button. */}
             {moneylinePlayed && marketButton({
               selection: moneylineSide,
-              label: 'ML',
+              label: moneylineOdds ?? 'ML',
               mine: moneylineMine,
-              // No line, so nothing can have moved away from it.
+              // Nothing is locked, so nothing can have moved away from it.
               lineMatches: true,
               marketTaken: Boolean(moneylinePick),
               disabled: false,
               ariaLabel: moneylineMine
-                ? `Your moneyline pick: ${teamName}`
+                ? `Your moneyline pick: ${teamName}${moneylineOdds ? ` at ${moneylineOdds}` : ''}`
                 : moneylinePick
                   ? `${teamName} to win - cancel your current moneyline pick first`
-                  : `Pick ${teamName} to win`,
+                  : `Pick ${teamName} to win${moneylineOdds ? ` at ${moneylineOdds}` : ''}`,
             })}
 
             {spreadPlayed && marketButton({

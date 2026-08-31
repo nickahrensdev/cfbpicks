@@ -206,6 +206,22 @@ export function formatTotal(overUnder, side) {
 }
 
 /**
+ * American odds, signed: {@code -450} / {@code +350}.
+ *
+ * <p>The sign is the whole meaning - it says which side is favoured - so a
+ * positive number is written with its plus rather than left bare.
+ *
+ * <p>Null when no book has posted one, which is common. The moneyline market
+ * needs nothing posted to be pickable, so callers name the market instead
+ * rather than disabling it.
+ */
+export function formatMoneyline(odds) {
+  if (odds === null || odds === undefined) return null;
+  const value = Number(odds);
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
+/**
  * "Over 44.5" rather than "O 44.5", for the places with room to spell it -
  * a held pick reads as a sentence, where the pick buttons are a fixed narrow
  * column and have to stay abbreviated.

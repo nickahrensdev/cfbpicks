@@ -384,7 +384,13 @@ export default function GameCard({
           </div>
         </div>
 
-        <div className="d-grid gap-2">
+        {/* minmax(0, 1fr) rather than the default 1fr. A grid item's automatic
+            minimum size is its content, so without this the rows below refuse
+            to shrink below the full team name plus three unshrinkable pick
+            buttons - and the last column spills past the card edge. The name
+            column inside each row is already set up to absorb the squeeze;
+            this is what lets it. */}
+        <div className="d-grid gap-2" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
           {/* Column headings. aria-hidden because each button already names
               its own market and number. Gone once the game has kicked off,
               along with the columns they label. */}

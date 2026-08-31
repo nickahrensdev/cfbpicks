@@ -58,12 +58,17 @@ export function TeamLink({ team, name, logo = true, logoSize = 22, className = '
   }
 
   return (
+    // min-width 0 on the link and text-truncate on the name let a long school
+    // ellipsize when its column is squeezed, rather than being clipped
+    // mid-letter. Both are inert wherever the container gives it room, which is
+    // everywhere except the game card's team rows.
     <Link
       to={`/teams/${team.id}`}
       className={`text-decoration-none link-body-emphasis d-inline-flex align-items-center gap-2 ${className}`}
+      style={{ minWidth: 0 }}
     >
       {logo && <TeamLogo team={team} size={logoSize} />}
-      <span>
+      <span className="text-truncate">
         <TeamRank rank={team.rank} className="me-1" />
         {label}
       </span>

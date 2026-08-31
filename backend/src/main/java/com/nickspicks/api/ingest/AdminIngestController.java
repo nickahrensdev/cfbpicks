@@ -5,6 +5,7 @@ import com.nickspicks.api.cfbd.CfbdQuotaService;
 import com.nickspicks.api.cfbd.CfbdQuotaSnapshot;
 import com.nickspicks.api.game.Game;
 import com.nickspicks.api.game.GameRepository;
+import com.nickspicks.api.pick.CadenceSettlementService;
 import com.nickspicks.api.game.GameStatus;
 import com.nickspicks.api.season.CurrentWeekResolver;
 import com.nickspicks.api.security.CurrentUserService;
@@ -46,12 +47,14 @@ public class AdminIngestController {
     private final GradingService grading;
     private final AsyncIngestService asyncIngest;
     private final DataLoadLogService dataLoadLogs;
+    private final CadenceSettlementService settlement;
 
     public AdminIngestController(CurrentWeekResolver weeks, CfbdClient cfbd,
                                  CfbdQuotaService quotaService,
                                  CurrentUserService currentUser, TeamRepository teams,
                                  GameRepository games, GradingService grading,
-                                 AsyncIngestService asyncIngest, DataLoadLogService dataLoadLogs) {
+                                 AsyncIngestService asyncIngest, DataLoadLogService dataLoadLogs,
+                                 CadenceSettlementService settlement) {
         this.teams = teams;
         this.games = games;
         this.grading = grading;
@@ -61,6 +64,7 @@ public class AdminIngestController {
         this.currentUser = currentUser;
         this.asyncIngest = asyncIngest;
         this.dataLoadLogs = dataLoadLogs;
+        this.settlement = settlement;
     }
 
     /**
@@ -257,6 +261,27 @@ public class AdminIngestController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("gameId", gameId);
         result.put("picksRegraded", grading.regradeGame(game));
+        return result;
+    }
+
+    /**
+     * Closes out every finished period that has not been settled yet.
+     *
+     * <p>The hourly job does this on its own; this is the button for when a
+     * group's minimums were only configured after a period had already closed,
+     * and for seeing the result without waiting for the next hour.
+     *
+     * <p>Safe to press repeatedly - a settled period is recorded and skipped.
+     */
+    @PostMapping("/settle")
+    public Map<String, Object> settle(@AuthenticationPrincipal Jwt jwt,
+                                      @RequestParam(required = false) Integer season) {
+        currentUser.requireAdmin(jwt);
+        int year = season != null ? season : weeks.currentSeason();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("season", year);
+        result.put("periodsSettled", settlement.settleAll(year));
         return result;
     }
 }

@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './auth/AuthProvider.jsx';
 import { ProfileProvider } from './auth/ProfileProvider.jsx';
+import { GroupProvider } from './auth/GroupProvider.jsx';
 import { applyTheme, cachedTheme } from './lib/theme.js';
 import './styles/theme.scss';
 import './styles/themes.css';
@@ -24,7 +25,9 @@ createRoot(document.getElementById('root')).render(
     <BrowserRouter basename={basename}>
       <AuthProvider>
         <ProfileProvider>
-          <App />
+          <GroupProvider>
+            <App />
+          </GroupProvider>
         </ProfileProvider>
       </AuthProvider>
     </BrowserRouter>

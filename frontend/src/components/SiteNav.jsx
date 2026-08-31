@@ -4,6 +4,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { useProfile } from '../auth/ProfileProvider.jsx';
+import { handle } from './common.jsx';
 
 // My picks is a filter on the games board, not a nav destination - the
 // toggle lives with the other filters. /my-picks still redirects there for
@@ -11,10 +12,12 @@ import { useProfile } from '../auth/ProfileProvider.jsx';
 const LINKS = [
   { to: '/', label: 'Games', end: true },
   { to: '/leaderboard', label: 'Leaderboard' },
+  { to: '/groups', label: 'Groups' },
 ];
 
 const ADMIN_LINKS = [
   { to: '/admin/members', label: 'Members' },
+  { to: '/admin/groups', label: 'Groups' },
   { to: '/admin/data', label: 'Data' },
   { to: '/admin/data-log', label: 'Data log' },
   { to: '/admin/activity', label: 'Activity log' },
@@ -37,6 +40,7 @@ export default function SiteNav() {
 
   return (
     <Navbar
+      data-sticky="nav"
       expand="lg"
       bg="dark"
       variant="dark"
@@ -74,7 +78,13 @@ export default function SiteNav() {
             {session ? (
               <>
                 <Nav.Link as={NavLink} to="/profile" className="d-flex align-items-center gap-2">
-                  {profile?.displayName ?? 'Profile'}
+                  {/* The handle where it fits; on a phone the row is
+                      already tight, and "My Profile" says what the link does
+                      better than a name does. */}
+                  <span className="d-none d-lg-inline">
+                    {profile ? handle(profile.username) : 'Profile'}
+                  </span>
+                  <span className="d-lg-none">My Profile</span>
                   {isAdmin && (
                     <Badge bg="primary" className="fw-normal">
                       admin

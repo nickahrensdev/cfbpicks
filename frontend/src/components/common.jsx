@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Spinner } from 'react-bootstrap';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 /**
  * Back to wherever you came from.
@@ -52,12 +52,134 @@ export function ErrorNotice({ error, onRetry }) {
   );
 }
 
+/**
+ * A destructive button that needs a second click.
+ *
+ * <p>The first click swaps the label for the warning, so the confirmation says
+ * what will actually be lost rather than asking "are you sure" about nothing.
+ * Clicking away resets it - an armed delete button left sitting there is its
+ * own hazard.
+ */
+export function ConfirmButton({
+  label,
+  confirmLabel,
+  onConfirm,
+  variant = 'danger',
+  size,
+  disabled = false,
+  className = '',
+}) {
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!armed) return undefined;
+    const reset = () => setArmed(false);
+    // Capture phase, so the button's own click is not what disarms it.
+    window.addEventListener('click', reset, { capture: true, once: true });
+    return () => window.removeEventListener('click', reset, { capture: true });
+  }, [armed]);
+
+  return (
+    <Button
+      variant={armed ? variant : `outline-${variant}`}
+      size={size}
+      disabled={disabled}
+      className={className}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (armed) {
+          setArmed(false);
+          onConfirm();
+        } else {
+          setArmed(true);
+        }
+      }}
+    >
+      {armed ? confirmLabel : label}
+    </Button>
+  );
+}
+
+/**
+ * Shown in place of a board when the member belongs to no group.
+ *
+ * <p>Every board is a group's board now, so with no group there is nothing to
+ * render - and an empty table would read as "no games this week" rather than
+ * "you have not joined a league".
+ */
+export function NoGroupNotice() {
+  return (
+    <EmptyState title="You are not in a group yet">
+      <p className="mb-3">
+        Games, picks and standings all belong to a group. Join one to get started.
+      </p>
+      <Button as={Link} to="/groups" variant="primary">
+        Find a group
+      </Button>
+    </EmptyState>
+  );
+}
+
 export function EmptyState({ title, children }) {
   return (
     <div className="text-center text-body-secondary py-5">
       <p className="mb-2 fw-semibold">{title}</p>
       {children}
     </div>
+  );
+}
+
+/**
+ * A member's username as a handle: {@code @nick}.
+ *
+ * <p>One helper rather than an "@" typed into each of the dozen places a name
+ * appears, so the prefix cannot drift and a handle is never accidentally
+ * rendered bare. Usernames carry no spaces, which is what lets the @ read as
+ * part of the name rather than as punctuation before it.
+ */
+export function handle(username) {
+  if (!username) return '';
+  // Tolerates a stored value that already leads with @ rather than doubling it.
+  return username.startsWith('@') ? username : `@${username}`;
+}
+
+/**
+ * The full identity: {@code Nick Ahrens (@nick)}.
+ *
+ * <p>Two fields because one could not do both jobs - the display name is what
+ * someone is called and may repeat, the username is who they are and does not.
+ * Anywhere both fit, both are shown; the handle alone is the fallback when
+ * only it is known, and where space is tight.
+ */
+export function memberName(displayName, username) {
+  if (!displayName) return handle(username);
+  if (!username) return displayName;
+  return `${displayName} (${handle(username)})`;
+}
+
+/**
+ * The same identity, but with the handle set smaller and quieter than the name.
+ *
+ * <p>A table of these reads as a column of names with an identifier attached,
+ * rather than as two names of equal weight competing for the eye. The string
+ * form above is still what a sentence or a toast wants.
+ *
+ * <p>`stacked` puts the handle on its own line under the name, for a column
+ * wide enough that a long name and a long handle side by side would set the
+ * whole table's width.
+ */
+export function MemberName({ displayName, username, className = '', stacked = false }) {
+  if (!displayName) return <span className={className}>{handle(username)}</span>;
+  const Wrapper = stacked ? 'div' : 'span';
+  return (
+    <Wrapper className={className}>
+      {displayName}
+      {username && (
+        <span className={`small text-body-secondary ${stacked ? 'd-block' : 'ms-2'}`}>
+          {handle(username)}
+        </span>
+      )}
+    </Wrapper>
   );
 }
 
@@ -89,8 +211,14 @@ export function formatTotalLong(overUnder, side) {
   return `${side === 'OVER' ? 'Over' : 'Under'} ${Number(overUnder)}`;
 }
 
-/** Formats whichever line a pick was made against. */
+/**
+ * Formats whichever line a pick was made against.
+ *
+ * <p>A winner pick has no line - it is played against the result, not a
+ * number - so there is nothing to format and it says so instead.
+ */
 export function formatLine(line, selection) {
+  if (selection === 'HOME_WINNER' || selection === 'AWAY_WINNER') return 'To win';
   return selection === 'OVER' || selection === 'UNDER'
     ? formatTotal(line, selection)
     : formatSpread(line, selection);
@@ -98,24 +226,99 @@ export function formatLine(line, selection) {
 
 /** Human label for a market. */
 export function marketLabel(market) {
-  return market === 'TOTAL' ? 'Total' : 'Spread';
+  if (market === 'TOTAL') return 'Total';
+  if (market === 'WINNER') return 'Winner';
+  return 'Spread';
 }
 
 /**
- * Whether anything on this game can still be picked.
+ * The same, abbreviated, for a narrow column that repeats it on every row.
  *
- * <p>Two ways a game drops out: the 30-minute window has closed (which also
- * covers kicked-off, finished and TBD-kickoff games), or neither market has a
- * number posted. A game with only one of the two lines is still pickable -
- * just not in both markets.
+ * <p>Three markets rendered at full width push the columns that carry the
+ * actual information off a phone screen, and a column whose values repeat is
+ * the cheapest place to buy that width back.
+ */
+export function marketAbbr(market) {
+  if (market === 'TOTAL') return 'O/U';
+  if (market === 'WINNER') return 'WIN';
+  return 'SPR';
+}
+
+/**
+ * A pick's line with nothing but the number.
+ *
+ * <p>{@link formatLine} prefixes a total with O or U so a bare number in a
+ * column beside two team rows cannot be read as belonging to a team. Where the
+ * pick itself is already spelled out one column over, that prefix is saying the
+ * same thing twice.
+ */
+export function formatLineBare(line, selection) {
+  if (selection === 'HOME_WINNER' || selection === 'AWAY_WINNER') return 'To win';
+  if (line === null || line === undefined) return 'No line';
+  return selection === 'OVER' || selection === 'UNDER'
+    ? `${Number(line)}`
+    : formatSpread(line, selection);
+}
+
+/**
+ * A row tint for a pick's outcome.
+ *
+ * <p>The colour replaces a result column rather than joining it: in a table
+ * where every other cell is two or three characters, a badge saying WIN was
+ * the widest thing on the row to say what a tint says at a glance.
+ *
+ * <p>Only the background is set, and only faintly. Bootstrap's `.table-success`
+ * and friends also force a near-black text colour, which is right on a white
+ * page and unreadable on a dark one - a pale pink row of dark text inside a
+ * dark card. Overriding `--bs-table-bg` is how the built-in variants tint a
+ * row, so hover and striping still layer over the top correctly, while the
+ * text keeps whatever colour the theme gives it.
+ *
+ * <p>A push and a void share grey - both decided nothing, and the difference
+ * between them is about the game, not about the pick.
+ */
+export function pickRowStyle(result) {
+  const tint = (name) => ({ '--bs-table-bg': `rgba(var(--bs-${name}-rgb), 0.13)` });
+  if (result === 'WIN') return tint('success');
+  if (result === 'LOSS') return tint('danger');
+  if (result === 'PUSH' || result === 'VOID') return tint('secondary');
+  return tint('warning');
+}
+
+/**
+ * Whether anything on this game can still be picked, in this group.
+ *
+ * <p>Two ways a game drops out: the lock window has closed (which also covers
+ * kicked-off, finished and TBD-kickoff games), or none of the markets the
+ * group plays has what it needs. A game with only one of the two lines is
+ * still pickable - just not in every market.
+ *
+ * <p>The winner market needs nothing posted, so a group that plays winners can
+ * pick any game that has not locked.
  *
  * <p>Defined once because the card's disabled buttons and the "hide
  * unpickable" filter have to agree; a game the filter keeps but the card
  * cannot act on is worse than either behaviour alone.
  */
-export function isPickable(game) {
+export function isPickable(game, markets = ALL_MARKETS) {
   if (game.locked) return false;
-  return game.homeSpread != null || game.overUnder != null;
+  if (markets.winner) return true;
+  return (markets.spread && game.homeSpread != null)
+    || (markets.total && game.overUnder != null);
+}
+
+/** Every market, for callers with no group context to narrow it. */
+export const ALL_MARKETS = { winner: true, spread: true, total: true };
+
+/** The markets a group plays, in the shape the board and card expect. */
+export function marketsOf(group) {
+  return group
+    ? {
+      winner: Boolean(group.winnerEnabled),
+      spread: Boolean(group.spreadEnabled),
+      total: Boolean(group.totalEnabled),
+    }
+    : ALL_MARKETS;
 }
 
 export function ResultBadge({ result }) {
@@ -132,8 +335,25 @@ export function ResultBadge({ result }) {
   return <Badge bg={variant}>{label}</Badge>;
 }
 
+/** Open padlock, for a group anyone can join. Paired with {@link LockIcon}. */
+export function UnlockIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="12"
+      height="12"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M11 1a2 2 0 0 0-2 2v4H3a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-.5V3a1.5 1.5 0 1 1 3 0v3h1V3a2 2 0 0 0-2-2z" />
+    </svg>
+  );
+}
+
 /** Padlock. Decorative - the badge it sits in carries the accessible name via title. */
-function LockIcon() {
+export function LockIcon() {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

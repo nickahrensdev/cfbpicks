@@ -60,22 +60,41 @@ function RefreshIcon() {
   );
 }
 
+/** Friendly names for game.status, in the order a week moves through them. */
+const STATUSES = [
+  ['SCHEDULED', 'Not started'],
+  ['IN_PROGRESS', 'Live'],
+  ['FINAL', 'Final'],
+  ['CANCELED', 'Canceled'],
+];
+
 /**
- * Conference / team / spread-size filters, collapsed by default so the board
- * is the first thing on screen.
+ * Conference / team / status / spread-size filters, collapsed by default so
+ * the board is the first thing on screen.
  *
  * <p>"My picks" stays outside the collapse: it is a view switch people reach
  * for constantly, and burying the most-used control behind a disclosure
  * would cost more than the space it saves. The count of active filters is
  * shown on the toggle so a collapsed panel can never hide the fact that the
  * list is filtered.
+ *
+ * <p>A bare toolbar rather than a filled panel. This sits directly under two
+ * sticky bars already, and a third tinted block above the board made the page
+ * feel like chrome with games underneath it.
+ *
+ * <p>Two fixed rows - the picker, then the actions and the count - rather than
+ * one row that wraps. A wrapping row moved controls between lines as the
+ * window and the board changed, so the toolbar never looked the same twice.
  */
 export default function GameFilters({
   options,
   value,
   onChange,
+  /** Shown at the right of the action row, describing the board below it. */
   resultCount,
   totalCount,
+  /** A daily board is already one day, so "today only" has nothing to narrow. */
+  daily = false,
   /** Rendered first in the control row - the week picker on the games board. */
   weekSelector = null,
   /** Manual re-fetch of the current board, next to the filter toggle. */
@@ -96,23 +115,33 @@ export default function GameFilters({
   const activeCount =
     (value.conference ? 1 : 0)
     + (value.teamId ? 1 : 0)
+    + (value.status ? 1 : 0)
     + (spreadNarrowed ? 1 : 0)
     + (value.pickableOnly ? 1 : 0)
-    + (value.todayOnly ? 1 : 0);
+    // Not counted on a daily board, where the control is hidden and the page
+    // ignores it - a filter nobody can see or clear must not show as active.
+    + (!daily && value.todayOnly ? 1 : 0);
   const filtered = activeCount > 0 || value.mine;
 
   return (
-    <div className="bg-body-tertiary rounded-3 p-3 mb-4">
-      {/* One row, never wrapping: week on the left, actions on the right.
-          The counts sit underneath so the controls keep their places as the
-          text beside them changes length. */}
-      <div className="d-flex align-items-center gap-2 flex-nowrap">
-        {weekSelector}
+    <div className="mb-3">
+      {/* Two fixed rows rather than one that wraps at some widths and not
+          others - the controls kept moving between lines as the board and the
+          window changed, which is harder to use than a layout that simply
+          always looks the same.
 
-        <div className="ms-auto d-flex align-items-center gap-2 flex-nowrap">
+          The period picker owns the first row. */}
+      <div className="d-flex align-items-center mb-3">{weekSelector}</div>
+
+      {/* Actions left; the count and refresh sit together on the right. The
+          count describes the board below, and refresh is what re-reads it. */}
+      <div className="d-flex align-items-center gap-2">
+        <div className="d-flex align-items-center gap-2 flex-nowrap">
+          {/* text-nowrap so "My picks" never breaks across two lines, which
+              made the whole row taller the moment it was switched on. */}
           <Button
             size="sm"
-            className="control-btn"
+            className="control-btn text-nowrap"
             variant={value.mine ? 'primary' : 'outline-primary'}
             onClick={() => update({ mine: !value.mine })}
             aria-pressed={value.mine}
@@ -142,6 +171,41 @@ export default function GameFilters({
             )}
           </Button>
 
+          {/* Only when there is something to clear, so the row stays quiet
+              in its resting state. */}
+          {filtered && (
+            <Button
+              variant="link"
+              size="sm"
+              className="p-0 ms-1 text-body-secondary text-nowrap"
+              onClick={() =>
+                onChange({
+                  conference: null,
+                  teamId: null,
+                  status: null,
+                  minSpread: null,
+                  maxSpread: null,
+                  mine: false,
+                  pickableOnly: false,
+                  todayOnly: false,
+                })
+              }
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+
+        <div className="ms-auto d-flex align-items-center gap-2 flex-nowrap">
+          {/* Nothing rather than "0 games" while a board is still loading. */}
+          {totalCount > 0 && (
+            <span className="small text-body-secondary text-nowrap">
+              {resultCount === totalCount
+                ? `${totalCount} games`
+                : `${resultCount} of ${totalCount} games`}
+            </span>
+          )}
+
           {onRefresh && (
             <Button
               size="sm"
@@ -158,36 +222,9 @@ export default function GameFilters({
         </div>
       </div>
 
-      <div className="d-flex align-items-center justify-content-between gap-2 mt-2">
-        <span className="small text-body-secondary">
-          {filtered ? `${resultCount} of ${totalCount} games` : `${totalCount} games`}
-        </span>
-
-        {filtered && (
-          <Button
-            variant="link"
-            size="sm"
-            className="p-0"
-            onClick={() =>
-              onChange({
-                conference: null,
-                teamId: null,
-                minSpread: null,
-                maxSpread: null,
-                mine: false,
-                pickableOnly: false,
-                todayOnly: false,
-              })
-            }
-          >
-            Clear
-          </Button>
-        )}
-      </div>
-
       <Collapse in={open}>
         <div id="game-filter-panel">
-          <Row className="g-3 align-items-end pt-3">
+          <Row className="g-3 align-items-end pt-3 pb-1">
             <Col xs={12} md={4}>
               <Form.Label htmlFor="filter-conference" className="small fw-semibold mb-1">
                 Conference
@@ -227,6 +264,25 @@ export default function GameFilters({
             </Col>
 
             <Col xs={12} md={4}>
+              <Form.Label htmlFor="filter-status" className="small fw-semibold mb-1">
+                Status
+              </Form.Label>
+              <Form.Select
+                id="filter-status"
+                size="sm"
+                value={value.status ?? ''}
+                onChange={(e) => update({ status: e.target.value || null })}
+              >
+                <option value="">Any status</option>
+                {STATUSES.map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </Form.Select>
+            </Col>
+
+            <Col xs={12} md={6}>
               <div className="d-flex justify-content-between align-items-baseline mb-1">
                 <span className="small fw-semibold">Spread size</span>
                 <span className="small text-body-secondary">
@@ -268,18 +324,22 @@ export default function GameFilters({
               </div>
             </Col>
 
-            <Col xs={12}>
-              <Form.Check
-                type="switch"
-                id="filter-today"
-                checked={Boolean(value.todayOnly)}
-                onChange={(e) => update({ todayOnly: e.target.checked })}
-                label="Today's games"
-              />
-              <div className="small text-body-tertiary">
-                Only games kicking off today, your local time.
-              </div>
-            </Col>
+            {/* Meaningless on a daily board - it is already one day, so this
+                could only ever show everything or nothing. */}
+            {!daily && (
+              <Col xs={12}>
+                <Form.Check
+                  type="switch"
+                  id="filter-today"
+                  checked={Boolean(value.todayOnly)}
+                  onChange={(e) => update({ todayOnly: e.target.checked })}
+                  label="Today's games"
+                />
+                <div className="small text-body-tertiary">
+                  Only games kicking off today, your local time.
+                </div>
+              </Col>
+            )}
           </Row>
         </div>
       </Collapse>

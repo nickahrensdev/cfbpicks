@@ -27,17 +27,35 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/me")
 public class MeController {
 
+    /** Both fields cap here. Shared with the provisioning path. */
+    public static final int NAME_MAX = 20;
+
     /**
-     * Display names are what the leaderboard shows, so they have to be
-     * unique. Letters, numbers and a few separators only - no leading or
-     * trailing whitespace to make two names look identical.
+     * The @handle, and the only unique one. No spaces, because it renders as
+     * {@code @nick} and a space in one reads as the end of the name rather
+     * than part of it.
+     *
+     * <p>Shared with {@link com.nickspicks.api.security.CurrentUserService},
+     * which seeds the first username and has to satisfy the same rule.
+     */
+    public static final String USERNAME_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._-]*[A-Za-z0-9]$";
+
+    /**
+     * What they are called. Free-form on purpose: two people can both be
+     * "Nick", and a display name is allowed the space that a handle is not.
      */
     public record DisplayNameRequest(
             @NotBlank
-            @Size(min = 2, max = 40)
-            @Pattern(regexp = "^[A-Za-z0-9][A-Za-z0-9 ._-]*[A-Za-z0-9]$",
-                    message = "Use letters, numbers, spaces, dots, dashes or underscores")
+            @Size(min = 2, max = NAME_MAX)
             String displayName) {
+    }
+
+    public record UsernameRequest(
+            @NotBlank
+            @Size(min = 2, max = NAME_MAX)
+            @Pattern(regexp = USERNAME_PATTERN,
+                    message = "Use letters, numbers, dots, dashes or underscores - no spaces")
+            String username) {
     }
 
     private final CurrentUserService currentUser;
@@ -54,6 +72,7 @@ public class MeController {
         return profile(user);
     }
 
+    /** Nothing to check but the shape - display names are not unique. */
     @PutMapping
     @Transactional
     public ApiDtos.MemberProfile updateDisplayName(
@@ -61,16 +80,28 @@ public class MeController {
             @Valid @RequestBody DisplayNameRequest request) {
 
         AppUser user = currentUser.resolve(jwt);
-        String wanted = request.displayName().trim();
+        user.setDisplayName(request.displayName().trim());
+        users.save(user);
+        return profile(user);
+    }
+
+    @PutMapping("/username")
+    @Transactional
+    public ApiDtos.MemberProfile updateUsername(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody UsernameRequest request) {
+
+        AppUser user = currentUser.resolve(jwt);
+        String wanted = request.username().trim();
 
         // Case-insensitive uniqueness, matching the database index. Comparing
-        // against the current name first lets someone re-case their own.
-        if (!wanted.equalsIgnoreCase(user.getDisplayName())
-                && users.existsByDisplayNameIgnoreCase(wanted)) {
-            throw new DisplayNameTakenException("That display name is already taken");
+        // against their current one first lets someone re-case their own.
+        if (!wanted.equalsIgnoreCase(user.getUsername())
+                && users.existsByUsernameIgnoreCase(wanted)) {
+            throw new UsernameTakenException("That username is already taken");
         }
 
-        user.setDisplayName(wanted);
+        user.setUsername(wanted);
         users.save(user);
         return profile(user);
     }
@@ -91,13 +122,13 @@ public class MeController {
     }
 
     private ApiDtos.MemberProfile profile(AppUser user) {
-        return new ApiDtos.MemberProfile(user.getId(), user.getDisplayName(), user.getEmail(),
+        return new ApiDtos.MemberProfile(user.getId(), user.getDisplayName(), user.getUsername(), user.getEmail(),
                 user.getRole().name(), user.getTheme().name(), user.getColorMode().name());
     }
 
     /** 409 rather than a validation error - the name is well-formed, just taken. */
-    public static class DisplayNameTakenException extends RuntimeException {
-        public DisplayNameTakenException(String message) {
+    public static class UsernameTakenException extends RuntimeException {
+        public UsernameTakenException(String message) {
             super(message);
         }
     }

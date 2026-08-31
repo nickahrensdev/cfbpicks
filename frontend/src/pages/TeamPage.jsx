@@ -11,6 +11,7 @@ import {
   formatSpread,
 } from '../components/common.jsx';
 import { api } from '../api/client.js';
+import { useGroup } from '../auth/GroupProvider.jsx';
 
 const inches = (value) =>
   value ? `${Math.floor(value / 12)}'${String(value % 12).padStart(2, '0')}"` : '-';
@@ -67,6 +68,8 @@ function record(split) {
 }
 
 export default function TeamPage() {
+  const { groupId } = useGroup();
+
   const { id } = useParams();
   const [team, setTeam] = useState(null);
   const [tab, setTab] = useState('schedule');
@@ -77,13 +80,13 @@ export default function TeamPage() {
     setLoading(true);
     setError(null);
     try {
-      setTeam(await api.team(id));
+      setTeam(await api.team(id, { groupId }));
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [groupId, id]);
 
   useEffect(() => {
     load();

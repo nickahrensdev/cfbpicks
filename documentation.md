@@ -1,8 +1,9 @@
 # Nick's Picks — Documentation
 
-A college football pick'em site. Members sign in, see the week's games with point spreads, pick up
-to ten against the spread, and are ranked on a leaderboard. Every team, player and coach on the site
-is clickable through to its own page.
+A college football pick'em site. Members join a **group** — an isolated league with its own rules —
+then see the week's games with point spreads, pick against the spread or the total, and are ranked
+on that group's leaderboard. Every team, player and coach on the site is clickable through to its
+own page.
 
 | Part | Stack | Location |
 | --- | --- | --- |
@@ -35,27 +36,31 @@ which owns the database and every outbound data call.
 
 | Rule | Where it is enforced |
 | --- | --- |
-| Up to **10 picks** per member per week, any mix of markets | `PickService` + the `weekly_entry` row lock + a DB check constraint |
-| One pick per **market** per game | `unique (user_id, game_id, market)` |
-| Create, edit or cancel until **30 minutes before kickoff** | [PickWindow.java](backend/src/main/java/com/nickspicks/api/pick/PickWindow.java) |
+| A **per-group cap** on picks per period, any mix of markets | `PickService` + the `cadence_entry` row lock |
+| One pick per **market** per game **per group** | `unique (group_id, user_id, game_id, market)` |
+| Create, edit or cancel until the **group's lock lead** before kickoff | [PickWindow.java](backend/src/main/java/com/nickspicks/api/pick/PickWindow.java) |
 | Picks graded **against the spread** | [GradingService.java](backend/src/main/java/com/nickspicks/api/ingest/GradingService.java) |
-| The line is **locked when the pick is made** | `pick.locked_spread`, re-locked on edit |
+| The line is **locked when the pick is made** | `pick.locked_line`, re-locked on edit |
 | A pick against a **stale line is rejected** | `PickService.requireCurrentLine` → `409 LINE_MOVED` |
 | Other members' picks are **hidden until kickoff** | `PickService.findRevealedForUserWeek`, server-side |
-| Leaderboard ranks by **wins, then fewest losses** | `LeaderboardService` |
+| Leaderboard ranks by **points, then wins, then fewest losses**, scored by the **group's** point values | `LeaderboardService` |
 | Admin actions require the **ADMIN role** | `CurrentUserService.requireAdmin` → `403 FORBIDDEN` |
+| Groups are **created by admins only** | `AdminGroupController` |
+| Group authority is the **OWNER role**, and a group may have several | `GroupService.canManage` reads `group_member`, not `pick_group` |
+| A group always keeps **at least one owner** | `GroupService.isLastOwner` blocks the last demotion or removal |
 
-### Two markets
+### Three markets
 
-A pick plays either the **spread** (`HOME` / `AWAY`) or the **total** (`OVER` / `UNDER`). Both grade
-to the same WIN/LOSS/PUSH outcomes and draw on the same allowance of ten, so a member spends their
-week across whichever mix they like, and the leaderboard is indifferent to which.
+A pick plays the **spread** (`HOME` / `AWAY`), the **total** (`OVER` / `UNDER`) or the **winner**
+(`HOME_WINNER` / `AWAY_WINNER`). All three grade
+to the same WIN/LOSS/PUSH outcomes and draw on the same allowance, so a member spends their week
+across whichever mix they like. What each is worth is the group's decision.
 
 The market is **derived from the selection** in
 [Selection.java](backend/src/main/java/com/nickspicks/api/pick/Selection.java) — each constant
 carries its own — so an inconsistent pair cannot be built in code. The `pick.market` column exists
-for the `(user_id, game_id, market)` unique key, with a check constraint pairing the two as a
-backstop for anything writing to the table directly.
+for the `(group_id, user_id, game_id, market)` unique key, with a check constraint pairing the two
+as a backstop for anything writing to the table directly.
 
 Totals grade against the combined score:
 
@@ -64,8 +69,24 @@ total = homeScore + awayScore
 OVER  → WIN if total > lockedLine     UNDER → the reverse
 ```
 
-Availability is per market — a game can carry a spread and no total — but the 30-minute lock is
-shared, because it is a property of kickoff rather than of a market. Switching an existing pick from
+Availability is per market — a game can carry a spread and no total — but the lock is shared,
+because it is a property of kickoff rather than of a market. A group that has turned a market off
+rejects picks in it outright, and the board does not draw its buttons.
+
+**The winner market has no line**, which is what makes it more than a third enum value:
+
+- `locked_line` is **null** for a winner pick, enforced by a check constraint that requires it for
+  the other two. Storing a zero would be a lie in the audit trail, and the moneyline does not fit —
+  those are integers well past `numeric(4,1)`, and most games carry none.
+- Nothing can move, so there is no `LINE_MOVED` and no re-lock.
+- Nothing needs posting, so a game is winner-pickable as soon as it is scheduled.
+- A tie would push, which college football has not produced since overtime arrived in 1996. The
+  branch is a guard against a bad score, not a case anyone will meet — so `winner_push_points` will
+  realistically never pay out.
+
+`HOME_WINNER` exists rather than reusing `HOME` because `Selection` derives its market from the
+constant. A constant meaning two different things depending on a market passed beside it would give
+up the guarantee that design exists for. Switching an existing pick from
 one market to the other is rejected: it would change the row's identity under the unique key, so it
 is a cancel and a new pick.
 
@@ -88,7 +109,7 @@ received). That sign logic lives only in `PickWindow.isLineImproved` and is cove
 getting it backwards would offer a button that quietly makes a pick worse.
 
 Re-locking never changes sides, is refused unless the line genuinely improved, and still respects the
-30-minute window.
+group's lock window.
 
 ### Roles
 
@@ -103,7 +124,7 @@ It is insert-only and has **no foreign key to `pick`**, so a cancelled pick keep
 though the pick row is gone. Visible at **Admin → Activity log**.
 
 Three things make a game unpickable: no posted line, a kickoff time still marked TBD, or the
-30-minute window having closed.
+group's lock window having closed.
 
 ### How grading works
 
@@ -131,7 +152,7 @@ Worked example — home favored by 7.5, final score 24-20:
 
 Two members who both took the same side can legitimately get different results, because each is
 graded on the number they actually saw. Later line movement updates the game but never touches an
-existing `pick.locked_spread`. Editing a pick re-locks the current line — you are committing to
+existing `pick.locked_line`. Editing a pick re-locks the current line — you are committing to
 today's number, not last week's.
 
 ---
@@ -330,37 +351,96 @@ Managed by Flyway ([db/migration/](backend/src/main/resources/db/migration/)); H
 `ddl-auto: validate` in every environment, so a drift between entity and table fails at startup.
 
 ```
-app_user       id (= Supabase auth sub) · email · display_name
+app_user       id (= Supabase auth sub) · email · display_name · username (unique, the @handle)
 team           id (CFBD) · school · mascot · conference · color · logo_url · venue_*
 athlete        (id, season) · name · team_id · position · jersey · height · weight · hometown
 coach          id · name · hire_date
 coach_season   (coach_id, season, school) · team_id · games · wins · losses · sp_*
 game           id (CFBD) · season · week · home/away team+id · kickoff · start_time_tbd
                home_spread · spread_open · over_under · moneylines · scores · elo · status
-pick           id · user_id · game_id · selection · locked_spread · result · UNIQUE(user_id, game_id)
-weekly_entry   (user_id, season, week) · pick_count  CHECK 0..10
+pick           id · group_id · user_id · game_id · selection · market · locked_line · result
+               locked_line null for WINNER, required for SPREAD/TOTAL (check constraint)
+               UNIQUE(group_id, user_id, game_id, market)
+cadence_entry  (group_id, user_id, period_key) · pick_count
+               period_key = '2026-W01' (weekly) or '2026-09-05' (daily)
+pick_group     id · name · visibility · join_password · owner_id · group_type · cadence
+               length_type · start_season · lock_lead_minutes · min/max_picks_per_cadence
+               winner/spread/total_enabled · nine *_points columns · strikes_allowed
+               team_pick_limit + scope
+group_member   (group_id, user_id) · role (OWNER | MEMBER) · joined_at
+group_join_request (group_id, user_id) unique · status (PENDING|APPROVED|DENIED)
+               requested_at · decided_at · decided_by
 cfbd_sync      (resource, sync_key)      what has been fetched
 cfbd_call_log  endpoint · status · called_at   quota accounting
-v_standings    (view) wins · losses · pushes per member per season
 ```
 
-### Why `weekly_entry` exists
+### Groups
 
-The ten-pick cap cannot be enforced by counting picks. Two concurrent requests both read nine and
+A group is an isolated picking league with its own rules. Settings are typed columns rather than a
+JSON blob, so Postgres rejects a nonsensical combination even if something writes to the table
+directly; `GroupSettings.validate()` duplicates the cross-field rules in Java only to produce a
+readable message. The table is `pick_group` because `group` is a SQL reserved word and
+`LeaderboardService` reads the schema through raw SQL.
+
+The one combination worth knowing: **elimination groups must be `PER_YEAR`**. A continuous
+elimination pool ends the first time everyone is out and can never start over. The **group type is
+fixed after creation** — the two types score and cap differently, so switching an established league
+would re-interpret picks made under the other rules.
+
+### Owners, creators and joining
+
+Authority is the `OWNER` role in `group_member`, which several members can hold at once. It is
+deliberately *not* `pick_group.created_by`: that column records only who made the group, drives the
+"creator" badge, and is nullable so a group outlives its creator's account. The last owner cannot be
+demoted or removed — a group with no owner has nobody who can configure it, approve anyone or delete
+it.
+
+`require_approval` turns joining into a request. Every route in — search, and later a shared link —
+produces the same pending row, so the setting means what it says however someone arrived. The
+password is checked *before* the request is queued, so a wrong one is refused immediately rather
+than wasting an owner's time. One row per person per group, reused on a re-request, so an owner sees
+a queue rather than a log of attempts.
+
+**Wired up as of V14**: picks, the games board and the leaderboard are all group-scoped, and the
+group's own cap, lock lead, enabled markets and point values decide what happens.
+
+> **Still configurable but not yet enforced**: elimination strikes, the minimum picks per cadence,
+> and the per-team pick limit. Those settings save and display, but nothing acts on them yet.
+
+### Why `cadence_entry` exists
+
+The pick cap cannot be enforced by counting picks. Two concurrent requests both read nine and
 both insert, and the member ends up with eleven. `SELECT ... FOR UPDATE` does not help either,
 because the conflicting row does not exist yet — there is nothing to lock.
 
-So every pick mutation takes a pessimistic write lock on the member's `weekly_entry` row first,
-which serialises them. The `CHECK (pick_count BETWEEN 0 AND 10)` constraint is the last line of
-defence. `PickRulesIntegrationTest.twoConcurrentTenthPicksLeaveExactlyTenPicks` fires six threads at
-the tenth slot and asserts exactly ten picks land.
+So every pick mutation takes a pessimistic write lock on the member's `cadence_entry` row first,
+which serialises them. `PickRulesIntegrationTest.twoConcurrentTenthPicksLeaveExactlyTenPicks` fires
+six threads at the tenth slot and asserts exactly ten picks land.
+
+It replaced `weekly_entry` in V14. That table's key hard-coded the week as the counting period,
+which a daily group cannot use; the key is now an opaque `period_key` that
+[CadencePeriod](backend/src/main/java/com/nickspicks/api/pick/CadencePeriod.java) derives from the
+group's cadence and the *game's* kickoff — not the clock, so a pick made on Tuesday for Saturday
+counts against Saturday. Daily buckets use the America/New_York date, so a late Eastern kickoff
+stays on its own game day instead of rolling into the next one.
+
+The old `CHECK (pick_count BETWEEN 0 AND 10)` is gone with it: the cap is per group now and may be
+absent entirely, so the upper bound cannot live in the schema.
 
 ### Ranking
 
-Lives only in the `v_standings` view, ordered by wins then fewest losses. Changing the rule is a
-migration, not a code change. Note the trade-off you chose: because picks are "up to ten", someone
-who picks all ten every week at 60% outranks someone who picks five carefully at 75%. Switching to
-win percentage is a one-line change in the view.
+Lives only in `LeaderboardService` — V12 dropped the competing `v_standings` view precisely because
+the two had diverged. Ties break on points, then most wins, then fewest losses, then name.
+
+Scoring is per group. The SQL returns a win/loss/push count *per market* and Java multiplies those
+by the group's nine `*_points` columns, so a league can pay 2 for a spread win and 1 for a total,
+or −1 for a loss. The arithmetic is in Java rather than the ORDER BY because the group's numbers
+are parameters, not constants, and one copy of the rule is easier to trust than two.
+
+The board starts from `group_member`, not `app_user`, so it contains the league and nobody else.
+
+Note the trade-off the cap creates: where a group allows "up to ten", someone who picks all ten
+every week at 60% outranks someone who picks five carefully at 75%.
 
 ### RLS
 
@@ -378,19 +458,34 @@ machine-readable `code`, so the UI can tell "too late" from "already have ten" w
 | --- | --- | --- |
 | `GET` | `/api/me` | Caller's profile; provisions the member row |
 | `GET` | `/api/weeks/current` | Season, current week, available weeks |
-| `GET` | `/api/games?season&week` | Games with spread, `locked`, `locksAt`, caller's pick, team summaries |
-| `GET` | `/api/games/{id}` | Adds opening line, O/U, moneylines, Elo, and member picks once kicked off |
+| `GET` | `/api/games?groupId&season&week` | Games with spread, `locked`, `locksAt`, caller's pick, team summaries |
+| `GET` | `/api/games/{id}?groupId` | Adds opening line, O/U, moneylines, Elo, and member picks once kicked off |
 | `GET` | `/api/games/filters?season&week` | Conferences, teams and widest line that week |
-| `GET` | `/api/picks?season&week` | Caller's picks + `picksUsed` / `picksRemaining` |
-| `POST` | `/api/picks` | `{gameId, selection, expectedLine}` → 201 |
-| `PUT` | `/api/picks/{id}` | `{selection, expectedLine}` — re-locks the current line |
-| `POST` | `/api/picks/{id}/relock` | Move onto a better line, same side |
-| `DELETE` | `/api/picks/{id}` | 204, frees the slot |
-| `GET` | `/api/members/{id}/picks` | Filtered server-side to games already kicked off |
-| `GET` | `/api/leaderboard?season&week` | Every member; no `week` means the whole season |
+| `GET` | `/api/picks?groupId&season&week` | Caller's picks + `picksUsed` / `picksRemaining` (null when the group sets no cap) |
+| `POST` | `/api/picks?groupId` | `{gameId, selection, expectedLine}` → 201 |
+| `PUT` | `/api/picks/{id}?groupId` | `{selection, expectedLine}` — re-locks the current line |
+| `POST` | `/api/picks/{id}/relock?groupId` | Move onto a better line, same side |
+| `DELETE` | `/api/picks/{id}?groupId` | Returns the updated card, and frees the slot |
+| `GET` | `/api/members/{id}/picks?groupId` | Filtered server-side to games already kicked off |
+| `GET` | `/api/leaderboard?groupId&season&week` | The group's members; no `week` means the whole season. A continuous group with no `season` is all-time |
 | `PUT` | `/api/me` | `{displayName}` — unique, case-insensitive |
-| `GET` | `/api/teams`, `/api/teams/{id}` | Detail includes roster, staff and schedule |
+| `GET` | `/api/teams`, `/api/teams/{id}?groupId` | Detail includes roster, staff and schedule. `groupId` is optional — without it the schedule renders unmarked |
 | `GET` | `/api/athletes/{id}`, `/api/coaches/{id}` | |
+| `GET` | `/api/groups/mine` | Groups the caller belongs to |
+| `GET` | `/api/groups/search?q` | Public groups only; `passwordRequired`, never the password |
+| `GET` | `/api/groups/{id}` | Full settings — members and admins only |
+| `GET` | `/api/groups/{id}/members` | Roster, owner first |
+| `POST` | `/api/groups/{id}/join` | `{password}`; public groups only. Returns `{pending, group}` — `pending` when the group vets joiners |
+| `GET` | `/api/groups/{id}/requests` | Owners — who is waiting to be let in |
+| `POST` | `/api/groups/{id}/requests/{userId}/approve` \| `/deny` | Owners — 204 |
+| `PUT` | `/api/groups/{id}/members/{userId}/role` | Owners — `{role}`; refuses to demote the last owner |
+| `PUT` | `/api/groups/{id}` | Owner (or admin) edits settings |
+| `DELETE` | `/api/groups/{id}` | Owner (or admin); 204, takes membership with it |
+| `DELETE` | `/api/groups/{id}/members/{userId}` | Owner removes, or a member leaves; the owner row is refused |
+| `GET`&nbsp;/&nbsp;`POST` | `/api/admin/groups` | **admin** — list all, or create (creator becomes owner) |
+| `GET`/`PUT`/`DELETE` | `/api/admin/groups/{id}` | **admin** — any group |
+| `GET`&nbsp;/&nbsp;`POST` | `/api/admin/groups/{id}/members` | **admin** — roster, or add `{userId}` with no password |
+| `DELETE` | `/api/admin/groups/{id}/members/{userId}` | **admin** |
 | `GET` | `/api/admin/users` | **admin** — with pick counts |
 | `PUT` | `/api/admin/users/{id}/role` | **admin** — `{role}` |
 | `DELETE` | `/api/admin/users/{id}` | **admin** — cascades picks and history |
@@ -401,11 +496,15 @@ machine-readable `code`, so the UI can tell "too late" from "already have ten" w
 | `code` | Status | Meaning |
 | --- | --- | --- |
 | `PICK_WINDOW_CLOSED` | 409 | Inside 30 minutes of kickoff |
-| `WEEKLY_LIMIT_REACHED` | 409 | Already holding ten |
+| `WEEKLY_LIMIT_REACHED` | 409 | Already at the group's cap for the period |
 | `LINE_MOVED` | 409 | Stale page; carries `currentSpread` |
 | `INVALID_PICK` | 409 | Duplicate pick, or a re-lock that would not improve the line |
-| `DISPLAY_NAME_TAKEN` | 409 | Another member has that name |
-| `FORBIDDEN` | 403 | Signed in, but not an admin |
+| `USERNAME_TAKEN` | 409 | Another member has that name |
+| `INVALID_GROUP_SETTINGS` | 400 | Settings that are individually valid but contradict each other |
+| `GROUP_PASSWORD_REQUIRED` | 400 | The group is locked and no password was sent |
+| `GROUP_PASSWORD_INCORRECT` | 403 | Wrong password |
+| `ALREADY_A_MEMBER` | 409 | Already in that group |
+| `FORBIDDEN` | 403 | Signed in, but not an admin — or not the group's owner |
 | `UPSTREAM_UNAVAILABLE` | 503 | CFBD unreachable or out of quota |
 | `VALIDATION_FAILED` | 400 | Body invalid; `errors` maps field → message |
 | `NOT_FOUND` | 404 | |
@@ -426,9 +525,10 @@ src/
 │   ├── links.jsx          TeamLink · AthleteLink · CoachLink · TeamLogo
 │   ├── common.jsx         LockCountdown · ResultBadge · formatSpread · formatKickoff
 │   ├── GameCard.jsx       one game, two sides as pick buttons
+│   ├── GroupSettingsForm.jsx  every group setting, tabbed; controlled by its parent
 │   └── WeekSelector.jsx
 └── pages/                 Login · Games · GameDetail · MyPicks · Leaderboard
-                           Team · Athlete · Coach · Admin
+                           Groups · GroupDetail · Team · Athlete · Coach · Admin
 ```
 
 ### Everything is clickable
@@ -449,10 +549,14 @@ non-FBS opponent), the components degrade to plain text rather than a dead link.
 | `/games/:id` | Line detail, and everyone's picks once it kicks off |
 | `/leaderboard` | Every member, week dropdown, name search, click through to a card |
 | `/members/:id` | Another member's locked picks |
-| `/profile` | Change your display name |
+| `/groups` | Your groups, plus search-and-join for public ones |
+| `/groups/:id` | A group's settings and roster; editable by the owner, read-only for members |
+| `/profile` | Change your display name and username |
 | `/teams/:id` | Schedule and roster tabs, staff, colours |
 | `/athletes/:id`, `/coaches/:id` | Player bio; coach career table |
 | `/admin/members` | **admin** — roles and account removal |
+| `/admin/groups` | **admin** — every group, and the create form |
+| `/admin/groups/:id` | **admin** — settings and membership for any group |
 | `/admin/data` | **admin** — ingest triggers with a quota meter |
 | `/admin/activity` | **admin** — the pick log |
 
@@ -609,10 +713,21 @@ described in §5.
 
 | Check | Result |
 | --- | --- |
-| `mvnw test` | 83 passing, 5 skipped (opt-in live test) |
+| `mvnw test` | 235 passing, 10 skipped (opt-in live tests) |
 | Over/under picks | Verified live — spread and total on the same game, shared cap, per-market stale-line and duplicate rejection |
-| `npm run build` | Passing — 415 modules |
-| Flyway V1–V4 on Supabase | Applied; `ddl-auto: validate` passes |
+| `npm run build` | Passing — 429 modules |
+| Flyway V1–V12 on Supabase | Applied; `ddl-auto: validate` passes |
+| Flyway V13 (groups) | Applied to Supabase; first group created through the admin screen |
+| Flyway V14 (group-scoped picks) | Applied to Supabase |
+| Flyway V15 (co-owners, join approval) | Applied to Supabase |
+| Flyway V16 (group favourites) | Applied to Supabase |
+| Flyway V17 (winner market) | Applied to Supabase |
+| Flyway V18 (display name + username) | Applied to Supabase; every existing handle kept its value |
+| Flyway V19 (per-market pick limits) | Applied to Supabase; additive, all six columns null = no limit |
+| Flyway V20 (cadence settlement) | Applied to Supabase; two new tables, nothing altered |
+| Flyway V21 (group sharing) | Applied to Supabase; two new tables plus one defaulted column |
+| Groups | Creation, settings, search, join, membership and delete — verified live |
+| Group-scoped picks and leaderboard | Covered by tests; not yet exercised against the live database |
 | Supabase Auth end to end | Verified — signup, ES256 token, member provisioning, role on `/api/me` |
 | CFBD ingest | Verified live — 16 calendar weeks, 266 teams (FBS + FCS), 138 coaches, 99 week-1 games with lines |
 | Week look-ahead | Verified live — 15 weeks selectable, 1 loaded |

@@ -3,6 +3,12 @@ package com.nickspicks.api.web;
 import com.nickspicks.api.espn.EspnDtos;
 import com.nickspicks.api.espn.EspnGameService;
 import com.nickspicks.api.espn.LiveScoreService;
+import com.nickspicks.api.group.Cadence;
+import com.nickspicks.api.group.GroupRole;
+import com.nickspicks.api.group.GroupSettings;
+import com.nickspicks.api.group.GroupType;
+import com.nickspicks.api.group.LengthType;
+import com.nickspicks.api.group.Visibility;
 import com.nickspicks.api.pick.Market;
 import com.nickspicks.api.pick.PickResult;
 import com.nickspicks.api.pick.Selection;
@@ -217,6 +223,7 @@ public final class ApiDtos {
             /** The caller's own picks on this game - at most one per market. */
             PickSummary mySpreadPick,
             PickSummary myTotalPick,
+            PickSummary myWinnerPick,
             /**
              * The current line is strictly better for the side the caller
              * took, so re-locking can only help. False when there is no pick.
@@ -297,18 +304,47 @@ public final class ApiDtos {
     public record MemberPick(
             UUID userId,
             String displayName,
+            String username,
             Selection selection,
             Market market,
             BigDecimal lockedLine,
             PickResult result) {
     }
 
+    /**
+     * One market's allowance in the period being viewed.
+     *
+     * <p>{@code min} is what the period will charge as losses if it closes
+     * unmet - see CadenceSettlementService - which is why the board has to be
+     * able to say so before it does.
+     */
+    public record MarketBudget(
+            Market market,
+            int used,
+            /** Null for no minimum. */
+            Integer min,
+            /** Null for no maximum. */
+            Integer max) {
+    }
+
     public record WeekPicks(
             Integer season,
             Integer week,
+            /** Picks made in this week, whatever the group's cadence. */
             Integer picksUsed,
+            /**
+             * Null when there is nothing to count down: the group sets no
+             * maximum, or its allowance is per day and a week holds several.
+             */
             Integer picksRemaining,
+            /** The cap per cadence period. Null means no cap. */
             Integer maxPicks,
+            /** Which period {@code maxPicks} applies to, so the UI can say so. */
+            Cadence cadence,
+            /** The fewest picks the period must close with. 0 means none. */
+            int minPicks,
+            /** Per-market allowances for the same period, enabled markets only. */
+            List<MarketBudget> markets,
             List<PickWithGame> picks) {
     }
 
@@ -338,15 +374,29 @@ public final class ApiDtos {
             Integer rank,
             UUID userId,
             String displayName,
+            /** The unique handle. Shown beside the name, which is not unique. */
+            String username,
             /** Every pick in the period, pending ones included. */
             long totalPicks,
             long wins,
             long losses,
             /** Ties. A pick that landed exactly on its number. */
             long pushes,
-            /** A win is 1, a tie is 0.5, a loss is 0. The primary ranking key. */
+            /** Scored by the group's own point values. The primary ranking key. */
             double points,
-            Double winPercentage) {
+            Double winPercentage,
+            /**
+             * Losses charged for minimums the member finished a period short
+             * of. Included in {@code losses} and {@code points} already; broken
+             * out so the board can say why a record looks worse than the picks
+             * behind it.
+             */
+            long penaltyLosses,
+            /**
+             * Out of an elimination pool - more losses than the group's strikes
+             * allow. Always false in a pickem group, which eliminates nobody.
+             */
+            boolean eliminated) {
     }
 
     // ------------------------------------------------------------------ misc
@@ -360,7 +410,194 @@ public final class ApiDtos {
                               Double maxSpread) {
     }
 
-    public record MemberProfile(UUID id, String displayName, String email, String role,
-                                String theme, String colorMode) {
+    public record MemberProfile(UUID id, String displayName, String username, String email,
+                                String role, String theme, String colorMode) {
+    }
+
+    // ---------------------------------------------------------------- groups
+
+    /**
+     * A group as it appears in a list - my groups, or an admin's list of all of
+     * them. Deliberately carries no settings and never the join password.
+     */
+    public record GroupSummary(
+            UUID id,
+            String name,
+            String description,
+            Visibility visibility,
+            GroupType groupType,
+            Cadence cadence,
+            LengthType lengthType,
+            Integer startSeason,
+            /** Minutes before kickoff that picks close. The footer states it. */
+            int lockLeadMinutes,
+            /**
+             * Which markets this group plays. The board needs them to decide
+             * which pick buttons to draw at all - offering one the group has
+             * turned off is a button that can only fail.
+             */
+            boolean winnerEnabled,
+            boolean spreadEnabled,
+            boolean totalEnabled,
+            /** Who made the group. Null once their account is gone. */
+            UUID createdById,
+            String creatorName,
+            long memberCount,
+            /** Whether the caller may edit or delete it - an owner, or an app admin. */
+            boolean manageable,
+            /** The caller's role in the group, or null if they are not a member. */
+            GroupRole myRole,
+            /** Pinned to the top of this member's group picker. */
+            boolean favorite,
+            /**
+             * Whether the caller may hand out a link to this group. Public
+             * groups are shareable by any member; a private one needs its
+             * owner to have opted in.
+             */
+            boolean shareable,
+            Instant createdAt) {
+    }
+
+    /**
+     * A shared group as its invitee sees it, before signing in.
+     *
+     * <p>Deliberately thin. Anyone holding the link can read this without an
+     * account, so it carries only what a landing page has to say to explain
+     * what the invitation is for - never the join password, and never the
+     * membership.
+     */
+    public record ShareInvite(
+            UUID groupId,
+            String name,
+            String description,
+            boolean passwordRequired,
+            boolean requiresApproval,
+            long memberCount,
+            /** Who shared it. Null once their account is gone. */
+            String sharerName) {
+    }
+
+    /**
+     * One of a member's groups, as their profile card lists them.
+     *
+     * <p>Only the groups the viewer also belongs to. A member's card is
+     * reachable by anyone signed in, and the leagues someone plays in are not
+     * public just because their picks in one of them are.
+     */
+    public record MemberGroupRow(
+            UUID groupId,
+            String name,
+            GroupType groupType,
+            Cadence cadence,
+            GroupRole role,
+            long memberCount,
+            /** Their standing in that group this season, or null if it has no board yet. */
+            Integer rank,
+            long wins,
+            long losses,
+            long pushes,
+            double points) {
+    }
+
+    /** Someone who could be added to a group. Email disambiguates same-named people. */
+    public record MemberOption(UUID id, String displayName, String username, String email) {
+    }
+
+    /** The token half of a share URL; the frontend builds the rest. */
+    public record ShareLinkResponse(String token) {
+    }
+
+    /** Where a share link should send the caller, once they are signed in. */
+    public record ShareClaim(
+            UUID groupId,
+            String name,
+            /** They are already in, so the link is just a way back to the board. */
+            boolean alreadyMember,
+            /** Their join is waiting on an owner. */
+            boolean pending,
+            boolean passwordRequired) {
+    }
+
+    /**
+     * A public group as a searcher sees it, before joining. {@code
+     * passwordRequired} drives the lock icon; the password itself is never
+     * serialised.
+     */
+    public record GroupSearchResult(
+            UUID id,
+            String name,
+            String description,
+            boolean passwordRequired,
+            long memberCount,
+            /** Who made it. Null once their account is gone. */
+            String creatorName,
+            boolean alreadyMember) {
+    }
+
+    /** Full settings, for the group detail page and the edit form. */
+    public record GroupDetail(
+            UUID id,
+            UUID createdById,
+            String creatorName,
+            long memberCount,
+            boolean manageable,
+            GroupRole myRole,
+            /** Waiting to be approved. Only populated for someone who can act on them. */
+            long pendingRequests,
+            /**
+             * Whether the caller may hand out a link to this group. The page
+             * hides the Share button rather than showing one that would be
+             * refused.
+             */
+            boolean shareable,
+            Instant createdAt,
+            Instant updatedAt,
+            /**
+             * Everything configurable, in the same shape the update endpoint
+             * accepts, so the edit form round-trips without a translation step.
+             * The join password is included only for someone who may manage the
+             * group - it is how an owner reads it back to share it.
+             */
+            GroupSettings settings) {
+    }
+
+    public record GroupMemberRow(
+            UUID userId,
+            String displayName,
+            String username,
+            String email,
+            GroupRole role,
+            /** Made the group. Independent of role - a creator can be demoted. */
+            boolean creator,
+            Instant joinedAt) {
+    }
+
+    /** Someone waiting for an owner to let them in. */
+    public record JoinRequestRow(
+            UUID userId,
+            String displayName,
+            String username,
+            String email,
+            Instant requestedAt) {
+    }
+
+    /**
+     * The result of asking to join. {@code pending} means the group requires
+     * approval and an owner now has the request; the group detail is withheld
+     * until they are actually in.
+     */
+    public record JoinResult(boolean pending, GroupDetail group) {
+    }
+
+    public record JoinGroupRequest(String password) {
+    }
+
+    public record AddMemberRequest(@NotNull UUID userId) {
+    }
+
+    public record MemberRoleRequest(@NotNull GroupRole role) {
+    }
+
+    public record FavoriteRequest(boolean favorite) {
     }
 }

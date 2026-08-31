@@ -49,7 +49,8 @@ public class PickAudit {
     @Column(nullable = false)
     private Market market;
 
-    @Column(name = "locked_line", nullable = false)
+    /** Null for a winner pick, which is played against no line. */
+    @Column(name = "locked_line")
     private BigDecimal lockedLine;
 
     @Enumerated(EnumType.STRING)

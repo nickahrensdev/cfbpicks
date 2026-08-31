@@ -1,0 +1,46 @@
+# Both halves of the app, locally, in containers. Same behaviour as the
+# quick-start in documentation.md §2: Vite on 5173 proxying /api to the API on
+# 8080, backend on the `local` profile against Supabase.
+#
+#   docker compose up --build
+#
+# The database is still Supabase - nothing here runs Postgres. Credentials come
+# from backend/src/main/resources/application-local.yml (gitignored), which the
+# image already carries; override any of them with environment variables here.
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      # Read only by docker-entrypoint.sh's TLS probe, which is diagnostic and
+      # non-fatal - the app starts either way.
+      SUPABASE_POOLER_HOST: aws-0-ca-central-1.pooler.supabase.com
+      # The dev server is a sibling container, but the browser still calls
+      # through the proxy from localhost, so the origins are unchanged.
+      # The LAN address is added so a phone on the same Wi-Fi can reach the
+      # dev server directly and still pass the API's CORS check.
+      ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.136:5173
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    environment:
+      # localhost inside this container is the container, not the host.
+      VITE_PROXY_TARGET: http://backend:8080
+    volumes:
+      - ./frontend:/app
+      # Keep the host's node_modules out - it holds Windows builds of esbuild
+      # and rollup, which will not run on Alpine. This volume gets the Linux
+      # ones instead, installed on first start.
+      - frontend_node_modules:/app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - backend
+
+volumes:
+  frontend_node_modules:

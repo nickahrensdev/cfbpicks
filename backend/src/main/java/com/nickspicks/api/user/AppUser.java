@@ -24,8 +24,18 @@ public class AppUser {
     @Column(nullable = false)
     private String email;
 
+    /** What they are called. Duplicates are fine - two people can be Nick. */
     @Column(name = "display_name", nullable = false)
     private String displayName;
+
+    /**
+     * Who they are: the unique @handle. Separate from the display name because
+     * one field could not be both a readable name and a stable identifier -
+     * uniqueness made the second Nick pick something else, and handle-safety
+     * banned the space in "Nick A".
+     */
+    @Column(nullable = false)
+    private String username;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -45,10 +55,11 @@ public class AppUser {
     protected AppUser() {
     }
 
-    public AppUser(UUID id, String email, String displayName) {
+    public AppUser(UUID id, String email, String displayName, String username) {
         this.id = id;
         this.email = email;
         this.displayName = displayName;
+        this.username = username;
     }
 
     public UUID getId() {
@@ -69,6 +80,14 @@ public class AppUser {
 
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     public Role getRole() {

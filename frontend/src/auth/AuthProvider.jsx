@@ -31,11 +31,13 @@ export function AuthProvider({ children }) {
       loading,
       configured: isSupabaseConfigured,
       signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
-      signUp: (email, password, displayName) =>
+      // Both land in Supabase user metadata; the API seeds its own row from
+      // them on the first authenticated request.
+      signUp: (email, password, displayName, username) =>
         supabase.auth.signUp({
           email,
           password,
-          options: { data: { display_name: displayName } },
+          options: { data: { display_name: displayName, username } },
         }),
       signOut: () => supabase.auth.signOut(),
     }),

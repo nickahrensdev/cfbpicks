@@ -28,11 +28,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.nickspicks.api.group.GroupMemberRepository;
+import com.nickspicks.api.group.GroupReferralRepository;
+import com.nickspicks.api.group.GroupRepository;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -50,21 +55,40 @@ public class AdminController {
     private final PickRepository picks;
     private final PickAuditRepository audits;
     private final GameRepository games;
+    private final GroupRepository groups;
+    private final GroupMemberRepository members;
+    private final GroupReferralRepository referrals;
 
     public AdminController(CurrentUserService currentUser, AppUserRepository users,
                            PickRepository picks, PickAuditRepository audits,
-                           GameRepository games) {
+                           GameRepository games, GroupRepository groups,
+                           GroupMemberRepository members, GroupReferralRepository referrals) {
         this.currentUser = currentUser;
         this.users = users;
         this.picks = picks;
         this.audits = audits;
         this.games = games;
+        this.groups = groups;
+        this.members = members;
+        this.referrals = referrals;
+    }
+
+    /** Turns a repository's (id, count) pairs into a lookup. */
+    private static Map<UUID, Long> tally(List<Object[]> rows) {
+        return rows.stream().collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
     }
 
     // ----------------------------------------------------------------- users
 
-    public record UserRow(UUID id, String displayName, String email, Role role,
-                          long totalPicks, Instant createdAt) {
+    public record UserRow(UUID id, String displayName, String username, String email, Role role,
+                          long totalPicks,
+                          /** Groups this member created. Survives them losing ownership of one. */
+                          long groupsCreated,
+                          /** Groups they are currently in, whatever their role. */
+                          long groupsJoined,
+                          /** People who first reached the site through one of their links. */
+                          long referrals,
+                          Instant createdAt) {
     }
 
     public record RoleRequest(@NotNull Role role) {
@@ -74,12 +98,21 @@ public class AdminController {
     public List<UserRow> listUsers(@AuthenticationPrincipal Jwt jwt) {
         currentUser.requireAdmin(jwt);
 
-        Map<UUID, Long> pickCounts = picks.countByUser().stream()
-                .collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
+        // Four aggregates, one grouped query each, rather than four counts per
+        // member - the list is every account on the site, so per-row queries
+        // would grow with it.
+        Map<UUID, Long> pickCounts = tally(picks.countByUser());
+        Map<UUID, Long> created = tally(groups.countByCreator());
+        Map<UUID, Long> joined = tally(members.countByMember());
+        Map<UUID, Long> referred = tally(referrals.countBySharer());
 
         return users.findAll().stream()
-                .map(user -> new UserRow(user.getId(), user.getDisplayName(), user.getEmail(),
+                .map(user -> new UserRow(user.getId(), user.getDisplayName(),
+                        user.getUsername(), user.getEmail(),
                         user.getRole(), pickCounts.getOrDefault(user.getId(), 0L),
+                        created.getOrDefault(user.getId(), 0L),
+                        joined.getOrDefault(user.getId(), 0L),
+                        referred.getOrDefault(user.getId(), 0L),
                         user.getCreatedAt()))
                 .sorted((a, b) -> a.displayName().compareToIgnoreCase(b.displayName()))
                 .toList();
@@ -103,8 +136,12 @@ public class AdminController {
         target.setRole(request.role());
         users.save(target);
 
-        return new UserRow(target.getId(), target.getDisplayName(), target.getEmail(),
-                target.getRole(), 0L, target.getCreatedAt());
+        // Counts are zero here rather than recomputed: the page reloads the
+        // whole list after a role change, so this response only has to carry
+        // the role that actually changed.
+        return new UserRow(target.getId(), target.getDisplayName(), target.getUsername(),
+                target.getEmail(),
+                target.getRole(), 0L, 0L, 0L, 0L, target.getCreatedAt());
     }
 
     @DeleteMapping("/users/{id}")
@@ -126,6 +163,7 @@ public class AdminController {
     // -------------------------------------------------------------- activity
 
     public record ActivityRow(Long id, Instant at, UUID userId, String displayName,
+                              String username,
                               PickAudit.Action action, Long gameId, String game,
                               String market, String selection, BigDecimal lockedLine,
                               String previousSelection, BigDecimal previousLockedLine) {
@@ -143,8 +181,8 @@ public class AdminController {
                 ? audits.findAllByOrderByCreatedAtDesc(PageRequest.of(0, capped))
                 : audits.findAllByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, capped));
 
-        Map<UUID, String> names = users.findAll().stream()
-                .collect(Collectors.toMap(AppUser::getId, AppUser::getDisplayName));
+        Map<UUID, AppUser> byId = users.findAll().stream()
+                .collect(Collectors.toMap(AppUser::getId, user -> user));
 
         Map<Long, String> gameLabels = new HashMap<>();
         games.findAllById(rows.stream().map(PickAudit::getGameId).distinct().toList())
@@ -155,7 +193,10 @@ public class AdminController {
                         row.getId(),
                         row.getCreatedAt(),
                         row.getUserId(),
-                        names.getOrDefault(row.getUserId(), "deleted member"),
+                        Optional.ofNullable(byId.get(row.getUserId()))
+                                .map(AppUser::getDisplayName).orElse("deleted member"),
+                        Optional.ofNullable(byId.get(row.getUserId()))
+                                .map(AppUser::getUsername).orElse(null),
                         row.getAction(),
                         row.getGameId(),
                         gameLabels.getOrDefault(row.getGameId(), "game " + row.getGameId()),

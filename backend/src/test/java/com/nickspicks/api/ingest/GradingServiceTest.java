@@ -12,12 +12,53 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The truth table for grading against the spread.
+ * The truth table for grading.
  *
  * <p>Spreads are from the home team's perspective, matching CFBD: -7.5 means
- * the home team is favored by 7.5.
+ * the home team is favored by 7.5. The winner market has no line at all and
+ * grades on the final score.
  */
 class GradingServiceTest {
+
+    // ---------------------------------------------------------------- winner
+
+    /** No line: the final score is the whole rule. */
+    @Test
+    void winnerPicksGradeOnTheFinalScoreAlone() {
+        GradingService grading = new GradingService(null);
+
+        assertThat(grading.grade(Selection.HOME_WINNER, null, 31, 20)).isEqualTo(PickResult.WIN);
+        assertThat(grading.grade(Selection.HOME_WINNER, null, 20, 31)).isEqualTo(PickResult.LOSS);
+        assertThat(grading.grade(Selection.AWAY_WINNER, null, 20, 31)).isEqualTo(PickResult.WIN);
+        assertThat(grading.grade(Selection.AWAY_WINNER, null, 31, 20)).isEqualTo(PickResult.LOSS);
+    }
+
+    /**
+     * Winning the game and covering the spread are different questions - the
+     * whole point of playing against a number. Home wins by 4 having been
+     * favoured by 7.5: the winner pick wins, the spread pick loses.
+     */
+    @Test
+    void aWinnerPickAndASpreadPickOnTheSameSideCanDisagree() {
+        GradingService grading = new GradingService(null);
+
+        assertThat(grading.grade(Selection.HOME_WINNER, null, 24, 20)).isEqualTo(PickResult.WIN);
+        assertThat(grading.grade(Selection.HOME, new BigDecimal("-7.5"), 24, 20))
+                .isEqualTo(PickResult.LOSS);
+    }
+
+    /**
+     * College football has not produced a tie since overtime arrived in 1996,
+     * so this is a guard rather than a case anyone will meet - but a bad score
+     * should push rather than silently become a loss.
+     */
+    @Test
+    void aTiedGameWouldPushAWinnerPick() {
+        GradingService grading = new GradingService(null);
+
+        assertThat(grading.grade(Selection.HOME_WINNER, null, 21, 21)).isEqualTo(PickResult.PUSH);
+        assertThat(grading.grade(Selection.AWAY_WINNER, null, 21, 21)).isEqualTo(PickResult.PUSH);
+    }
 
     private final GradingService grading = new GradingService(null);
 

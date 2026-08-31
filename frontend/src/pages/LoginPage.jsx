@@ -1,23 +1,31 @@
 import { useState } from 'react';
 import { Alert, Button, Card, Col, Container, Form, Row, Spinner } from 'react-bootstrap';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../auth/AuthProvider.jsx';
 
 export default function LoginPage() {
   const { session, signIn, signUp, configured } = useAuth();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
-  const [mode, setMode] = useState('signin');
+  // Arrived from a share link. Signing in returns to the invitation rather
+  // than to the board, so the group they were invited to is not lost on the
+  // way through the login screen.
+  const joinToken = searchParams.get('join');
+
+  const [mode, setMode] = useState(searchParams.get('mode') === 'signup' ? 'signup' : 'signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
 
   if (session) {
-    return <Navigate to={location.state?.from ?? '/'} replace />;
+    const destination = joinToken ? `/join/${joinToken}` : (location.state?.from ?? '/');
+    return <Navigate to={destination} replace />;
   }
 
   if (!configured) {
@@ -41,10 +49,12 @@ export default function LoginPage() {
     setError(null);
     setNotice(null);
 
+    // Both fields are optional at the form; the API seeds anything left blank
+    // from the email address, then makes the username unique if it collides.
     const { error: authError } =
       mode === 'signin'
         ? await signIn(email, password)
-        : await signUp(email, password, displayName.trim() || email.split('@')[0]);
+        : await signUp(email, password, displayName.trim(), username.trim());
 
     if (authError) {
       setError(authError.message);
@@ -64,7 +74,9 @@ export default function LoginPage() {
             <Card.Body className="p-4">
               <h1 className="h4 mb-1">{mode === 'signin' ? 'Sign in' : 'Create an account'}</h1>
               <p className="text-body-secondary small mb-4">
-                Members only - picks and the leaderboard need an account.
+                {joinToken
+                  ? 'Sign in and we will take you straight back to the invitation.'
+                  : 'Members only - picks and the leaderboard need an account.'}
               </p>
 
               {error && <Alert variant="danger">{error}</Alert>}
@@ -72,16 +84,41 @@ export default function LoginPage() {
 
               <Form onSubmit={submit}>
                 {mode === 'signup' && (
-                  <Form.Group className="mb-3" controlId="display-name">
-                    <Form.Label>Display name</Form.Label>
-                    <Form.Control
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      autoComplete="nickname"
-                      maxLength={55}
-                      placeholder="How you appear on the leaderboard"
-                    />
-                  </Form.Group>
+                  <>
+                    {/* Two names, because one cannot do both jobs: the display
+                        name is what you are called and may repeat, the username
+                        is who you are and has to be unique. */}
+                    <Form.Group className="mb-3" controlId="display-name">
+                      <Form.Label>Display name</Form.Label>
+                      <Form.Control
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        autoComplete="name"
+                        maxLength={20}
+                        placeholder="Nick Ahrens"
+                      />
+                      <Form.Text>
+                        Up to 20 characters. Does not have to be unique.
+                      </Form.Text>
+                    </Form.Group>
+
+                    <Form.Group className="mb-3" controlId="username">
+                      <Form.Label>Username</Form.Label>
+                      <Form.Control
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        autoComplete="username"
+                        minLength={2}
+                        maxLength={20}
+                        pattern="[A-Za-z0-9][A-Za-z0-9._-]*[A-Za-z0-9]"
+                        placeholder="nick"
+                      />
+                      <Form.Text>
+                        2-20 characters, no spaces. Unique across the site - shown as
+                        @username.
+                      </Form.Text>
+                    </Form.Group>
+                  </>
                 )}
 
                 <Form.Group className="mb-3" controlId="email">

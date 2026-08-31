@@ -12,28 +12,35 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * A member's slot count for one week.
+ * A member's pick count for one period of one group.
  *
- * <p>This row exists to make the weekly pick cap atomic. Counting picks cannot
+ * <p>This row exists to make the pick cap atomic. Counting picks cannot
  * prevent two concurrent requests from both passing the check, because the
  * conflicting row does not exist yet and so {@code SELECT ... FOR UPDATE} has
  * nothing to lock. Every pick mutation takes a pessimistic write lock on this
  * row first, which serialises them.
+ *
+ * <p>Replaces {@code weekly_entry}, whose key hard-coded the week as the
+ * counting period. The period is now an opaque label from
+ * {@link CadencePeriod}, so a daily group counts by day without a second
+ * mechanism.
  */
 @Entity
-@Table(name = "weekly_entry")
-@IdClass(WeeklyEntry.Key.class)
-public class WeeklyEntry {
+@Table(name = "cadence_entry")
+@IdClass(CadenceEntry.Key.class)
+public class CadenceEntry {
+
+    @Id
+    @Column(name = "group_id")
+    private UUID groupId;
 
     @Id
     @Column(name = "user_id")
     private UUID userId;
 
     @Id
-    private Integer season;
-
-    @Id
-    private Integer week;
+    @Column(name = "period_key")
+    private String periodKey;
 
     @Column(name = "pick_count", nullable = false)
     private int pickCount;
@@ -41,25 +48,25 @@ public class WeeklyEntry {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
-    protected WeeklyEntry() {
+    protected CadenceEntry() {
     }
 
-    public WeeklyEntry(UUID userId, Integer season, Integer week) {
+    public CadenceEntry(UUID groupId, UUID userId, String periodKey) {
+        this.groupId = groupId;
         this.userId = userId;
-        this.season = season;
-        this.week = week;
+        this.periodKey = periodKey;
+    }
+
+    public UUID getGroupId() {
+        return groupId;
     }
 
     public UUID getUserId() {
         return userId;
     }
 
-    public Integer getSeason() {
-        return season;
-    }
-
-    public Integer getWeek() {
-        return week;
+    public String getPeriodKey() {
+        return periodKey;
     }
 
     public int getPickCount() {
@@ -75,20 +82,20 @@ public class WeeklyEntry {
         return updatedAt;
     }
 
-    /** Composite key for {@link WeeklyEntry}. */
+    /** Composite key for {@link CadenceEntry}. */
     public static class Key implements Serializable {
 
+        private UUID groupId;
         private UUID userId;
-        private Integer season;
-        private Integer week;
+        private String periodKey;
 
         public Key() {
         }
 
-        public Key(UUID userId, Integer season, Integer week) {
+        public Key(UUID groupId, UUID userId, String periodKey) {
+            this.groupId = groupId;
             this.userId = userId;
-            this.season = season;
-            this.week = week;
+            this.periodKey = periodKey;
         }
 
         @Override
@@ -97,14 +104,14 @@ public class WeeklyEntry {
                 return true;
             }
             return other instanceof Key key
+                    && Objects.equals(groupId, key.groupId)
                     && Objects.equals(userId, key.userId)
-                    && Objects.equals(season, key.season)
-                    && Objects.equals(week, key.week);
+                    && Objects.equals(periodKey, key.periodKey);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(userId, season, week);
+            return Objects.hash(groupId, userId, periodKey);
         }
     }
 }

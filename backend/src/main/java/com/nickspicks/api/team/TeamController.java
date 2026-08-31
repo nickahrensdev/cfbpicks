@@ -8,6 +8,8 @@ import com.nickspicks.api.coach.CoachSeason;
 import com.nickspicks.api.coach.CoachSeasonRepository;
 import com.nickspicks.api.espn.EspnClient;
 import com.nickspicks.api.game.GameService;
+import com.nickspicks.api.group.Group;
+import com.nickspicks.api.group.GroupService;
 import com.nickspicks.api.ingest.ReferenceIngestService;
 import com.nickspicks.api.ranking.Poll;
 import com.nickspicks.api.ranking.PollRanking;
@@ -53,6 +55,7 @@ public class TeamController {
     private final TeamRecordRepository teamRecords;
     private final TeamAtsService teamAtsService;
     private final TeamMatchupService matchupService;
+    private final GroupService groups;
 
     public TeamController(TeamRepository teams, AthleteRepository athletes, CoachRepository coaches,
                           CoachSeasonRepository coachSeasons,
@@ -60,7 +63,8 @@ public class TeamController {
                           CurrentWeekResolver weeks, CurrentUserService currentUser,
                           DtoMapper mapper, RankingService rankings, EspnClient espn,
                           TeamRecordRepository teamRecords, TeamAtsService teamAtsService,
-                          TeamMatchupService matchupService) {
+                          TeamMatchupService matchupService, GroupService groups) {
+        this.groups = groups;
         this.espn = espn;
         this.rankings = rankings;
         this.teams = teams;
@@ -92,7 +96,8 @@ public class TeamController {
     }
 
     @GetMapping("/{id}")
-    public ApiDtos.TeamDetail detail(@AuthenticationPrincipal Jwt jwt, @PathVariable int id) {
+    public ApiDtos.TeamDetail detail(@AuthenticationPrincipal Jwt jwt, @PathVariable int id,
+                                     @RequestParam(required = false) UUID groupId) {
         Team team = teams.findById(id)
                 .orElseThrow(() -> new NotFoundException("Team %d not found".formatted(id)));
 
@@ -110,6 +115,10 @@ public class TeamController {
                 log.warn("Roster unavailable for {}: {}", team.getSchool(), ex.getMessage());
             }
         }
+
+        // Optional: without a group the schedule still renders, just without
+        // the caller's picks marked on it.
+        Group group = groupId == null ? null : groups.requirePlayable(groupId, userId);
 
         ApiDtos.TeamSummary summary = mapper.teamSummary(team);
 
@@ -166,7 +175,7 @@ public class TeamController {
                 team.getAbbreviation(), team.getConference(), team.getDivision(), team.getColor(),
                 team.getAlternateColor(), team.getLogoUrl(), team.getTwitter(), team.getVenueName(),
                 team.getVenueCity(), team.getVenueState(), team.getVenueCapacity(),
-                staff, roster, gameService.teamSchedule(season, id, userId),
+                staff, roster, gameService.teamSchedule(group, season, id, userId),
                 headlineRank, current, history,
                 // Supplements what CFBD gives us with ESPN branding and venue
                 // detail. Optional by design - null just means a plainer page.

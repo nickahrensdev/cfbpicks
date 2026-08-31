@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Card, Col, Container, Form, Row, Spinner } from 'react-bootstrap';
 
 import { useProfile } from '../auth/ProfileProvider.jsx';
-import { Loading } from '../components/common.jsx';
+import { Loading, memberName } from '../components/common.jsx';
 import { api } from '../api/client.js';
 import { applyTheme } from '../lib/theme.js';
 
@@ -19,6 +19,7 @@ const THEME_OPTIONS = [
 export default function ProfilePage() {
   const { profile, loading, refresh } = useProfile();
   const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
   const [notice, setNotice] = useState(null);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -26,12 +27,20 @@ export default function ProfilePage() {
   const [savingTheme, setSavingTheme] = useState(false);
 
   useEffect(() => {
-    if (profile) setDisplayName(profile.displayName);
+    if (profile) {
+      setDisplayName(profile.displayName);
+      setUsername(profile.username);
+    }
   }, [profile]);
 
   if (loading || !profile) {
     return <Loading label="Loading your profile" />;
   }
+
+  const nextDisplayName = displayName.trim();
+  const nextUsername = username.trim();
+  const displayNameChanged = nextDisplayName !== profile.displayName;
+  const usernameChanged = nextUsername !== profile.username;
 
   const submit = async (event) => {
     event.preventDefault();
@@ -39,12 +48,16 @@ export default function ProfilePage() {
     setNotice(null);
     setError(null);
     try {
-      await api.updateDisplayName(displayName.trim());
+      // Two endpoints because they answer different questions - only the
+      // username has to be unique. Sending just what changed keeps an
+      // untouched field out of the other one's validation.
+      if (displayNameChanged) await api.updateDisplayName(nextDisplayName);
+      if (usernameChanged) await api.updateUsername(nextUsername);
       await refresh();
-      setNotice('Display name updated.');
+      setNotice('Profile updated.');
     } catch (err) {
-      // The name is well-formed but taken, or it failed validation.
-      setError(err.fieldErrors?.displayName ?? err.message);
+      // Well-formed but taken, or it failed validation outright.
+      setError(err.fieldErrors?.username ?? err.fieldErrors?.displayName ?? err.message);
     } finally {
       setSaving(false);
     }
@@ -90,12 +103,27 @@ export default function ProfilePage() {
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     minLength={2}
-                    maxLength={40}
+                    maxLength={20}
                     required
                   />
                   <Form.Text>
-                    2-40 characters. Letters, numbers, spaces, dots, dashes and underscores. Must be
-                    unique.
+                    2-20 characters. What you are called - it does not have to be unique.
+                  </Form.Text>
+                </Form.Group>
+
+                <Form.Group className="mb-3" controlId="profile-username">
+                  <Form.Label>Username</Form.Label>
+                  <Form.Control
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    minLength={2}
+                    maxLength={20}
+                    pattern="[A-Za-z0-9][A-Za-z0-9._-]*[A-Za-z0-9]"
+                    required
+                  />
+                  <Form.Text>
+                    2-20 characters, no spaces. Unique across the site - leaderboards show you as{' '}
+                    {memberName(nextDisplayName || profile.displayName, nextUsername || profile.username)}.
                   </Form.Text>
                 </Form.Group>
 
@@ -111,7 +139,7 @@ export default function ProfilePage() {
                   </span>
                   <Button
                     type="submit"
-                    disabled={saving || displayName.trim() === profile.displayName}
+                    disabled={saving || (!displayNameChanged && !usernameChanged)}
                   >
                     {saving && <Spinner as="span" size="sm" animation="border" className="me-2" />}
                     Save

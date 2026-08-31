@@ -4,10 +4,18 @@ import com.nickspicks.api.IntegrationTest;
 import com.nickspicks.api.game.Game;
 import com.nickspicks.api.game.GameRepository;
 import com.nickspicks.api.game.GameStatus;
+import com.nickspicks.api.group.Group;
+import com.nickspicks.api.group.GroupMember;
+import com.nickspicks.api.group.GroupMemberRepository;
+import com.nickspicks.api.group.GroupRepository;
+import com.nickspicks.api.group.GroupRole;
+import com.nickspicks.api.group.TestGroups;
+import com.nickspicks.api.user.AppUser;
 import com.nickspicks.api.pick.PickAuditRepository;
 import com.nickspicks.api.pick.PickRepository;
-import com.nickspicks.api.pick.WeeklyEntryRepository;
+import com.nickspicks.api.pick.CadenceEntryRepository;
 import com.nickspicks.api.user.AppUserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -44,7 +52,16 @@ class AdminAndAuditIntegrationTest extends IntegrationTest {
     private PickRepository picks;
 
     @Autowired
-    private WeeklyEntryRepository entries;
+    private CadenceEntryRepository entries;
+
+    @Autowired
+    private GroupRepository groups;
+
+    @Autowired
+    private GroupMemberRepository groupMembers;
+
+    /** The league the audit-trail test picks in. */
+    private Group group;
 
     @Autowired
     private AppUserRepository users;
@@ -52,11 +69,20 @@ class AdminAndAuditIntegrationTest extends IntegrationTest {
     @Autowired
     private PickAuditRepository audits;
 
+    @BeforeEach
+    void createGroup() {
+        users.save(new AppUser(MEMBER, "member@example.com", "member", "member"));
+        group = groups.save(new Group(MEMBER, TestGroups.weeklyPickem()));
+        groupMembers.save(new GroupMember(group.getId(), MEMBER, GroupRole.OWNER));
+    }
+
     @Override
     protected void cleanUp() {
         audits.deleteAll();
         picks.deleteAll();
         entries.deleteAll();
+        groupMembers.deleteAll();
+        groups.deleteAll();
         games.deleteAll();
         users.deleteAll();
     }
@@ -110,7 +136,7 @@ class AdminAndAuditIntegrationTest extends IntegrationTest {
         Game game = openGame(700L);
 
         String pickId = com.jayway.jsonpath.JsonPath.read(
-                mockMvc.perform(post("/api/picks").with(member())
+                mockMvc.perform(post("/api/picks?groupId=" + group.getId()).with(member())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"gameId\": 700, \"selection\": \"HOME\"}"))
                         .andExpect(status().isCreated())
@@ -120,12 +146,13 @@ class AdminAndAuditIntegrationTest extends IntegrationTest {
         // Line moves, member re-locks by editing.
         game.setHomeSpread(new BigDecimal("-3.0"));
         games.save(game);
-        mockMvc.perform(put("/api/picks/" + pickId).with(member())
+        mockMvc.perform(put("/api/picks/" + pickId + "?groupId=" + group.getId()).with(member())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"selection\": \"AWAY\"}"))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(delete("/api/picks/" + pickId).with(member()))
+        mockMvc.perform(delete("/api/picks/" + pickId + "?groupId=" + group.getId())
+                        .with(member()))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/admin/activity").with(admin()))

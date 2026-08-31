@@ -25,8 +25,17 @@ public class PickWindow {
         this.properties = properties;
     }
 
+    /**
+     * The site-wide default, for the few callers with no group in hand -
+     * grading and the ESPN poller, which are group-blind. Anything a member
+     * looks at should pass the group's own lead time instead.
+     */
     public Duration lockLead() {
         return Duration.ofMinutes(properties.getPickem().getLockLeadMinutes());
+    }
+
+    public int defaultLockLeadMinutes() {
+        return properties.getPickem().getLockLeadMinutes();
     }
 
     /** The instant a game stops accepting changes. */
@@ -34,11 +43,15 @@ public class PickWindow {
         return game.getKickoff().minus(lockLead());
     }
 
+    public Instant locksAt(Game game, int lockLeadMinutes) {
+        return game.getKickoff().minus(Duration.ofMinutes(lockLeadMinutes));
+    }
+
     /**
      * Whether the game is still accepting changes at all.
      *
-     * <p>Timing only - the 30-minute lock is a property of kickoff, not of any
-     * one market. Whether a particular market can be picked also needs
+     * <p>Timing only - the lock is a property of kickoff, not of any one
+     * market. Whether a particular market can be picked also needs
      * {@link #hasLine}.
      */
     public boolean isOpen(Game game) {
@@ -46,9 +59,17 @@ public class PickWindow {
     }
 
     public boolean isOpen(Game game, Instant now) {
+        return isOpen(game, now, defaultLockLeadMinutes());
+    }
+
+    public boolean isOpen(Game game, int lockLeadMinutes) {
+        return isOpen(game, Instant.now(), lockLeadMinutes);
+    }
+
+    public boolean isOpen(Game game, Instant now, int lockLeadMinutes) {
         return !game.isStartTimeTbd()                  // a lock needs a real kickoff time
                 && game.getStatus() == GameStatus.SCHEDULED
-                && now.isBefore(locksAt(game));
+                && now.isBefore(locksAt(game, lockLeadMinutes));
     }
 
     /** Whether a market can be picked: the window is open and it has a line. */
@@ -61,16 +82,25 @@ public class PickWindow {
     }
 
     /**
-     * A game can carry a spread and no total, or the reverse, so availability
-     * is per market rather than one flag for the card.
+     * Whether this market can be picked on this game at all.
+     *
+     * <p>A game can carry a spread and no total, or the reverse, so
+     * availability is per market rather than one flag for the card. The winner
+     * market needs nothing posted - the teams are playing either way - so it
+     * is always available on a scheduled game.
      */
     public boolean hasLine(Game game, Market market) {
-        return line(game, market) != null;
+        return market == Market.WINNER || line(game, market) != null;
     }
 
-    /** The game's current number for a market. */
+    /** The game's current number for a market, or null for one with no line. */
     public BigDecimal line(Game game, Market market) {
-        return market == Market.TOTAL ? game.getOverUnder() : game.getHomeSpread();
+        return switch (market) {
+            case SPREAD -> game.getHomeSpread();
+            case TOTAL -> game.getOverUnder();
+            // Nothing to lock, nothing to move, nothing to re-lock onto.
+            case WINNER -> null;
+        };
     }
 
     /** Whether this game's picks may be shown to members other than the owner. */
@@ -94,6 +124,9 @@ public class PickWindow {
      *
      * <p>A sign error here hands out a "better line" button that quietly makes
      * a pick worse, so it is expressed once, here, and tested as a table.
+     *
+     * <p>Never true for a winner pick: both numbers are null, so the guard
+     * below returns false and no re-lock is ever offered.
      */
     public boolean isLineImproved(Pick pick, Game game) {
         BigDecimal current = line(game, pick.getMarket());
@@ -106,6 +139,9 @@ public class PickWindow {
         return switch (pick.getSelection()) {
             case HOME, UNDER -> current.compareTo(locked) > 0;
             case AWAY, OVER -> current.compareTo(locked) < 0;
+            // Unreachable - a winner pick has no locked line, so the guard
+            // above has already returned.
+            case HOME_WINNER, AWAY_WINNER -> false;
         };
     }
 }

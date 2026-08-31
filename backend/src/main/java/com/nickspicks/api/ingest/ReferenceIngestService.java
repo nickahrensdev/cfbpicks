@@ -49,7 +49,6 @@ public class ReferenceIngestService {
     private static final String RESOURCE_CALENDAR = "calendar";
     private static final String RESOURCE_TEAMS = "teams";
     private static final String RESOURCE_COACHES = "coaches";
-    private static final String RESOURCE_ROSTER = "roster";
 
     private final CfbdClient cfbd;
     private final CfbdSyncRepository syncs;
@@ -287,69 +286,6 @@ public class ReferenceIngestService {
                 .map(Team::getId)
                 .findFirst()
                 .orElse(null);
-    }
-
-    /**
-     * Fetches a roster the first time it is asked for and never again. Called
-     * lazily from the team detail endpoint.
-     */
-    @Transactional
-    public int ensureRoster(Team team, int season) {
-        String key = team.getId() + ":" + season;
-        if (syncs.isSynced(RESOURCE_ROSTER, key)) {
-            return 0;
-        }
-
-        List<CfbdDtos.RosterPlayerDto> dtos = cfbd.roster(team.getSchool(), season);
-
-        // The feed can list the same athlete twice in one roster. Left
-        // unchecked that fails on the (id, season) key: the first insert has
-        // not flushed when the second lookup runs, so it misses and tries to
-        // insert again, rolling back the whole roster.
-        Set<String> seen = new HashSet<>();
-
-        for (CfbdDtos.RosterPlayerDto dto : dtos) {
-            if (dto.id() == null || !seen.add(dto.id())) {
-                continue;
-            }
-            Athlete athlete = athletes.findById(new Athlete.Key(dto.id(), season))
-                    .orElseGet(Athlete::new);
-            athlete.setId(dto.id());
-            athlete.setSeason(season);
-            athlete.setFirstName(dto.firstName());
-            athlete.setLastName(dto.lastName());
-            athlete.setTeamId(team.getId());
-            athlete.setTeamSchool(team.getSchool());
-            athlete.setPosition(dto.position());
-            athlete.setJersey(dto.jersey());
-            athlete.setHeight(dto.height());
-            athlete.setWeight(dto.weight());
-            athlete.setYear(dto.year());
-            athlete.setHomeCity(dto.homeCity());
-            athlete.setHomeState(dto.homeState());
-            athlete.setHomeCountry(dto.homeCountry());
-            athlete.setUpdatedAt(Instant.now());
-            athletes.save(athlete);
-        }
-
-        syncs.markSynced(RESOURCE_ROSTER, key);
-        log.info("Ingested {} roster entries for {} {}", dtos.size(), team.getSchool(), season);
-        return dtos.size();
-    }
-
-    /**
-     * Forces one team's roster to be fetched again.
-     *
-     * <p>The sync marker means "we asked", which is normally what you want -
-     * some programs genuinely have no roster on file and should not be
-     * re-requested on every page view. But if a fetch half-failed, or the
-     * provider has since fixed its data, the marker leaves that team
-     * permanently empty. This is the way out.
-     */
-    @Transactional
-    public int refreshRoster(Team team, int season) {
-        syncs.deleteById(new CfbdSync.Key(RESOURCE_ROSTER, team.getId() + ":" + season));
-        return ensureRoster(team, season);
     }
 
     public boolean teamsSynced(int season) {

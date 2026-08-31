@@ -131,12 +131,6 @@ public class CfbdClient {
                 });
     }
 
-    public List<CfbdDtos.RosterPlayerDto> roster(String team, int year) {
-        return get("/roster", Map.of("team", team, "year", year),
-                new ParameterizedTypeReference<>() {
-                });
-    }
-
     /**
      * Coaches for a season.
      *

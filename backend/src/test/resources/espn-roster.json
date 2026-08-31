@@ -1,0 +1,111 @@
+{
+  "team": {
+    "id": "194",
+    "athletes": [
+      {
+        "id": "5081820",
+        "firstName": "David",
+        "lastName": "Adolph",
+        "weight": 210.0,
+        "height": 77.0,
+        "birthPlace": {
+          "city": "Dublin",
+          "state": "OH",
+          "country": "USA"
+        },
+        "jersey": "82",
+        "position": {
+          "id": "1",
+          "name": "Wide Receiver",
+          "displayName": "Wide Receiver",
+          "abbreviation": "WR",
+          "leaf": true,
+          "parent": {}
+        },
+        "experience": {
+          "years": 4,
+          "displayValue": "Senior",
+          "abbreviation": "SR"
+        }
+      },
+      {
+        "id": "5244752",
+        "firstName": "Favour",
+        "lastName": "Akih",
+        "weight": 184.0,
+        "height": 71.0,
+        "birthPlace": {
+          "city": "Delaware",
+          "state": "OH",
+          "country": "USA"
+        },
+        "jersey": "29",
+        "position": {
+          "id": "9",
+          "name": "Running Back",
+          "displayName": "Running Back",
+          "abbreviation": "RB",
+          "leaf": true,
+          "parent": {}
+        },
+        "experience": {
+          "years": 1,
+          "displayValue": "Freshman",
+          "abbreviation": "FR"
+        }
+      },
+      {
+        "id": "5141355",
+        "firstName": "Tarvos",
+        "lastName": "Alford",
+        "weight": 233.0,
+        "height": 73.0,
+        "birthPlace": {
+          "city": "Port Saint Lucie",
+          "state": "FL",
+          "country": "USA"
+        },
+        "jersey": "17",
+        "position": {
+          "id": "30",
+          "name": "Linebacker",
+          "displayName": "Linebacker",
+          "abbreviation": "LB",
+          "leaf": true,
+          "parent": {}
+        },
+        "experience": {
+          "years": 2,
+          "displayValue": "Sophomore",
+          "abbreviation": "SO"
+        }
+      },
+      {
+        "id": "5081820",
+        "firstName": "David",
+        "lastName": "Adolph",
+        "weight": 210.0,
+        "height": 77.0,
+        "birthPlace": {
+          "city": "Dublin",
+          "state": "OH",
+          "country": "USA"
+        },
+        "jersey": "82",
+        "position": {
+          "id": "1",
+          "name": "Wide Receiver",
+          "displayName": "Wide Receiver",
+          "abbreviation": "WR",
+          "leaf": true,
+          "parent": {}
+        },
+        "experience": {
+          "years": 4,
+          "displayValue": "Senior",
+          "abbreviation": "SR"
+        }
+      }
+    ]
+  }
+}

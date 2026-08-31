@@ -2,15 +2,14 @@ package com.nickspicks.api.team;
 
 import com.nickspicks.api.athlete.Athlete;
 import com.nickspicks.api.athlete.AthleteRepository;
-import com.nickspicks.api.cfbd.CfbdUnavailableException;
 import com.nickspicks.api.coach.CoachRepository;
 import com.nickspicks.api.coach.CoachSeason;
 import com.nickspicks.api.coach.CoachSeasonRepository;
 import com.nickspicks.api.espn.EspnClient;
+import com.nickspicks.api.espn.EspnRosterService;
 import com.nickspicks.api.game.GameService;
 import com.nickspicks.api.group.Group;
 import com.nickspicks.api.group.GroupService;
-import com.nickspicks.api.ingest.ReferenceIngestService;
 import com.nickspicks.api.ranking.Poll;
 import com.nickspicks.api.ranking.PollRanking;
 import com.nickspicks.api.ranking.RankingService;
@@ -41,11 +40,11 @@ public class TeamController {
 
     private static final Logger log = LoggerFactory.getLogger(TeamController.class);
 
+    private final EspnRosterService rosters;
     private final TeamRepository teams;
     private final AthleteRepository athletes;
     private final CoachRepository coaches;
     private final CoachSeasonRepository coachSeasons;
-    private final ReferenceIngestService referenceIngest;
     private final GameService gameService;
     private final CurrentWeekResolver weeks;
     private final CurrentUserService currentUser;
@@ -59,7 +58,7 @@ public class TeamController {
 
     public TeamController(TeamRepository teams, AthleteRepository athletes, CoachRepository coaches,
                           CoachSeasonRepository coachSeasons,
-                          ReferenceIngestService referenceIngest, GameService gameService,
+                          EspnRosterService rosters, GameService gameService,
                           CurrentWeekResolver weeks, CurrentUserService currentUser,
                           DtoMapper mapper, RankingService rankings, EspnClient espn,
                           TeamRecordRepository teamRecords, TeamAtsService teamAtsService,
@@ -67,11 +66,11 @@ public class TeamController {
         this.groups = groups;
         this.espn = espn;
         this.rankings = rankings;
+        this.rosters = rosters;
         this.teams = teams;
         this.athletes = athletes;
         this.coaches = coaches;
         this.coachSeasons = coachSeasons;
-        this.referenceIngest = referenceIngest;
         this.gameService = gameService;
         this.weeks = weeks;
         this.currentUser = currentUser;
@@ -105,15 +104,16 @@ public class TeamController {
         UUID userId = currentUser.resolveId(jwt);
 
         // The roster is fetched the first time someone opens this page and
-        // never again - one API call per team for the life of the season.
-        // Works for FCS as well as FBS.
+        // never again that season. From ESPN rather than CFBD: this was the
+        // only user-triggered call against a metered API, and a member
+        // clicking through the league could spend hundreds of the thousand
+        // monthly calls on it. ESPN is unmetered and covers FCS too.
+        //
+        // Best-effort by construction - EspnRosterService returns 0 rather
+        // than throwing, so a provider outage degrades the page to an empty
+        // roster tab instead of breaking it.
         if (!athletes.existsByTeamIdAndSeason(id, season)) {
-            try {
-                referenceIngest.ensureRoster(team, season);
-            } catch (CfbdUnavailableException ex) {
-                // A missing roster should degrade the page, not break it.
-                log.warn("Roster unavailable for {}: {}", team.getSchool(), ex.getMessage());
-            }
+            rosters.ensureRoster(team, season);
         }
 
         // Optional: without a group the schedule still renders, just without

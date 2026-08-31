@@ -103,56 +103,11 @@ class CfbdLiveIngestTest extends IntegrationTest {
     }
 
     @Test
-    void ingestsCoachesAndRosters() {
+    void ingestsCoaches() {
         referenceIngest.ingestTeams(2026);
         referenceIngest.ingestCoaches(2026);
 
         assertThat(coaches.findAll()).isNotEmpty();
-
-        Team team = school("Alabama");
-        referenceIngest.ensureRoster(team, 2026);
-        assertThat(athletes.findAllByTeamIdAndSeasonOrderByJerseyAsc(team.getId(), 2026))
-                .isNotEmpty()
-                .allSatisfy(athlete -> assertThat(athlete.getLastName()).isNotBlank());
-    }
-
-    /**
-     * A school whose name contains an ampersand. Unencoded, the query string
-     * ends at the "&" and the provider answers about "Texas A" - a 200 with
-     * an empty body, which looks exactly like a team with no roster.
-     */
-    @Test
-    void handlesTeamNamesContainingSpecialCharacters() {
-        referenceIngest.ingestTeams(2026);
-
-        Team team = school("Texas A&M");
-        assertThat(referenceIngest.ensureRoster(team, 2026)).isGreaterThan(50);
-        assertThat(athletes.findAllByTeamIdAndSeasonOrderByJerseyAsc(team.getId(), 2026))
-                .isNotEmpty();
-    }
-
-    /**
-     * FCS rosters do exist upstream, so an FCS team page is populated the same
-     * way an FBS one is. (Coaches are a different story - see
-     * {@code ReferenceIngestService#ingestCoaches}.)
-     */
-    @Test
-    void fetchesFcsRostersOnDemand() {
-        referenceIngest.ingestTeams(2026);
-
-        Team fcs = teams.findAll().stream()
-                .filter(t -> "fcs".equals(t.getClassification()))
-                .filter(t -> "Montana".equals(t.getSchool()))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("Montana missing from the FCS ingest"));
-
-        referenceIngest.ensureRoster(fcs, 2026);
-        assertThat(athletes.findAllByTeamIdAndSeasonOrderByJerseyAsc(fcs.getId(), 2026))
-                .isNotEmpty();
-
-        assertThat(referenceIngest.ensureRoster(fcs, 2026))
-                .as("second call is served from the sync marker, spending no quota")
-                .isZero();
     }
 
     /** One call returns every week and every poll; only three are kept. */

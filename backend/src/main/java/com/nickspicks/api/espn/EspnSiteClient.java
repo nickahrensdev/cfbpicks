@@ -84,6 +84,21 @@ public class EspnSiteClient {
         return fetch("/summary?event=" + gameId, ttl);
     }
 
+    /**
+     * A team's current roster, in one call.
+     *
+     * <p>{@code ?enable=roster} on the team resource rather than the dedicated
+     * {@code /roster} path, which silently caps at 100 players - Ohio State
+     * returns 100 there and 120 here, so the shorter path drops a fifth of
+     * every squad without saying so.
+     *
+     * <p>Current only. ESPN has no season parameter here, so a past year's
+     * roster cannot be re-fetched; whatever was stored for it stays as it is.
+     */
+    public Optional<JsonNode> roster(int teamId, Duration ttl) {
+        return fetch("/teams/" + teamId + "?enable=roster", ttl);
+    }
+
     private Optional<JsonNode> fetch(String path, Duration ttl) {
         CacheEntry cached = cache.get(path);
         if (cached != null && cached.expiresAt().isAfter(Instant.now())) {

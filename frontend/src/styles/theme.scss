@@ -291,7 +291,12 @@ body {
 // spreads line up vertically however long the team names are - and the
 // heading sits squarely over them.
 .pick-col {
-  min-width: 4.5rem;
+  // Sized to the widest label that actually appears - "+29.5", "O52.5" - and
+  // no wider. Three of these plus a logo is most of a phone's width, and every
+  // pixel spent here comes straight off the team name. A button whose content
+  // needs more (a "No line" placeholder) still grows past it; this is a floor,
+  // not a cap.
+  min-width: 3.5rem;
 }
 
 // A held pick's row in the card's picks panel. Blue rather than the neutral
@@ -315,6 +320,10 @@ body {
 .pick-button {
   @extend .pick-col;
   font-variant-numeric: tabular-nums;
+  // Tighter than btn-sm's default .5rem for the same reason as the width above.
+  // Set through Bootstrap's own variable rather than a padding declaration, so
+  // it does not depend on this file being compiled after the bootstrap import.
+  --bs-btn-padding-x: 0.375rem;
 
   // Disabled already says "this is picked" - color is reserved for two
   // things: a light-blue tint while the pick is live and its line has not

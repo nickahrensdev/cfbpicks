@@ -191,14 +191,18 @@ export function formatSpread(homeSpread, side) {
 }
 
 /**
- * A total, prefixed with the side taken: `O 46.5` / `U 46.5`.
+ * A total, prefixed with the side taken: `O46.5` / `U46.5`.
  *
  * <p>The prefix is not decoration. In a column beside the two team rows a bare
  * number would read as belonging to that team, when it belongs to the game.
+ *
+ * <p>Set tight against the number rather than spaced off it. The pair reads as
+ * one token either way, and on a phone the space was costing the team name
+ * beside it several characters.
  */
 export function formatTotal(overUnder, side) {
   if (overUnder === null || overUnder === undefined) return 'No line';
-  return `${side === 'OVER' ? 'O' : 'U'} ${Number(overUnder)}`;
+  return `${side === 'OVER' ? 'O' : 'U'}${Number(overUnder)}`;
 }
 
 /**

@@ -2,13 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Card, Container, Form, Table } from 'react-bootstrap';
 import { Link, useSearchParams } from 'react-router-dom';
 
-import {
-  EmptyState,
-  ErrorNotice,
-  Loading,
-  formatLine,
-  marketLabel,
-} from '../../components/common.jsx';
+import { EmptyState, ErrorNotice, formatLine, Loading, marketLabel, memberName } from '../../components/common.jsx';
 import { api } from '../../api/client.js';
 
 const ACTION_VARIANTS = {
@@ -142,7 +136,7 @@ export default function ActivityLogPage() {
                       </td>
                       <td>
                         <Link to={`/members/${row.userId}`} className="text-decoration-none">
-                          {row.displayName}
+                          {memberName(row.displayName, row.username)}
                         </Link>
                       </td>
                       <td>

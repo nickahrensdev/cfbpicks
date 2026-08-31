@@ -131,14 +131,66 @@ body {
 
 // The pick budget stays visible while scrolling a long board. Sits directly
 // under the sticky navbar rather than overlapping it.
-.picks-bar {
+// Two bars stack under the navbar, so their offsets are derived from one
+// place rather than each carrying its own magic number.
+//
+//   navbar      3.5rem tall, sticky, z-index 1020 (Bootstrap's)
+//   .group-bar  directly below it - which group everything is showing
+//   .picks-bar  below that, on the games board only
+// Measured at runtime by lib/stickyOffsets.js and written onto :root. The
+// values here are only the pre-hydration fallback - a wrong guess lets one bar
+// slide under another, which looks like each is being clipped as you scroll.
+:root {
+  --nav-height: 3.5rem;
+  --group-bar-height: 0px;
+}
+
+%stuck-bar {
   position: sticky;
-  // Sits directly below the sticky navbar rather than under it. 3.5rem is the
-  // navbar's height at its default padding and brand size.
-  top: 3.5rem;
-  z-index: 1019; // just under Bootstrap's sticky navbar (1020)
   background: rgba(var(--bs-body-bg-rgb), 0.97);
   backdrop-filter: blur(6px);
+}
+
+// Touch devices leave :hover applied after a tap, until something else is
+// tapped - so a button stays lit long after the action ran. Bootstrap 5.3
+// drives button colours from CSS variables, which makes resetting to the
+// resting appearance a three-line job rather than one rule per variant.
+@media (hover: none) {
+  .btn:hover {
+    color: var(--bs-btn-color);
+    background-color: var(--bs-btn-bg);
+    border-color: var(--bs-btn-border-color);
+  }
+
+  // Except when it genuinely is on - an active toggle keeps its own colours.
+  .btn.active:hover,
+  .btn[aria-pressed='true']:hover {
+    color: var(--bs-btn-active-color);
+    background-color: var(--bs-btn-active-bg);
+    border-color: var(--bs-btn-active-border-color);
+  }
+}
+
+// Smaller than Bootstrap's .small (0.875em): this is a secondary line under a
+// group's name, telling two same-named groups apart, and it should read as
+// supporting detail rather than competing with the name above it.
+.group-subline {
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.group-bar {
+  @extend %stuck-bar;
+  top: var(--nav-height);
+  // No min-height: --group-bar-height is measured *from* this element, so
+  // feeding it back in would be circular.
+  z-index: 1019; // just under Bootstrap's sticky navbar (1020)
+}
+
+.picks-bar {
+  @extend %stuck-bar;
+  top: calc(var(--nav-height) + var(--group-bar-height));
+  z-index: 1018; // and under the group bar, which outranks it
 }
 
 // Two-thumb range slider. The inputs are transparent and stacked; only their

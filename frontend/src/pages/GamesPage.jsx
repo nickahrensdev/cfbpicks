@@ -5,12 +5,16 @@ import { useSearchParams } from 'react-router-dom';
 import GameCard from '../components/GameCard.jsx';
 import GameFilters from '../components/GameFilters.jsx';
 import WeekSelector from '../components/WeekSelector.jsx';
-import { EmptyState, ErrorNotice, Loading, isPickable } from '../components/common.jsx';
+import DaySelector, { formatDay } from '../components/DaySelector.jsx';
+import { EmptyState, ErrorNotice, Loading, isPickable, marketLabel, marketsOf } from '../components/common.jsx';
 import { api } from '../api/client.js';
+import { NoGroupNotice } from '../components/common.jsx';
+import { useGroup } from '../auth/GroupProvider.jsx';
 
 const NO_FILTERS = {
   conference: null,
   teamId: null,
+  status: null,
   minSpread: null,
   maxSpread: null,
   mine: false,
@@ -19,6 +23,17 @@ const NO_FILTERS = {
 };
 
 export default function GamesPage() {
+  const { groupId, group, hasNoGroups } = useGroup();
+
+  // A daily group spends its allowance per game day, so its board is a day
+  // rather than a week - a week would mix several allowances together.
+  const daily = group?.cadence === 'DAILY';
+
+  // Which markets this group plays, so the board only offers buttons that
+  // can actually be picked. Memoised: a fresh object each render would
+  // invalidate the filtered list every time.
+  const markets = useMemo(() => marketsOf(group), [group]);
+
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [meta, setMeta] = useState(null);
@@ -30,7 +45,17 @@ export default function GamesPage() {
     mine: searchParams.get('mine') === '1',
   });
   const [picksUsed, setPicksUsed] = useState(0);
-  const [maxPicks, setMaxPicks] = useState(10);
+  const [maxPicks, setMaxPicks] = useState(null);
+  const [cadence, setCadence] = useState('WEEKLY');
+  // Null whenever no single number describes what is left - see WeekPicks.
+  const [picksRemaining, setPicksRemaining] = useState(null);
+  // What this period still requires: the overall minimum, and one entry per
+  // enabled market with its own used/min/max.
+  const [minPicks, setMinPicks] = useState(0);
+  const [marketBudgets, setMarketBudgets] = useState([]);
+  // Daily boards only: the selected day, and the days that have games.
+  const [day, setDay] = useState(null);
+  const [gameDays, setGameDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -51,29 +76,64 @@ export default function GamesPage() {
       .catch(setError);
   }, []);
 
-  const loadWeek = useCallback(async () => {
-    if (week === null || !meta) return;
+  useEffect(() => {
+    if (!daily || !meta) return;
 
-    if (loadedWeek.current !== week) setLoading(true);
+    api
+      .gameDays({ season: meta.season })
+      .then((days) => {
+        setGameDays(days);
+        setDay((current) => {
+          if (current) return current;
+          // Start on today when there are games, otherwise the next day that
+          // has some - landing on an empty Tuesday would be a poor greeting.
+          const today = new Date().toLocaleDateString('en-CA');
+          return days.find((value) => value >= today) ?? days[days.length - 1] ?? today;
+        });
+      })
+      .catch(() => setGameDays([]));
+  }, [daily, meta]);
+
+  const loadWeek = useCallback(async () => {
+    // The board is group-scoped, so there is nothing to ask for until the
+    // selection has resolved. A daily board additionally waits for its day.
+    if (!meta || !groupId) return;
+    if (daily ? !day : week === null) return;
+
+    const period = daily ? day : week;
+    if (loadedWeek.current !== period) setLoading(true);
     setError(null);
 
     try {
       const [weekGames, picks, options] = await Promise.all([
-        api.games({ season: meta.season, week }),
-        api.myPicks({ season: meta.season, week }),
-        api.gameFilters({ season: meta.season, week }),
+        daily
+          ? api.games({ groupId, date: day })
+          : api.games({ groupId, season: meta.season, week }),
+        // A daily group asks by day, which is the period its allowance is
+        // actually measured in - by week it could only return a number that
+        // contradicts what picking enforces.
+        api.myPicks(daily
+          ? { groupId, season: meta.season, date: day }
+          : { groupId, season: meta.season, week }),
+        daily
+          ? api.gameFilters({ date: day })
+          : api.gameFilters({ season: meta.season, week }),
       ]);
       setGames(weekGames);
       setPicksUsed(picks.picksUsed);
       setMaxPicks(picks.maxPicks);
+      setCadence(picks.cadence);
+      setPicksRemaining(picks.picksRemaining);
+      setMinPicks(picks.minPicks ?? 0);
+      setMarketBudgets(picks.markets ?? []);
       setFilterOptions(options);
-      loadedWeek.current = week;
+      loadedWeek.current = period;
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, [meta, week]);
+  }, [daily, day, groupId, meta, week]);
 
   useEffect(() => {
     loadWeek();
@@ -105,7 +165,9 @@ export default function GamesPage() {
       // state the server has not applied yet and would undo the card.
       if (busyGameId !== null) return;
       try {
-        const refreshed = await api.games({ season: meta.season, week });
+        const refreshed = daily
+          ? await api.games({ groupId, date: day })
+          : await api.games({ groupId, season: meta.season, week });
         setGames(refreshed);
       } catch {
         // A dropped poll is not worth an error banner - the next one is 30
@@ -114,13 +176,13 @@ export default function GamesPage() {
     }, 30_000);
 
     return () => clearInterval(timer);
-  }, [anyLive, busyGameId, meta, week]);
+  }, [anyLive, busyGameId, daily, day, groupId, meta, week]);
 
   // Keep "my picks" in the URL so the view survives a refresh and can be
   // linked to, but reset the rest when the week changes.
   useEffect(() => {
     setFilters((current) => ({ ...NO_FILTERS, mine: current.mine }));
-  }, [week]);
+  }, [week, day]);
 
   const updateFilters = (next) => {
     setFilters(next);
@@ -129,16 +191,22 @@ export default function GamesPage() {
 
   const visibleGames = useMemo(() => {
     return games.filter((game) => {
-      if (filters.mine && !game.mySpreadPick && !game.myTotalPick) return false;
+      if (filters.mine
+          && !game.mySpreadPick && !game.myTotalPick && !game.myWinnerPick) {
+        return false;
+      }
       // Literal: a locked game is not actionable even if it was already
       // picked, which is what "still pick" means.
-      if (filters.pickableOnly && !isPickable(game)) return false;
+      if (filters.pickableOnly && !isPickable(game, markets)) return false;
       // Local calendar day, not UTC - a kickoff at 11pm local should not
       // fall off "today" just because it is already tomorrow in UTC.
-      if (filters.todayOnly
+      // Ignored on a daily board: the control is hidden there, and a filter
+      // nobody can see or turn off would silently empty the page.
+      if (!daily && filters.todayOnly
           && new Date(game.kickoff).toDateString() !== new Date().toDateString()) {
         return false;
       }
+      if (filters.status && game.status !== filters.status) return false;
       if (filters.conference) {
         // Read from the game, not the team record: non-FBS opponents have a
         // conference here but no team row to hang it off.
@@ -160,7 +228,7 @@ export default function GamesPage() {
       }
       return true;
     });
-  }, [games, filters]);
+  }, [games, filters, daily, markets]);
 
   /**
    * Applies a pick without reloading the board. `action` resolves straight
@@ -186,7 +254,7 @@ export default function GamesPage() {
           variant: 'warning',
           text: `${err.message}. The card now shows the current line - pick again if you still want it.`,
         });
-        const refreshed = await api.game(game.id).catch(() => null);
+        const refreshed = await api.game(game.id, { groupId }).catch(() => null);
         if (refreshed) {
           setGames((current) =>
             current.map((row) => (row.id === game.id ? refreshed.game : row)),
@@ -223,8 +291,8 @@ export default function GamesPage() {
       game,
       () =>
         (existing
-          ? api.updatePick(existing.id, selection, line)
-          : api.createPick(game.id, selection, line)
+          ? api.updatePick(groupId, existing.id, selection, line)
+          : api.createPick(groupId, game.id, selection, line)
         ).then((response) => response.game),
       // Switching sides within a market spends nothing extra.
       existing ? 0 : 1,
@@ -234,58 +302,114 @@ export default function GamesPage() {
   const handleClear = (game, selection) =>
     // deletePick resolves straight to the GameSummary - there is no pick
     // left to wrap it in.
-    applyPick(game, () => api.deletePick(pickFor(game, selection).id), -1);
+    applyPick(game, () => api.deletePick(groupId, pickFor(game, selection).id), -1);
 
   const handleRelock = (game, pick) =>
-    applyPick(game, () => api.relockPick(pick.id).then((response) => response.game), 0);
+    applyPick(game, () => api.relockPick(groupId, pick.id).then((response) => response.game), 0);
 
-  const remaining = Math.max(0, maxPicks - picksUsed);
+  // Null only when the group sets no maximum at all. A daily group used to
+  // land here too - a week holds several of its allowances, so no single
+  // number described what was left - but the board now asks by day, which is
+  // the period the allowance is actually measured in.
+  const remaining = picksRemaining;
+  const perPeriod = cadence === 'DAILY' ? 'day' : 'week';
+
+  // Minimums this period has not met yet, phrased as what is left to do rather
+  // than as the rule. A minimum is charged as losses when the period closes -
+  // see CadenceSettlementService - so saying it only afterwards would be the
+  // one time it could not help.
+  const outstanding = [
+    ...marketBudgets
+      .filter((budget) => budget.min > 0 && budget.used < budget.min)
+      .map((budget) => `${budget.min - budget.used} more ${marketLabel(budget.market).toLowerCase()}`),
+    // The overall minimum is separate: a member can satisfy every market and
+    // still be short of the total the group asks for.
+    ...(minPicks > picksUsed ? [`${minPicks - picksUsed} more in total`] : []),
+  ];
   const weekNotLoaded =
     meta && week !== null && !meta.loadedWeeks?.includes(week) && games.length === 0;
 
+  if (hasNoGroups) {
+    return (
+      <Container className="py-4 py-md-5">
+        <NoGroupNotice />
+      </Container>
+    );
+  }
+
   return (
     <>
-      {/* Pinned so the pick budget stays visible while scrolling a long board. */}
+      {/* Pinned so the pick budget stays visible while scrolling a long board.
+          A group with no maximum has no budget to show, so the bar becomes a
+          plain count rather than a progress bar to nowhere. */}
       <div className="picks-bar border-bottom">
         <Container className="py-2">
           <div className="d-flex justify-content-between align-items-center gap-3 small">
             <span className="fw-semibold text-nowrap">
-              {picksUsed} / {maxPicks} picks
+              {/* A running total against the cap, or a plain count for a group
+                  that sets none. */}
+              {remaining == null ? `${picksUsed} picks` : `${picksUsed} / ${maxPicks} picks`}
               <span className="d-none d-sm-inline text-body-secondary fw-normal">
                 {' '}
-                · week {week ?? '-'}
+                · {daily ? formatDay(day) : `week ${week ?? '-'}`}
               </span>
             </span>
-            <ProgressBar
-              now={(picksUsed / maxPicks) * 100}
-              variant={remaining === 0 ? 'secondary' : 'primary'}
-              style={{ height: 6, flex: 1 }}
-              aria-label={`${picksUsed} of ${maxPicks} picks used`}
-            />
-            <span className="text-body-secondary text-nowrap">{remaining} left</span>
+            {remaining != null && (
+              <>
+                <ProgressBar
+                  now={(picksUsed / maxPicks) * 100}
+                  variant={remaining === 0 ? 'secondary' : 'primary'}
+                  style={{ height: 6, flex: 1 }}
+                  aria-label={`${picksUsed} of ${maxPicks} picks used`}
+                />
+                <span className="text-body-secondary text-nowrap">{remaining} left</span>
+              </>
+            )}
           </div>
+
+          {/* What this period will charge if it closes as it stands. Only
+              rendered when something is actually outstanding - a member who
+              has met every minimum should not be reading about minimums. */}
+          {outstanding.length > 0 && (
+            <div className="small text-warning-emphasis mt-1">
+              Still needed this {perPeriod}: {outstanding.join(', ')}
+              <span className="d-none d-md-inline text-body-secondary">
+                {' '}
+                — anything short when the {perPeriod} closes counts as a loss.
+              </span>
+            </div>
+          )}
         </Container>
       </div>
 
-      <Container className="py-4">
-        <h1 className="h3 mb-3">Week {week ?? '-'}</h1>
+      {/* Tight to the sticky bars above - there is no heading between them
+          and the picker any more, so the usual page padding left a gap with
+          nothing in it. */}
+      <Container className="pt-2 pb-4">
+        {/* No heading: the picker below already names the week or day, and
+            repeating it above only pushed the board further down.
 
-        {/* Always rendered, even for a week with no games - it carries the
-            week picker, which is how you get to a week that has some. */}
+            Always rendered, even for a period with no games - it carries the
+            picker, which is how you get to one that has some. */}
         <GameFilters
           weekSelector={
-            <WeekSelector
-              compact
-              weeks={meta?.availableWeeks}
-              current={week}
-              onChange={setWeek}
-            />
+            daily ? (
+              <DaySelector compact value={day} onChange={setDay} days={gameDays} />
+            ) : (
+              <WeekSelector
+                compact
+                weeks={meta?.availableWeeks}
+                current={week}
+                onChange={setWeek}
+              />
+            )
           }
           options={filterOptions}
           value={filters}
           onChange={updateFilters}
           resultCount={visibleGames.length}
           totalCount={games.length}
+          daily={daily}
           onRefresh={handleRefresh}
           refreshing={loading || refreshing}
         />
@@ -299,7 +423,7 @@ export default function GamesPage() {
 
         {loading ? (
           <Loading label="Loading games" />
-        ) : weekNotLoaded ? (
+        ) : !daily && weekNotLoaded ? (
           <EmptyState title={`Week ${week} has not been loaded yet`}>
             <p className="small mb-0">
               An admin can pull it in from Admin → Data. Schedules and lines for future weeks are
@@ -307,12 +431,18 @@ export default function GamesPage() {
             </p>
           </EmptyState>
         ) : games.length === 0 ? (
-          <EmptyState title="No games this week" />
+          <EmptyState title={daily ? 'No games on this day' : 'No games this week'}>
+            {daily && (
+              <p className="small mb-0">
+                Use the arrows to step to another day, or the date field to jump.
+              </p>
+            )}
+          </EmptyState>
         ) : visibleGames.length === 0 ? (
           <EmptyState
             title={
               filters.pickableOnly && !filters.mine && games.length > 0
-                ? 'Every game this week has locked'
+                ? `Every game ${daily ? 'today' : 'this week'} has locked`
                 : filters.mine
                   ? 'No picks in this week yet'
                   : 'No games match these filters'
@@ -322,17 +452,18 @@ export default function GamesPage() {
           </EmptyState>
         ) : (
           <Row xs={1} md={2} xl={3} className="g-3 g-md-4">
-            {visibleGames.map((game) => (
-              <Col key={game.id}>
-                <GameCard
-                  game={game}
-                  busy={busyGameId === game.id}
-                  onPick={handlePick}
-                  onClear={handleClear}
-                  onRelock={handleRelock}
-                />
-              </Col>
-            ))}
+              {visibleGames.map((game) => (
+                <Col key={game.id}>
+                  <GameCard
+                    game={game}
+                    markets={markets}
+                    busy={busyGameId === game.id}
+                    onPick={handlePick}
+                    onClear={handleClear}
+                    onRelock={handleRelock}
+                  />
+                </Col>
+              ))}
           </Row>
         )}
       </Container>

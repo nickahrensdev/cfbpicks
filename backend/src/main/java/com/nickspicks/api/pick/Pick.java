@@ -21,6 +21,13 @@ public class Pick {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /**
+     * The league this pick was made in. Part of the pick's identity - the same
+     * member can play the same game in two groups, under two sets of rules.
+     */
+    @Column(name = "group_id", nullable = false)
+    private UUID groupId;
+
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
@@ -44,8 +51,11 @@ public class Pick {
      * for a SPREAD pick, a total for a TOTAL one. Grading uses this, never the
      * game's current line, so later movement cannot change a pick a member
      * already committed to.
+     *
+     * <p>Null for a WINNER pick, which is played against no number at all. A
+     * check constraint keeps the two in step.
      */
-    @Column(name = "locked_line", nullable = false)
+    @Column(name = "locked_line")
     private BigDecimal lockedLine;
 
     @Enumerated(EnumType.STRING)
@@ -67,6 +77,14 @@ public class Pick {
 
     public void setId(UUID id) {
         this.id = id;
+    }
+
+    public UUID getGroupId() {
+        return groupId;
+    }
+
+    public void setGroupId(UUID groupId) {
+        this.groupId = groupId;
     }
 
     public UUID getUserId() {

@@ -53,44 +53,124 @@ export const api = {
   me: () => request('/api/me'),
   updateDisplayName: (displayName) =>
     request('/api/me', { method: 'PUT', body: JSON.stringify({ displayName }) }),
+  updateUsername: (username) =>
+    request('/api/me/username', { method: 'PUT', body: JSON.stringify({ username }) }),
   updateTheme: (theme, colorMode) =>
     request('/api/me/theme', { method: 'PUT', body: JSON.stringify({ theme, colorMode }) }),
   meta: () => request('/api/meta'),
 
   currentWeek: () => request('/api/weeks/current'),
-  games: ({ season, week, conference, teamId, minSpread, maxSpread } = {}) =>
-    request(`/api/games${query({ season, week, conference, teamId, minSpread, maxSpread })}`),
-  gameFilters: ({ season, week } = {}) => request(`/api/games/filters${query({ season, week })}`),
-  game: (id) => request(`/api/games/${id}`),
+  // Every board is scoped to a group: your picks on it, and that group's lock
+  // times. The server rejects a group you are not a member of.
+  // `date` is for a group that picks daily; it takes precedence over `week`,
+  // because a week would mix several days' allowances onto one board.
+  games: ({ groupId, season, week, date, conference, teamId, minSpread, maxSpread } = {}) =>
+    request(
+      `/api/games${query({
+        groupId, season, week, date, conference, teamId, minSpread, maxSpread,
+      })}`,
+    ),
+  gameDays: ({ season } = {}) => request(`/api/games/days${query({ season })}`),
+  gameFilters: ({ season, week, date } = {}) =>
+    request(`/api/games/filters${query({ season, week, date })}`),
+  game: (id, { groupId } = {}) => request(`/api/games/${id}${query({ groupId })}`),
 
-  myPicks: ({ season, week } = {}) => request(`/api/picks${query({ season, week })}`),
+  // `date` is for a group that picks daily: a week holds seven of those
+  // groups' allowances, so only a named day has a countdown to give.
+  myPicks: ({ groupId, season, week, date } = {}) =>
+    request(`/api/picks${query({ groupId, season, week, date })}`),
   // expectedSpread is the line the page was showing. The server rejects the
   // pick with LINE_MOVED if it is no longer current, so a stale tab cannot
   // commit someone to a number they never saw.
-  createPick: (gameId, selection, expectedSpread) =>
-    request('/api/picks', {
+  createPick: (groupId, gameId, selection, expectedSpread) =>
+    request(`/api/picks${query({ groupId })}`, {
       method: 'POST',
       body: JSON.stringify({ gameId, selection, expectedSpread }),
     }),
-  updatePick: (id, selection, expectedSpread) =>
-    request(`/api/picks/${id}`, {
+  updatePick: (groupId, id, selection, expectedSpread) =>
+    request(`/api/picks/${id}${query({ groupId })}`, {
       method: 'PUT',
       body: JSON.stringify({ selection, expectedSpread }),
     }),
-  relockPick: (id) => request(`/api/picks/${id}/relock`, { method: 'POST' }),
-  deletePick: (id) => request(`/api/picks/${id}`, { method: 'DELETE' }),
-  memberPicks: (userId, { season, week } = {}) =>
-    request(`/api/members/${userId}/picks${query({ season, week })}`),
+  relockPick: (groupId, id) =>
+    request(`/api/picks/${id}/relock${query({ groupId })}`, { method: 'POST' }),
+  deletePick: (groupId, id) =>
+    request(`/api/picks/${id}${query({ groupId })}`, { method: 'DELETE' }),
+  memberPicks: (userId, { groupId, season, week } = {}) =>
+    request(`/api/members/${userId}/picks${query({ groupId, season, week })}`),
+  // Only the groups the viewer is also in - see MemberGroupsController.
+  memberGroups: (userId) => request(`/api/members/${userId}/groups`),
 
-  leaderboard: ({ season, week } = {}) => request(`/api/leaderboard${query({ season, week })}`),
+  leaderboard: ({ groupId, season, week } = {}) =>
+    request(`/api/leaderboard${query({ groupId, season, week })}`),
 
   teams: ({ conference, search } = {}) => request(`/api/teams${query({ conference, search })}`),
-  team: (id) => request(`/api/teams/${id}`),
+  // groupId is optional here: a team page is reachable from any team name on
+  // the site, and without a group it just renders the schedule unmarked.
+  team: (id, { groupId } = {}) => request(`/api/teams/${id}${query({ groupId })}`),
   // Cached and refreshed server-side; safe to call every time a matchup is
   // viewed - see TeamMatchupService for the staleness rule.
   matchup: (team1Id, team2Id) => request(`/api/teams/matchup${query({ team1Id, team2Id })}`),
   athlete: (id) => request(`/api/athletes/${id}`),
   coach: (id) => request(`/api/coaches/${id}`),
+
+  // Groups. Creation is admin-only for now, so it sits under /api/admin;
+  // everything an owner or member does is on /api/groups.
+  myGroups: () => request('/api/groups/mine'),
+  searchGroups: ({ q } = {}) => request(`/api/groups/search${query({ q })}`),
+  group: (id) => request(`/api/groups/${id}`),
+  groupMembers: (id) => request(`/api/groups/${id}/members`),
+  // Omitted password is a real case - an open group needs none, and the server
+  // answers GROUP_PASSWORD_REQUIRED if it turns out one was needed.
+  joinGroup: (id, password) =>
+    request(`/api/groups/${id}/join`, { method: 'POST', body: JSON.stringify({ password }) }),
+  favoriteGroup: (id, favorite) =>
+    request(`/api/groups/${id}/favorite`, {
+      method: 'PUT',
+      body: JSON.stringify({ favorite }),
+    }),
+  // Returns the same token every time - a link already sent has to keep
+  // working, so pressing Share again never mints a new one.
+  shareGroup: (id) => request(`/api/groups/${id}/share`, { method: 'POST' }),
+  // The only group call that works signed out: someone deciding whether to
+  // make an account has to see what they are being invited to first.
+  shareInvite: (token) => request(`/api/share/${token}`),
+  claimShare: (token) => request(`/api/share/${token}/claim`, { method: 'POST' }),
+  joinByShare: (token, password) =>
+    request(`/api/share/${token}/join`, { method: 'POST', body: JSON.stringify({ password }) }),
+  groupRequests: (id) => request(`/api/groups/${id}/requests`),
+  approveGroupRequest: (id, userId) =>
+    request(`/api/groups/${id}/requests/${userId}/approve`, { method: 'POST' }),
+  denyGroupRequest: (id, userId) =>
+    request(`/api/groups/${id}/requests/${userId}/deny`, { method: 'POST' }),
+  setGroupMemberRole: (id, userId, role) =>
+    request(`/api/groups/${id}/members/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    }),
+  updateGroup: (id, settings) =>
+    request(`/api/groups/${id}`, { method: 'PUT', body: JSON.stringify(settings) }),
+  deleteGroup: (id) => request(`/api/groups/${id}`, { method: 'DELETE' }),
+  leaveGroup: (id, userId) => request(`/api/groups/${id}/members/${userId}`, { method: 'DELETE' }),
+
+  adminGroups: () => request('/api/admin/groups'),
+  adminCreateGroup: (settings) =>
+    request('/api/admin/groups', { method: 'POST', body: JSON.stringify(settings) }),
+  adminGroup: (id) => request(`/api/admin/groups/${id}`),
+  adminUpdateGroup: (id, settings) =>
+    request(`/api/admin/groups/${id}`, { method: 'PUT', body: JSON.stringify(settings) }),
+  adminDeleteGroup: (id) => request(`/api/admin/groups/${id}`, { method: 'DELETE' }),
+  adminGroupMembers: (id) => request(`/api/admin/groups/${id}/members`),
+  // Searched rather than listed: the old picker downloaded every account.
+  adminGroupCandidates: (id, { q } = {}) =>
+    request(`/api/admin/groups/${id}/candidates${query({ q })}`),
+  adminAddGroupMember: (id, userId) =>
+    request(`/api/admin/groups/${id}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+  adminRemoveGroupMember: (id, userId) =>
+    request(`/api/admin/groups/${id}/members/${userId}`, { method: 'DELETE' }),
 
   adminUsers: () => request('/api/admin/users'),
   adminSetRole: (userId, role) =>
@@ -117,6 +197,11 @@ export const api = {
   // Every load above returns immediately (202, {logId, status: "RUNNING"})
   // and finishes in the background - this is where the Data log tab reads
   // the actual result from.
+  // Closes out every finished period that has not been charged yet. The
+  // hourly job does this anyway; the button is for a group whose minimums were
+  // set after a period had already closed.
+  settlePeriods: ({ season } = {}) =>
+    request(`/api/admin/settle${query({ season })}`, { method: 'POST' }),
   dataLoads: () => request('/api/admin/data-loads'),
 
 };

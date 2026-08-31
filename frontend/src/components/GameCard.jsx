@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { TeamLink } from './links.jsx';
 import {
+  ALL_MARKETS,
   LockCountdown,
   ResultBadge,
   formatKickoff,
@@ -22,12 +23,17 @@ import {
  * purely for layout. The buttons carry an `O`/`U` prefix and a market-naming
  * aria-label so nothing implies the total belongs to a particular team.
  */
+/** Short market badge -> the word used in the cancel button's label. */
+const MARKET_NAMES = { SPR: 'spread', 'O/U': 'total', WIN: 'winner' };
+
 export default function GameCard({
   game,
   onPick,
   onClear,
   onRelock,
   busy = false,
+  /** Which markets this group plays - buttons for the others are not drawn. */
+  markets = ALL_MARKETS,
   // Hidden on the game details page itself, where the link would just
   // point back to the page already on screen.
   showDetailsLink = true,
@@ -36,6 +42,10 @@ export default function GameCard({
 
   const spreadPick = game.mySpreadPick;
   const totalPick = game.myTotalPick;
+  const winnerPick = game.myWinnerPick;
+  const winnerPlayed = markets.winner;
+  const spreadPlayed = markets.spread;
+  const totalPlayed = markets.total;
   const locked = game.locked;
   const finished = game.status === 'FINAL';
   // Present only while ESPN has the game in progress, so its presence is the
@@ -91,14 +101,16 @@ export default function GameCard({
     );
   };
 
-  /** One team row: name, its spread button, and one side of the total. */
+  /** One team row: name, its winner and spread buttons, and one side of the total. */
   const sideRow = (side, team, fallbackName, totalSide) => {
     const teamName = team?.school ?? fallbackName;
+    const winnerSide = side === 'HOME' ? 'HOME_WINNER' : 'AWAY_WINNER';
     const spreadMine = spreadPick?.selection === side;
     const spreadLineMatches =
       spreadMine && String(spreadPick.lockedLine) === String(game.homeSpread);
     const totalMine = totalPick?.selection === totalSide;
     const totalLineMatches = totalMine && String(totalPick.lockedLine) === String(game.overUnder);
+    const winnerMine = winnerPick?.selection === winnerSide;
     // Live scores come off the in-progress feed; once the game is final the
     // game itself carries them.
     const score = side === 'HOME'
@@ -140,7 +152,25 @@ export default function GameCard({
             this member actually holds is shown by the picks panel below. */}
         {!scoreboard && (
           <>
-            {marketButton({
+            {/* Only when the group plays winners. There is no line to show, so
+                the button says what it does rather than a number - and it is
+                never disabled for a missing line, because there is none. */}
+            {winnerPlayed && marketButton({
+              selection: winnerSide,
+              label: 'Win',
+              mine: winnerMine,
+              // No line, so nothing can have moved away from it.
+              lineMatches: true,
+              marketTaken: Boolean(winnerPick),
+              disabled: false,
+              ariaLabel: winnerMine
+                ? `Your winner pick: ${teamName}`
+                : winnerPick
+                  ? `${teamName} to win - cancel your current winner pick first`
+                  : `Pick ${teamName} to win`,
+            })}
+
+            {spreadPlayed && marketButton({
               selection: side,
               label: formatSpread(game.homeSpread, side),
               mine: spreadMine,
@@ -154,7 +184,7 @@ export default function GameCard({
                   : `Pick ${teamName} at ${formatSpread(game.homeSpread, side)}`,
             })}
 
-            {marketButton({
+            {totalPlayed && marketButton({
               selection: totalSide,
               label: formatTotal(game.overUnder, totalSide),
               mine: totalMine,
@@ -223,7 +253,7 @@ export default function GameCard({
               variant="outline-danger"
               disabled={busy}
               onClick={() => onClear?.(game, pick.selection)}
-              aria-label={`Cancel your ${marketLabel === 'SPR' ? 'spread' : 'total'} pick`}
+              aria-label={`Cancel your ${MARKET_NAMES[marketLabel] ?? 'market'} pick`}
               title="Cancel this pick"
             >
               ✕
@@ -259,6 +289,16 @@ export default function GameCard({
     return improved ? 'bg-warning-subtle' : 'pick-row--mine';
   };
 
+  const winnerRow = pickRow({
+    marketLabel: 'WIN',
+    pick: winnerPick,
+    currentLine: null,
+    // Nothing to re-lock onto: a winner pick has no number to improve.
+    improved: false,
+    format: (_line, selection) =>
+      `${selection === 'HOME_WINNER' ? game.homeTeamName : game.awayTeamName} to win`,
+    withTeamName: false,
+  });
   const spreadRow = pickRow({
     marketLabel: 'SPR',
     pick: spreadPick,

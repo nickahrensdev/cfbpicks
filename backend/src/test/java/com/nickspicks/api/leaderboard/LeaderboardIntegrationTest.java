@@ -4,16 +4,23 @@ import com.nickspicks.api.IntegrationTest;
 import com.nickspicks.api.game.Game;
 import com.nickspicks.api.game.GameRepository;
 import com.nickspicks.api.game.GameStatus;
+import com.nickspicks.api.group.Group;
+import com.nickspicks.api.group.GroupMember;
+import com.nickspicks.api.group.GroupMemberRepository;
+import com.nickspicks.api.group.GroupRepository;
+import com.nickspicks.api.group.GroupRole;
+import com.nickspicks.api.group.TestGroups;
 import com.nickspicks.api.ingest.GradingService;
 import com.nickspicks.api.pick.Pick;
 import com.nickspicks.api.pick.PickRepository;
 import com.nickspicks.api.pick.PickResult;
 import com.nickspicks.api.pick.PickService;
 import com.nickspicks.api.pick.Selection;
-import com.nickspicks.api.pick.WeeklyEntryRepository;
+import com.nickspicks.api.pick.CadenceEntryRepository;
 import com.nickspicks.api.user.AppUser;
 import com.nickspicks.api.user.AppUserRepository;
 import com.nickspicks.api.web.ApiDtos;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -35,7 +42,16 @@ class LeaderboardIntegrationTest extends IntegrationTest {
     private PickRepository pickRepository;
 
     @Autowired
-    private WeeklyEntryRepository entries;
+    private CadenceEntryRepository entries;
+
+    @Autowired
+    private GroupRepository groups;
+
+    @Autowired
+    private GroupMemberRepository groupMembers;
+
+    /** The league every member below plays in. */
+    private Group group;
 
     @Autowired
     private GameRepository games;
@@ -49,10 +65,26 @@ class LeaderboardIntegrationTest extends IntegrationTest {
     @Autowired
     private LeaderboardService standings;
 
+    /**
+     * The owner is deliberately not enrolled as a group_member here. The
+     * standings read group_member, so enrolling them would put a 0-0-0 row on
+     * every board below and turn each exact assertion into an exercise in
+     * ignoring it. Every member these tests care about joins through
+     * {@link #member}.
+     */
+    @BeforeEach
+    void createGroup() {
+        UUID owner = UUID.randomUUID();
+        users.save(new AppUser(owner, "owner@example.com", "owner", "owner"));
+        group = groups.save(new Group(owner, TestGroups.weeklyPickem()));
+    }
+
     @Override
     protected void cleanUp() {
         pickRepository.deleteAll();
         entries.deleteAll();
+        groupMembers.deleteAll();
+        groups.deleteAll();
         games.deleteAll();
         users.deleteAll();
     }
@@ -77,21 +109,21 @@ class LeaderboardIntegrationTest extends IntegrationTest {
         Game five = game(5L);
 
         // topdog: wins both, then ties the third.
-        picks.create(topDog, one.getId(), Selection.HOME);
-        picks.create(topDog, two.getId(), Selection.AWAY);
-        picks.create(topDog, three.getId(), Selection.HOME);
+        picks.create(group, topDog, one.getId(), Selection.HOME);
+        picks.create(group, topDog, two.getId(), Selection.AWAY);
+        picks.create(group, topDog, three.getId(), Selection.HOME);
 
         // tiebroken: same two wins, but takes the losing side of game four
         // instead of tying - level on wins with topdog, half a point behind.
-        picks.create(tieBroken, one.getId(), Selection.HOME);
-        picks.create(tieBroken, two.getId(), Selection.AWAY);
-        picks.create(tieBroken, four.getId(), Selection.AWAY);
+        picks.create(group, tieBroken, one.getId(), Selection.HOME);
+        picks.create(group, tieBroken, two.getId(), Selection.AWAY);
+        picks.create(group, tieBroken, four.getId(), Selection.AWAY);
 
         // grinder: one win and two ties. Same 2.0 points as tiebroken, but
         // fewer wins, so the second key puts them below.
-        picks.create(grinder, one.getId(), Selection.HOME);
-        picks.create(grinder, three.getId(), Selection.AWAY);
-        picks.create(grinder, five.getId(), Selection.HOME);
+        picks.create(group, grinder, one.getId(), Selection.HOME);
+        picks.create(group, grinder, three.getId(), Selection.AWAY);
+        picks.create(group, grinder, five.getId(), Selection.HOME);
 
         finish(one, 31, 20);    // home covers -7.5
         finish(two, 24, 20);    // home wins but fails to cover
@@ -102,7 +134,7 @@ class LeaderboardIntegrationTest extends IntegrationTest {
         List.of(1L, 2L, 3L, 4L, 5L).forEach(id ->
                 grading.gradeGame(games.findById(id).orElseThrow()));
 
-        List<ApiDtos.StandingsRow> table = standings.standings(2026, null);
+        List<ApiDtos.StandingsRow> table = standings.standings(group, 2026, null);
 
         assertThat(table).extracting(ApiDtos.StandingsRow::displayName)
                 .containsExactly("b-topdog", "a-tiebroken", "c-grinder");
@@ -141,8 +173,8 @@ class LeaderboardIntegrationTest extends IntegrationTest {
         Game tie = game(20L);
         Game lost = game(21L);
 
-        picks.create(tier, tie.getId(), Selection.HOME);
-        picks.create(loser, lost.getId(), Selection.AWAY);
+        picks.create(group, tier, tie.getId(), Selection.HOME);
+        picks.create(group, loser, lost.getId(), Selection.AWAY);
 
         finishExact(tie, 27, 20, new BigDecimal("-7.0")); // lands on 7 - tie
         finish(lost, 31, 20);                            // home covers, AWAY loses
@@ -150,7 +182,7 @@ class LeaderboardIntegrationTest extends IntegrationTest {
         grading.gradeGame(games.findById(20L).orElseThrow());
         grading.gradeGame(games.findById(21L).orElseThrow());
 
-        List<ApiDtos.StandingsRow> table = standings.standings(2026, null);
+        List<ApiDtos.StandingsRow> table = standings.standings(group, 2026, null);
 
         ApiDtos.StandingsRow tierRow = row(table, "tier");
         assertThat(tierRow.pushes()).isEqualTo(1);
@@ -169,7 +201,7 @@ class LeaderboardIntegrationTest extends IntegrationTest {
     void voidsPicksOnCanceledGamesInsteadOfCountingThemAsLosses() {
         UUID user = member("unlucky");
         Game canceled = game(10L);
-        picks.create(user, canceled.getId(), Selection.HOME);
+        picks.create(group, user, canceled.getId(), Selection.HOME);
 
         canceled.setStatus(GameStatus.CANCELED);
         games.save(canceled);
@@ -181,7 +213,7 @@ class LeaderboardIntegrationTest extends IntegrationTest {
 
         // The member still stands, on an empty record - a canceled game is
         // not a loss for anyone, and it earns no points either.
-        ApiDtos.StandingsRow unlucky = row(standings.standings(2026, null), "unlucky");
+        ApiDtos.StandingsRow unlucky = row(standings.standings(group, 2026, null), "unlucky");
         assertThat(unlucky.wins()).isZero();
         assertThat(unlucky.losses()).isZero();
         assertThat(unlucky.pushes()).isZero();
@@ -200,7 +232,7 @@ class LeaderboardIntegrationTest extends IntegrationTest {
     void regradeGameOverwritesAnAlreadySettledPickWhenTheScoreIsCorrected() {
         UUID member = member("bettor");
         Game game = game(20L);
-        picks.create(member, game.getId(), Selection.HOME);
+        picks.create(group, member, game.getId(), Selection.HOME);
 
         finish(game, 31, 20); // covers -7.5 -> WIN
         grading.gradeGame(game);
@@ -238,7 +270,8 @@ class LeaderboardIntegrationTest extends IntegrationTest {
 
     private UUID member(String name) {
         UUID id = UUID.randomUUID();
-        users.save(new AppUser(id, name + "@example.com", name));
+        users.save(new AppUser(id, name + "@example.com", name, name));
+        groupMembers.save(new GroupMember(group.getId(), id, GroupRole.MEMBER));
         return id;
     }
 

@@ -44,6 +44,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/meta", "/actuator/health", "/actuator/info").permitAll()
+                        // A share link has to explain itself before anyone
+                        // signs in - somebody deciding whether to make an
+                        // account needs to see what they are being invited to.
+                        // Read-only, and it carries no password and no roster.
+                        .requestMatchers(HttpMethod.GET, "/api/share/*").permitAll()
                         // Called by Supabase pg_cron, which carries no Supabase user session -
                         // CronController authenticates the caller itself via a shared-secret
                         // header instead of a JWT.

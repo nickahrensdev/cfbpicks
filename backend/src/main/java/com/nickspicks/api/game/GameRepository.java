@@ -11,6 +11,20 @@ public interface GameRepository extends JpaRepository<Game, Long> {
 
     List<Game> findAllBySeasonAndWeekOrderByKickoffAsc(Integer season, Integer week);
 
+    /** Every game of a season - what settling a group's periods walks. */
+    List<Game> findAllBySeason(Integer season);
+
+    /**
+     * One game day. Half-open on purpose - a kickoff at exactly midnight
+     * belongs to the day starting, not the one ending.
+     */
+    List<Game> findAllByKickoffGreaterThanEqualAndKickoffLessThanOrderByKickoffAsc(
+            Instant from, Instant to);
+
+    /** Every kickoff in a season, for working out which days have games. */
+    @Query("select g.kickoff from Game g where g.season = :season")
+    List<Instant> findKickoffs(@Param("season") Integer season);
+
     @Query("""
             select g from Game g
             where g.season = :season

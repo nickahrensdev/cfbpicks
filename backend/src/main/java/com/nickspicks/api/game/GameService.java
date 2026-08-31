@@ -2,8 +2,10 @@ package com.nickspicks.api.game;
 
 import com.nickspicks.api.espn.EspnGameService;
 import com.nickspicks.api.espn.LiveScoreService;
+import com.nickspicks.api.group.Group;
 import com.nickspicks.api.pick.Pick;
 import com.nickspicks.api.pick.PickRepository;
+import com.nickspicks.api.pick.CadencePeriod;
 import com.nickspicks.api.pick.PickWindow;
 import com.nickspicks.api.ranking.RankingService;
 import com.nickspicks.api.team.Team;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -71,31 +74,75 @@ public class GameService {
     }
 
     @Transactional(readOnly = true)
-    public List<ApiDtos.GameSummary> listWeek(int season, int week, UUID userId) {
-        return listWeek(season, week, userId, GameFilter.NONE);
+    public List<ApiDtos.GameSummary> listWeek(Group group, int season, int week, UUID userId) {
+        return listWeek(group, season, week, userId, GameFilter.NONE);
+    }
+
+    /**
+     * One game day, for a group that picks daily.
+     *
+     * <p>The day is sliced on {@link CadencePeriod#GAME_DAY_ZONE}, the same
+     * boundary the pick allowance uses. Anything else and the board would show
+     * a late kickoff that counts against a different day's quota.
+     */
+    @Transactional(readOnly = true)
+    public List<ApiDtos.GameSummary> listDay(Group group, LocalDate day, UUID userId,
+                                             GameFilter filter) {
+        Instant from = day.atStartOfDay(CadencePeriod.GAME_DAY_ZONE).toInstant();
+        Instant to = day.plusDays(1).atStartOfDay(CadencePeriod.GAME_DAY_ZONE).toInstant();
+
+        return summarise(group, userId, filter,
+                games.findAllByKickoffGreaterThanEqualAndKickoffLessThanOrderByKickoffAsc(from, to));
+    }
+
+    /** Days in the season with at least one game, so a date picker can start somewhere useful. */
+    @Transactional(readOnly = true)
+    public List<LocalDate> gameDays(int season) {
+        return games.findKickoffs(season).stream()
+                .filter(Objects::nonNull)
+                .map(kickoff -> kickoff.atZone(CadencePeriod.GAME_DAY_ZONE).toLocalDate())
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<ApiDtos.GameSummary> listWeek(int season, int week, UUID userId,
+    public List<ApiDtos.GameSummary> listWeek(Group group, int season, int week, UUID userId,
                                               GameFilter filter) {
-        List<Game> weekGames = games.findAllBySeasonAndWeekOrderByKickoffAsc(season, week);
+        return summarise(group, userId, filter,
+                games.findAllBySeasonAndWeekOrderByKickoffAsc(season, week));
+    }
+
+    /** Shared by the weekly board and the daily one - only the query differs. */
+    private List<ApiDtos.GameSummary> summarise(Group group, UUID userId, GameFilter filter,
+                                                List<Game> weekGames) {
 
         // One team lookup for the whole page rather than two per game.
         Map<Integer, Team> teamCache = teamCache();
-        // Ranks as of the week being viewed, not today's - looking back at
-        // week 3 should show who was ranked going into week 3.
-        Map<Integer, Integer> ranks = rankings.rankLookup(season, week);
+
+        // Ranks as of each game's own week, not today's - looking back at week
+        // 3 should show who was ranked going into week 3. Cached per week
+        // because a single day can span only one, but a week query spans one
+        // too and this keeps both paths on the same code.
+        Map<Integer, Map<Integer, Integer>> ranksByWeek = new HashMap<>();
+
         // Grouped, not keyed: a member can hold both a spread and a total on
         // the same game.
-        Map<Long, List<Pick>> myPicks = picks.findForUserWeek(userId, season, week).stream()
-                .collect(Collectors.groupingBy(Pick::getGameId));
+        Map<Long, List<Pick>> myPicks = weekGames.isEmpty()
+                ? Map.of()
+                : picks.findAllByGroupIdAndUserIdAndGameIdIn(group.getId(), userId,
+                                weekGames.stream().map(Game::getId).toList())
+                        .stream()
+                        .collect(Collectors.groupingBy(Pick::getGameId));
 
         Map<Long, LiveScoreService.LiveGame> live = liveScoresFor(weekGames);
 
         return weekGames.stream()
                 .filter(game -> matches(game, filter))
-                .map(game -> mapper.gameSummary(game, myPicks.get(game.getId()), teamCache, ranks,
-                        live))
+                .map(game -> mapper.gameSummary(game, myPicks.get(game.getId()), teamCache,
+                        ranksByWeek.computeIfAbsent(game.getWeek(),
+                                week -> rankings.rankLookup(game.getSeason(), week)),
+                        live, group.getLockLeadMinutes()))
                 .toList();
     }
 
@@ -117,10 +164,23 @@ public class GameService {
         return anyLive ? liveScores.current() : Map.of();
     }
 
+    /** Conferences and teams playing on a given day. */
+    @Transactional(readOnly = true)
+    public ApiDtos.GameFilters filterOptionsForDay(LocalDate day) {
+        Instant from = day.atStartOfDay(CadencePeriod.GAME_DAY_ZONE).toInstant();
+        Instant to = day.plusDays(1).atStartOfDay(CadencePeriod.GAME_DAY_ZONE).toInstant();
+
+        return filterOptionsFrom(
+                games.findAllByKickoffGreaterThanEqualAndKickoffLessThanOrderByKickoffAsc(from, to));
+    }
+
     /** Conferences and teams playing in a given week, for the filter controls. */
     @Transactional(readOnly = true)
     public ApiDtos.GameFilters filterOptions(int season, int week) {
-        List<Game> weekGames = games.findAllBySeasonAndWeekOrderByKickoffAsc(season, week);
+        return filterOptionsFrom(games.findAllBySeasonAndWeekOrderByKickoffAsc(season, week));
+    }
+
+    private ApiDtos.GameFilters filterOptionsFrom(List<Game> weekGames) {
         Map<Integer, Team> teamCache = teamCache();
 
         List<String> conferences = weekGames.stream()
@@ -182,18 +242,18 @@ public class GameService {
     }
 
     @Transactional(readOnly = true)
-    public ApiDtos.GameDetail detail(long gameId, UUID userId) {
+    public ApiDtos.GameDetail detail(Group group, long gameId, UUID userId) {
         Game game = games.findById(gameId)
                 .orElseThrow(() -> new NotFoundException("Game %d not found".formatted(gameId)));
 
         Map<Integer, Team> teamCache = teamCache();
         Map<Integer, Integer> ranks = rankings.rankLookup(game.getSeason(), game.getWeek());
-        List<Pick> myPicks = picks.findAllByUserIdAndGameId(userId, gameId);
+        List<Pick> myPicks = picks.findAllByGroupIdAndUserIdAndGameId(group.getId(), userId, gameId);
 
         // Everyone's picks are visible only once the game has started, so the
         // detail page cannot be used to scout the field beforehand.
         boolean revealed = window.isRevealed(game, Instant.now());
-        List<ApiDtos.MemberPick> memberPicks = revealed ? memberPicks(gameId) : List.of();
+        List<ApiDtos.MemberPick> memberPicks = revealed ? memberPicks(group.getId(), gameId) : List.of();
 
         // Both sides in one query. Loaded straight from our own table - see
         // TeamAtsService, nothing here calls the provider. A non-FBS opponent
@@ -207,7 +267,8 @@ public class GameService {
                         .toList());
 
         return new ApiDtos.GameDetail(
-                mapper.gameSummary(game, myPicks, teamCache, ranks, liveScoresFor(List.of(game))),
+                mapper.gameSummary(game, myPicks, teamCache, ranks, liveScoresFor(List.of(game)),
+                        group.getLockLeadMinutes()),
                 game.getSpreadOpen(),
                 game.getOverUnder(),
                 game.getOverUnderOpen(),
@@ -241,11 +302,24 @@ public class GameService {
         return teamId == null ? List.of() : mapper.atsHistory(ats.get(teamId));
     }
 
+    /**
+     * A team's season, with the caller's picks on each game marked.
+     *
+     * <p>{@code group} may be null. A team page is reference material reachable
+     * from any team name on the site, so it stays readable for someone with no
+     * group selected - they just see the schedule without their picks, rather
+     * than an error.
+     */
     @Transactional(readOnly = true)
-    public List<ApiDtos.GameSummary> teamSchedule(int season, int teamId, UUID userId) {
+    public List<ApiDtos.GameSummary> teamSchedule(Group group, int season, int teamId, UUID userId) {
         Map<Integer, Team> teamCache = teamCache();
-        Map<Long, List<Pick>> myPicks = picks.findAllByUserId(userId).stream()
-                .collect(Collectors.groupingBy(Pick::getGameId));
+        Map<Long, List<Pick>> myPicks = group == null
+                ? Map.of()
+                : picks.findAllByUserId(userId).stream()
+                        .filter(pick -> pick.getGroupId().equals(group.getId()))
+                        .collect(Collectors.groupingBy(Pick::getGameId));
+
+        int lockLead = group == null ? window.defaultLockLeadMinutes() : group.getLockLeadMinutes();
 
         // Each row shows the ranks that applied in that game's own week, so a
         // schedule reads the way a record book does.
@@ -258,20 +332,25 @@ public class GameService {
                 .map(game -> mapper.gameSummary(game, myPicks.get(game.getId()), teamCache,
                         ranksByWeek.computeIfAbsent(game.getWeek(),
                                 week -> rankings.rankLookup(season, week)),
-                        live))
+                        live, lockLead))
                 .toList();
     }
 
-    private List<ApiDtos.MemberPick> memberPicks(long gameId) {
+    private List<ApiDtos.MemberPick> memberPicks(UUID groupId, long gameId) {
         Map<UUID, AppUser> members = users.findAll().stream()
                 .collect(Collectors.toMap(AppUser::getId, Function.identity()));
 
-        return picks.findAllByGameId(gameId).stream()
+        // Scoped to the group being viewed: another league's picks on the same
+        // game are none of this league's business.
+        return picks.findAllByGroupIdAndGameId(groupId, gameId).stream()
                 .map(pick -> new ApiDtos.MemberPick(
                         pick.getUserId(),
                         members.containsKey(pick.getUserId())
                                 ? members.get(pick.getUserId()).getDisplayName()
                                 : "Unknown",
+                        members.containsKey(pick.getUserId())
+                                ? members.get(pick.getUserId()).getUsername()
+                                : null,
                         pick.getSelection(),
                         pick.getMarket(),
                         pick.getLockedLine(),

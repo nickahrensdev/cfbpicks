@@ -1,6 +1,7 @@
 package com.nickspicks.api.web;
 
 import com.nickspicks.api.cfbd.CfbdUnavailableException;
+import com.nickspicks.api.group.GroupExceptions;
 import com.nickspicks.api.ingest.GameNotGradableException;
 import com.nickspicks.api.pick.PickExceptions;
 import com.nickspicks.api.pick.PickExceptions.InvalidPickException;
@@ -56,9 +57,29 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.CONFLICT, "INVALID_PICK", ex.getMessage());
     }
 
-    @ExceptionHandler(MeController.DisplayNameTakenException.class)
-    public ProblemDetail handleNameTaken(MeController.DisplayNameTakenException ex) {
-        return problem(HttpStatus.CONFLICT, "DISPLAY_NAME_TAKEN", ex.getMessage());
+    @ExceptionHandler(MeController.UsernameTakenException.class)
+    public ProblemDetail handleUsernameTaken(MeController.UsernameTakenException ex) {
+        return problem(HttpStatus.CONFLICT, "USERNAME_TAKEN", ex.getMessage());
+    }
+
+    @ExceptionHandler(GroupExceptions.InvalidGroupSettingsException.class)
+    public ProblemDetail handleInvalidGroupSettings(GroupExceptions.InvalidGroupSettingsException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_GROUP_SETTINGS", ex.getMessage());
+    }
+
+    @ExceptionHandler(GroupExceptions.PasswordRequiredException.class)
+    public ProblemDetail handleGroupPasswordRequired(GroupExceptions.PasswordRequiredException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "GROUP_PASSWORD_REQUIRED", ex.getMessage());
+    }
+
+    @ExceptionHandler(GroupExceptions.PasswordIncorrectException.class)
+    public ProblemDetail handleGroupPasswordIncorrect(GroupExceptions.PasswordIncorrectException ex) {
+        return problem(HttpStatus.FORBIDDEN, "GROUP_PASSWORD_INCORRECT", ex.getMessage());
+    }
+
+    @ExceptionHandler(GroupExceptions.AlreadyMemberException.class)
+    public ProblemDetail handleAlreadyMember(GroupExceptions.AlreadyMemberException ex) {
+        return problem(HttpStatus.CONFLICT, "ALREADY_A_MEMBER", ex.getMessage());
     }
 
     @ExceptionHandler(CfbdUnavailableException.class)

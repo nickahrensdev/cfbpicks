@@ -67,6 +67,7 @@ export default function AdminPage() {
     scores: '',
     rankings: '',
     ats: '',
+    settle: '',
   });
   const [parts, setParts] = useState(['calendar', 'teams', 'coaches']);
 
@@ -379,6 +380,36 @@ export default function AdminPage() {
                 onClick={() => run('ATS ingest', () => api.ingestAts({ season: season('ats') }))}
               >
                 {busy === 'ATS ingest' ? 'Loading…' : 'Load'}
+              </Button>
+            </div>
+          </Card.Body>
+        </Card>
+
+        <Card className="shadow-sm">
+          <Card.Body className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+            <div>
+              <div className="fw-semibold">Settle closed periods</div>
+              <div className="small text-body-secondary">
+                Charges every group minimum that a finished week or day closed without meeting,
+                as losses on the leaderboard. An hourly job already does this — the button is
+                for a group whose minimums were set after a period had already closed, or for
+                seeing the result without waiting. Costs no API calls, and a period that has
+                already been settled is skipped rather than charged twice.
+              </div>
+            </div>
+            <div className="d-flex gap-2 align-items-center flex-shrink-0">
+              <YearInput
+                id="year-settle"
+                value={years.settle}
+                onChange={setYear('settle')}
+                disabled={busy !== null}
+              />
+              <Button
+                disabled={busy !== null}
+                onClick={() => run('Settlement', () =>
+                  api.settlePeriods({ season: season('settle') }))}
+              >
+                {busy === 'Settlement' ? 'Settling…' : 'Settle'}
               </Button>
             </div>
           </Card.Body>

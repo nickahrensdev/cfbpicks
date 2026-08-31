@@ -128,31 +128,37 @@ public class DtoMapper {
     }
 
     public ApiDtos.GameSummary gameSummary(Game game, Collection<Pick> myPicks,
-                                           Map<Integer, Team> teamCache) {
-        return gameSummary(game, myPicks, teamCache, null, null);
+                                           Map<Integer, Team> teamCache, int lockLeadMinutes) {
+        return gameSummary(game, myPicks, teamCache, null, null, lockLeadMinutes);
     }
 
     public ApiDtos.GameSummary gameSummary(Game game, Collection<Pick> myPicks,
                                            Map<Integer, Team> teamCache,
-                                           Map<Integer, Integer> ranks) {
-        return gameSummary(game, myPicks, teamCache, ranks, null);
+                                           Map<Integer, Integer> ranks, int lockLeadMinutes) {
+        return gameSummary(game, myPicks, teamCache, ranks, null, lockLeadMinutes);
     }
 
     /**
-     * @param myPicks the caller's picks on this game - at most one per market,
-     *                and often none
-     * @param live    ESPN's view of games currently being played, keyed by game
-     *                id. Null or absent means nothing live to show.
+     * @param myPicks          the caller's picks on this game - at most one per
+     *                         market, and often none
+     * @param live             ESPN's view of games currently being played, keyed
+     *                         by game id. Null or absent means nothing live.
+     * @param lockLeadMinutes  the viewing group's lock lead. The card's
+     *                         {@code locked} flag and countdown are group
+     *                         settings now, so the same game can be closed in
+     *                         one league and still open in another.
      */
     public ApiDtos.GameSummary gameSummary(Game game, Collection<Pick> myPicks,
                                            Map<Integer, Team> teamCache,
                                            Map<Integer, Integer> ranks,
-                                           Map<Long, LiveScoreService.LiveGame> live) {
+                                           Map<Long, LiveScoreService.LiveGame> live,
+                                           int lockLeadMinutes) {
         Instant now = Instant.now();
 
         Pick spreadPick = pickFor(myPicks, Market.SPREAD);
         Pick totalPick = pickFor(myPicks, Market.TOTAL);
-        boolean open = window.isOpen(game, now);
+        Pick winnerPick = pickFor(myPicks, Market.WINNER);
+        boolean open = window.isOpen(game, now, lockLeadMinutes);
 
         return new ApiDtos.GameSummary(
                 game.getId(),
@@ -174,9 +180,10 @@ public class DtoMapper {
                 game.getHomeScore(),
                 game.getAwayScore(),
                 !open,
-                window.locksAt(game),
+                window.locksAt(game, lockLeadMinutes),
                 pickSummary(spreadPick),
                 pickSummary(totalPick),
+                pickSummary(winnerPick),
                 spreadPick != null && open && window.isLineImproved(spreadPick, game),
                 totalPick != null && open && window.isLineImproved(totalPick, game),
                 liveFor(live, game));

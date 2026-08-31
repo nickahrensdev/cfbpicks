@@ -1,19 +1,26 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import SiteNav from './components/SiteNav.jsx';
+import GroupBar from './components/GroupBar.jsx';
+import { usePointerBlur } from './lib/pointerFocus.js';
 import SiteFooter from './components/SiteFooter.jsx';
 import ProtectedRoute from './auth/ProtectedRoute.jsx';
 import AdminRoute from './auth/AdminRoute.jsx';
 import LoginPage from './pages/LoginPage.jsx';
+import JoinByLinkPage from './pages/JoinByLinkPage.jsx';
 import GamesPage from './pages/GamesPage.jsx';
 import GameDetailPage from './pages/GameDetailPage.jsx';
 import MemberPicksPage from './pages/MemberPicksPage.jsx';
 import LeaderboardPage from './pages/LeaderboardPage.jsx';
+import GroupsPage from './pages/GroupsPage.jsx';
+import GroupDetailPage from './pages/GroupDetailPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import TeamPage from './pages/TeamPage.jsx';
 import AthletePage from './pages/AthletePage.jsx';
 import CoachPage from './pages/CoachPage.jsx';
 import AdminUsersPage from './pages/admin/AdminUsersPage.jsx';
+import AdminGroupsPage from './pages/admin/AdminGroupsPage.jsx';
+import AdminGroupEditPage from './pages/admin/AdminGroupEditPage.jsx';
 import AdminDataPage from './pages/admin/AdminDataPage.jsx';
 import DataLogPage from './pages/admin/DataLogPage.jsx';
 import ActivityLogPage from './pages/admin/ActivityLogPage.jsx';
@@ -30,12 +37,23 @@ const adminOnly = (element) => (
 );
 
 export default function App() {
+  // A clicked button should not go on looking selected until you click
+  // elsewhere. Keyboard focus is untouched.
+  usePointerBlur();
+
   return (
     <div className="app-shell">
       <SiteNav />
+      {/* The league every board below is rendered in. Renders nothing when
+          there is no group selected, so the login page is unaffected. */}
+      <GroupBar />
       <main className="app-main">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          {/* Unguarded on purpose: an invitation has to explain itself to
+              somebody who has no account yet. The page sends them on to sign
+              in, carrying the token so they come back here. */}
+          <Route path="/join/:token" element={<JoinByLinkPage />} />
 
           <Route path="/" element={guarded(<GamesPage />)} />
           <Route path="/games/:id" element={guarded(<GameDetailPage />)} />
@@ -43,12 +61,16 @@ export default function App() {
           <Route path="/my-picks" element={<Navigate to="/?mine=1" replace />} />
           <Route path="/members/:userId" element={guarded(<MemberPicksPage />)} />
           <Route path="/leaderboard" element={guarded(<LeaderboardPage />)} />
+          <Route path="/groups" element={guarded(<GroupsPage />)} />
+          <Route path="/groups/:id" element={guarded(<GroupDetailPage />)} />
           <Route path="/profile" element={guarded(<ProfilePage />)} />
           <Route path="/teams/:id" element={guarded(<TeamPage />)} />
           <Route path="/athletes/:id" element={guarded(<AthletePage />)} />
           <Route path="/coaches/:id" element={guarded(<CoachPage />)} />
 
           <Route path="/admin/members" element={adminOnly(<AdminUsersPage />)} />
+          <Route path="/admin/groups" element={adminOnly(<AdminGroupsPage />)} />
+          <Route path="/admin/groups/:id" element={adminOnly(<AdminGroupEditPage />)} />
           <Route path="/admin/data" element={adminOnly(<AdminDataPage />)} />
           <Route path="/admin/data-log" element={adminOnly(<DataLogPage />)} />
           <Route path="/admin/activity" element={adminOnly(<ActivityLogPage />)} />

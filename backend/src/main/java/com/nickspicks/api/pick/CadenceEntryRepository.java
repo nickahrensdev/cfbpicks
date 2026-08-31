@@ -9,18 +9,18 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface WeeklyEntryRepository extends JpaRepository<WeeklyEntry, WeeklyEntry.Key> {
+public interface CadenceEntryRepository extends JpaRepository<CadenceEntry, CadenceEntry.Key> {
 
     /**
      * Pessimistic write lock - this is what serialises concurrent pick
-     * mutations for the same member and week.
+     * mutations for the same member and period.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
-            select e from WeeklyEntry e
-            where e.userId = :userId and e.season = :season and e.week = :week
+            select e from CadenceEntry e
+            where e.groupId = :groupId and e.userId = :userId and e.periodKey = :periodKey
             """)
-    Optional<WeeklyEntry> findAndLock(@Param("userId") UUID userId,
-                                      @Param("season") Integer season,
-                                      @Param("week") Integer week);
+    Optional<CadenceEntry> findAndLock(@Param("groupId") UUID groupId,
+                                       @Param("userId") UUID userId,
+                                       @Param("periodKey") String periodKey);
 }

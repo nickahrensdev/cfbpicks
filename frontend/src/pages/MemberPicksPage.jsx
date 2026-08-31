@@ -1,57 +1,68 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Card, Container, Form } from 'react-bootstrap';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Alert, Badge, Card, Container, Form, Table } from 'react-bootstrap';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { TeamLink } from '../components/links.jsx';
 import {
   EmptyState,
   ErrorNotice,
   Loading,
+  NoGroupNotice,
   ResultBadge,
   formatKickoff,
   formatLine,
 } from '../components/common.jsx';
 import { api } from '../api/client.js';
+import { useGroup } from '../auth/GroupProvider.jsx';
 
 /**
  * Another member's card. The API only returns picks on games that have
  * already kicked off, so this page cannot be used to scout the field.
  */
 export default function MemberPicksPage() {
+  const { groupId, hasNoGroups } = useGroup();
+
   const { userId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [meta, setMeta] = useState(null);
+  // null means every week, which is what arriving without a ?week gets you.
+  // Defaulting to the current week showed an empty card the moment the season
+  // moved past the last week anyone had picked.
   const [week, setWeek] = useState(() => {
     const value = searchParams.get('week');
     return value ? Number(value) : null;
   });
   const [picks, setPicks] = useState([]);
+  // The leagues this member and the viewer are both in - see
+  // MemberGroupsController for why it is only the shared ones.
+  const [memberGroups, setMemberGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api
-      .currentWeek()
-      .then((current) => {
-        setMeta(current);
-        setWeek((value) => value ?? current.week);
-      })
-      .catch(setError);
+    // Only for the week list - the selection deliberately stays on "all".
+    api.currentWeek().then(setMeta).catch(setError);
   }, []);
 
+  // Independent of the week picker: which leagues someone plays in does not
+  // change when you change the week you are looking at.
+  useEffect(() => {
+    api.memberGroups(userId).then(setMemberGroups).catch(() => setMemberGroups([]));
+  }, [userId]);
+
   const load = useCallback(async () => {
-    if (week == null) return;
+    if (!groupId) return;
     setLoading(true);
     setError(null);
     try {
-      setPicks(await api.memberPicks(userId, { season: meta?.season, week }));
+      setPicks(await api.memberPicks(userId, { groupId, season: meta?.season, week }));
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, [userId, meta, week]);
+  }, [groupId, userId, meta, week]);
 
   useEffect(() => {
     load();
@@ -62,9 +73,67 @@ export default function MemberPicksPage() {
     setSearchParams(next ? { week: String(next) } : {});
   };
 
+  if (hasNoGroups) {
+    return (
+      <Container className="py-4 py-md-5">
+        <NoGroupNotice />
+      </Container>
+    );
+  }
+
   return (
     <Container className="py-4 py-md-5">
       <h1 className="h3 mb-4">Member picks</h1>
+
+      {/* Shared leagues only. A card is readable by anyone signed in, but the
+          other groups someone plays in are not public just because their picks
+          in a group you share are. */}
+      {memberGroups.length > 0 && (
+        <Card className="shadow-sm mb-4">
+          <Card.Body className="pb-2">
+            <h2 className="h6 text-uppercase text-body-secondary mb-3">Groups you share</h2>
+          </Card.Body>
+          <div className="table-responsive">
+            <Table hover size="sm" className="align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">Group</th>
+                  <th scope="col" className="d-none d-md-table-cell">Format</th>
+                  <th scope="col" className="text-center">Rank</th>
+                  <th scope="col" className="text-center" title="Wins-losses-ties">W-L-T</th>
+                  <th scope="col" className="text-end">Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {memberGroups.map((row) => (
+                  <tr key={row.groupId}>
+                    <td>
+                      <Link to={`/groups/${row.groupId}`} className="text-decoration-none">
+                        {row.name}
+                      </Link>
+                      {row.role === 'OWNER' && (
+                        <Badge bg="primary-subtle" text="primary-emphasis" className="ms-2">
+                          owner
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="d-none d-md-table-cell small text-body-secondary">
+                      {row.groupType === 'ELIMINATION' ? 'Elimination' : "Pick'em"} ·{' '}
+                      {row.cadence === 'DAILY' ? 'Daily' : 'Weekly'} · {row.memberCount}{' '}
+                      {row.memberCount === 1 ? 'member' : 'members'}
+                    </td>
+                    <td className="text-center fw-semibold">{row.rank ?? '—'}</td>
+                    <td className="text-center">
+                      {row.wins}-{row.losses}-{row.pushes}
+                    </td>
+                    <td className="text-end fw-semibold">{row.points.toFixed(1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        </Card>
+      )}
 
       <Form.Group className="mb-4" style={{ maxWidth: '14rem' }}>
         <Form.Label htmlFor="member-week" className="small fw-semibold mb-1">
@@ -73,8 +142,9 @@ export default function MemberPicksPage() {
         <Form.Select
           id="member-week"
           value={week ?? ''}
-          onChange={(e) => changeWeek(Number(e.target.value))}
+          onChange={(e) => changeWeek(e.target.value === '' ? null : Number(e.target.value))}
         >
+          <option value="">All weeks</option>
           {(meta?.availableWeeks ?? []).map((option) => (
             <option key={option} value={option}>
               Week {option}
@@ -90,7 +160,9 @@ export default function MemberPicksPage() {
       ) : picks.length === 0 ? (
         <EmptyState title="Nothing to show yet">
           <p className="small mb-0">
-            Either this member has no picks in week {week}, or none of their games have kicked off.
+            {week == null
+              ? 'Either this member has made no picks in this group, or none of their games have kicked off.'
+              : `Either this member has no picks in week ${week}, or none of their games have kicked off.`}
           </p>
         </EmptyState>
       ) : (

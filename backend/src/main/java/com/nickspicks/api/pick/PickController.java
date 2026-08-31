@@ -3,6 +3,9 @@ package com.nickspicks.api.pick;
 import com.nickspicks.api.config.AppProperties;
 import com.nickspicks.api.game.Game;
 import com.nickspicks.api.game.GameRepository;
+import com.nickspicks.api.group.Cadence;
+import com.nickspicks.api.group.Group;
+import com.nickspicks.api.group.GroupService;
 import com.nickspicks.api.ranking.RankingService;
 import com.nickspicks.api.season.CurrentWeekResolver;
 import com.nickspicks.api.team.Team;
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -45,11 +49,12 @@ public class PickController {
     private final PickWindow window;
     private final TeamRepository teams;
     private final RankingService rankings;
+    private final GroupService groups;
 
     public PickController(PickService picks, GameRepository games, CurrentWeekResolver weeks,
                           CurrentUserService currentUser, DtoMapper mapper,
                           AppProperties properties, PickWindow window, TeamRepository teams,
-                          RankingService rankings) {
+                          RankingService rankings, GroupService groups) {
         this.picks = picks;
         this.games = games;
         this.weeks = weeks;
@@ -59,6 +64,7 @@ public class PickController {
         this.window = window;
         this.teams = teams;
         this.rankings = rankings;
+        this.groups = groups;
     }
 
     /**
@@ -70,10 +76,10 @@ public class PickController {
      * pick on the games board, and paying for it on every click is what made
      * pick actions feel slow.
      */
-    private ApiDtos.GameSummary gameSummaryFor(UUID userId, Game game) {
-        List<Pick> myPicks = picks.findForUserGame(userId, game.getId());
+    private ApiDtos.GameSummary gameSummaryFor(Group group, UUID userId, Game game) {
+        List<Pick> myPicks = picks.findForUserGame(group.getId(), userId, game.getId());
         Map<Integer, Integer> ranks = rankings.rankLookup(game.getSeason(), game.getWeek());
-        return mapper.gameSummary(game, myPicks, null, ranks);
+        return mapper.gameSummary(game, myPicks, null, ranks, group.getLockLeadMinutes());
     }
 
     private Game requireGame(Long gameId) {
@@ -81,46 +87,76 @@ public class PickController {
                 .orElseThrow(() -> new NotFoundException("Game %d not found".formatted(gameId)));
     }
 
+    /**
+     * @param date one day, for a group that picks daily. A week holds seven of
+     *             those groups' allowances, so asking by week could only ever
+     *             return a number that contradicts what picking enforces -
+     *             which is why the board sends the day it is actually showing.
+     */
     @GetMapping("/picks")
     public ApiDtos.WeekPicks myPicks(@AuthenticationPrincipal Jwt jwt,
+                                     @RequestParam UUID groupId,
                                      @RequestParam(required = false) Integer season,
-                                     @RequestParam(required = false) Integer week) {
+                                     @RequestParam(required = false) Integer week,
+                                     @RequestParam(required = false) LocalDate date) {
         UUID userId = currentUser.resolveId(jwt);
+        Group group = groups.requirePlayable(groupId, userId);
         int resolvedSeason = season == null ? weeks.currentSeason() : season;
         int resolvedWeek = week == null ? weeks.currentWeek() : week;
 
-        List<ApiDtos.PickWithGame> rows = withGames(
-                picks.findForUserWeek(userId, resolvedSeason, resolvedWeek));
+        boolean byDay = date != null && group.getCadence() == Cadence.DAILY;
 
-        int max = properties.getPickem().getMaxPicksPerWeek();
-        int remaining = picks.remainingPicks(userId, resolvedSeason, resolvedWeek);
+        List<Pick> held = byDay
+                ? picks.findForUserDay(group.getId(), userId, date)
+                : picks.findForUserWeek(group.getId(), userId, resolvedSeason, resolvedWeek);
 
-        return new ApiDtos.WeekPicks(resolvedSeason, resolvedWeek, max - remaining, remaining, max,
-                rows);
+        List<ApiDtos.PickWithGame> rows = withGames(group, held);
+
+        // Counted from the picks themselves, which is true for either cadence -
+        // the counter row is keyed by period, and a daily group has several
+        // periods inside one week.
+        int used = rows.size();
+
+        Integer max = group.getMaxPicksPerCadence();
+        // With a day named, a daily group has a real countdown for the first
+        // time. Without one, null still means "no single number describes this".
+        Integer remaining = byDay
+                ? (max == null ? null : Math.max(0, max - used))
+                : picks.remainingPicks(group, userId, resolvedSeason, resolvedWeek);
+
+        return new ApiDtos.WeekPicks(resolvedSeason, resolvedWeek, used, remaining, max,
+                group.getCadence(), group.getMinPicksPerCadence(),
+                picks.marketBudgets(group, held), rows);
     }
 
     @PostMapping("/picks")
     public ResponseEntity<ApiDtos.PickResponse> create(
             @AuthenticationPrincipal Jwt jwt,
+            @RequestParam UUID groupId,
             @Valid @RequestBody ApiDtos.CreatePickRequest request) {
         UUID userId = currentUser.resolveId(jwt);
+        Group group = groups.requirePlayable(groupId, userId);
 
-        Pick pick = picks.create(userId, request.gameId(), request.selection(),
+        Pick pick = picks.create(group, userId, request.gameId(), request.selection(),
                 request.expectedLine());
         Game game = requireGame(pick.getGameId());
         return ResponseEntity.created(URI.create("/api/picks/" + pick.getId()))
-                .body(new ApiDtos.PickResponse(mapper.pickSummary(pick), gameSummaryFor(userId, game)));
+                .body(new ApiDtos.PickResponse(mapper.pickSummary(pick),
+                        gameSummaryFor(group, userId, game)));
     }
 
     @PutMapping("/picks/{id}")
     public ApiDtos.PickResponse update(@AuthenticationPrincipal Jwt jwt,
                                        @PathVariable UUID id,
+                                       @RequestParam UUID groupId,
                                        @Valid @RequestBody ApiDtos.UpdatePickRequest request) {
         UUID userId = currentUser.resolveId(jwt);
+        Group group = groups.requirePlayable(groupId, userId);
 
-        Pick pick = picks.update(userId, id, request.selection(), request.expectedLine());
+        Pick pick = picks.update(group, userId, id, request.selection(), request.expectedLine());
         Game game = requireGame(pick.getGameId());
-        return new ApiDtos.PickResponse(mapper.pickSummary(pick), gameSummaryFor(userId, game));
+        return new ApiDtos.PickResponse(mapper.pickSummary(pick),
+                gameSummaryFor(group, userId, game));
     }
 
     /**
@@ -128,20 +164,25 @@ public class PickController {
      * unless the line actually improved.
      */
     @PostMapping("/picks/{id}/relock")
-    public ApiDtos.PickResponse relock(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+    public ApiDtos.PickResponse relock(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                       @RequestParam UUID groupId) {
         UUID userId = currentUser.resolveId(jwt);
+        Group group = groups.requirePlayable(groupId, userId);
 
-        Pick pick = picks.relock(userId, id);
+        Pick pick = picks.relock(group, userId, id);
         Game game = requireGame(pick.getGameId());
-        return new ApiDtos.PickResponse(mapper.pickSummary(pick), gameSummaryFor(userId, game));
+        return new ApiDtos.PickResponse(mapper.pickSummary(pick),
+                gameSummaryFor(group, userId, game));
     }
 
     /** Returns the game's updated card state rather than 204 - there is no pick left to report. */
     @DeleteMapping("/picks/{id}")
-    public ApiDtos.GameSummary delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+    public ApiDtos.GameSummary delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                      @RequestParam UUID groupId) {
         UUID userId = currentUser.resolveId(jwt);
-        Game game = picks.delete(userId, id);
-        return gameSummaryFor(userId, game);
+        Group group = groups.requirePlayable(groupId, userId);
+        Game game = picks.delete(group, userId, id);
+        return gameSummaryFor(group, userId, game);
     }
 
     /**
@@ -151,15 +192,20 @@ public class PickController {
     @GetMapping("/members/{userId}/picks")
     public List<ApiDtos.PickWithGame> memberPicks(@AuthenticationPrincipal Jwt jwt,
                                                   @PathVariable UUID userId,
+                                                  @RequestParam UUID groupId,
                                                   @RequestParam(required = false) Integer season,
                                                   @RequestParam(required = false) Integer week) {
-        // Resolve the caller so an unprovisioned member still gets a row.
-        currentUser.resolveId(jwt);
+        // The caller has to be in the group to read anyone's card in it.
+        Group group = groups.requirePlayable(groupId, currentUser.resolveId(jwt));
 
         int resolvedSeason = season == null ? weeks.currentSeason() : season;
-        int resolvedWeek = week == null ? weeks.currentWeek() : week;
 
-        return withGames(picks.findRevealedForUserWeek(userId, resolvedSeason, resolvedWeek));
+        // No week means the whole season, matching the leaderboard's
+        // "Overall". Deliberately not defaulting to the current week: that
+        // moves on the moment a slate finishes, so a member with a full season
+        // of picks would show an empty card the day after the last game.
+        return withGames(group,
+                picks.findRevealedForUser(group.getId(), userId, resolvedSeason, week));
     }
 
     /**
@@ -169,7 +215,7 @@ public class PickController {
      * pick - ten picks would otherwise cost ten game lookups plus twenty team
      * lookups to render one page.
      */
-    private List<ApiDtos.PickWithGame> withGames(List<Pick> picksToMap) {
+    private List<ApiDtos.PickWithGame> withGames(Group group, List<Pick> picksToMap) {
         if (picksToMap.isEmpty()) {
             return List.of();
         }
@@ -189,9 +235,10 @@ public class PickController {
                             mapper.pickSummary(pick),
                             game == null
                                     ? null
-                                    : mapper.gameSummary(game, List.of(pick), teamCache),
+                                    : mapper.gameSummary(game, List.of(pick), teamCache,
+                                            group.getLockLeadMinutes()),
                             game != null
-                                    && window.isOpen(game)
+                                    && window.isOpen(game, group.getLockLeadMinutes())
                                     && window.isLineImproved(pick, game));
                 })
                 .toList();

@@ -5,17 +5,9 @@ import { Link, useParams } from 'react-router-dom';
 import GameCard from '../components/GameCard.jsx';
 import { TeamLogo } from '../components/links.jsx';
 import WinProbabilityDonut from '../components/WinProbabilityDonut.jsx';
-import {
-  BackButton,
-  ErrorNotice,
-  Loading,
-  ResultBadge,
-  formatLine,
-  formatSpread,
-  formatTotal,
-  marketLabel,
-} from '../components/common.jsx';
+import { BackButton, ErrorNotice, formatLineBare, formatSpread, formatTotal, Loading, marketAbbr, marketsOf, MemberName, NoGroupNotice, pickRowStyle } from '../components/common.jsx';
 import { api } from '../api/client.js';
+import { useGroup } from '../auth/GroupProvider.jsx';
 
 function Stat({ label, value, note }) {
   if (value === null || value === undefined || value === '') return null;
@@ -41,6 +33,23 @@ function movement(current, open) {
   return `${delta > 0 ? '+' : ''}${Number(delta.toFixed(1))} since open`;
 }
 
+/**
+ * Which side a pick took, in as few characters as the column allows.
+ *
+ * <p>Teams shrink to their abbreviation - "OSU" rather than "Ohio State" -
+ * because the pick table repeats one of two team names on every row, and at
+ * full length they are the only thing that forces it to scroll on a phone.
+ * A team we have no row for has no abbreviation, so its name stands in.
+ */
+function pickSide(game, pick) {
+  if (pick.selection === 'OVER') return 'Over';
+  if (pick.selection === 'UNDER') return 'Under';
+  const home = pick.selection === 'HOME' || pick.selection === 'HOME_WINNER';
+  return home
+    ? (game.homeTeam?.abbreviation ?? game.homeTeamName)
+    : (game.awayTeam?.abbreviation ?? game.awayTeamName);
+}
+
 /** "11-4-1" from an ATS summary, or a dash when that team has no row for the season. */
 function atsRecord(ats) {
   if (!ats) return '—';
@@ -55,6 +64,8 @@ function atsMargin(ats) {
 }
 
 export default function GameDetailPage() {
+  const { groupId, group, hasNoGroups } = useGroup();
+
   const { id } = useParams();
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -64,16 +75,17 @@ export default function GameDetailPage() {
   const [notice, setNotice] = useState(null);
 
   const load = useCallback(async () => {
+    if (!groupId) return;
     setLoading(true);
     setError(null);
     try {
-      setDetail(await api.game(id));
+      setDetail(await api.game(id, { groupId }));
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [groupId, id]);
 
   useEffect(() => {
     load();
@@ -126,17 +138,17 @@ export default function GameDetailPage() {
     const line = lineFor(g, selection);
     return applyPick(() =>
       (existing
-        ? api.updatePick(existing.id, selection, line)
-        : api.createPick(g.id, selection, line)
+        ? api.updatePick(groupId, existing.id, selection, line)
+        : api.createPick(groupId, g.id, selection, line)
       ).then((response) => response.game),
     );
   };
 
   const handleClear = (g, selection) =>
-    applyPick(() => api.deletePick(pickFor(g, selection).id));
+    applyPick(() => api.deletePick(groupId, pickFor(g, selection).id));
 
   const handleRelock = (g, pick) =>
-    applyPick(() => api.relockPick(pick.id).then((response) => response.game));
+    applyPick(() => api.relockPick(groupId, pick.id).then((response) => response.game));
 
   // Head-to-head history. Fetched once the two team ids are known - a
   // non-FBS opponent with no team id just means no section, not an error.
@@ -161,11 +173,18 @@ export default function GameDetailPage() {
   useEffect(() => {
     if (!isLive) return undefined;
     const timer = setInterval(() => {
-      api.game(id).then(setDetail).catch(() => {});
+      api.game(id, { groupId }).then(setDetail).catch(() => {});
     }, 30_000);
     return () => clearInterval(timer);
-  }, [isLive, id]);
+  }, [isLive, groupId, id]);
 
+  if (hasNoGroups) {
+    return (
+      <Container className="py-4 py-md-5">
+        <NoGroupNotice />
+      </Container>
+    );
+  }
   if (loading) return <Loading label="Loading game" />;
   if (error) {
     return (
@@ -227,6 +246,7 @@ export default function GameDetailPage() {
       <div className="mb-4">
         <GameCard
           game={game}
+          markets={marketsOf(group)}
           busy={busy}
           onPick={handlePick}
           onClear={handleClear}
@@ -280,9 +300,7 @@ export default function GameDetailPage() {
         </Card.Body>
       </Card>
 
-      {/* Season-long ATS, refreshed on demand - see TeamAtsService. Distinct
-          from ESPN's per-game "Around the game" ATS summary below, which is
-          a different provider's number for this matchup specifically. */}
+      {/* Season-long ATS, refreshed on demand - see TeamAtsService. */}
       {atsSeasons.length > 0 && (
         <Card className="shadow-sm mb-4">
           <Card.Body>
@@ -324,7 +342,7 @@ export default function GameDetailPage() {
                           <div className="fw-semibold">{atsRecord(away)}</div>
                           {atsMargin(away) && (
                             <div className="small text-body-tertiary">
-                              {atsMargin(away)} avg cover
+                              {atsMargin(away)} avg
                             </div>
                           )}
                         </td>
@@ -332,7 +350,7 @@ export default function GameDetailPage() {
                           <div className="fw-semibold">{atsRecord(home)}</div>
                           {atsMargin(home) && (
                             <div className="small text-body-tertiary">
-                              {atsMargin(home)} avg cover
+                              {atsMargin(home)} avg
                             </div>
                           )}
                         </td>
@@ -384,11 +402,25 @@ export default function GameDetailPage() {
             <div className="table-responsive">
               <Table size="sm" className="align-middle mb-0">
                 <thead>
+                  {/* Logos, matching the ATS table above - two full school
+                      names across the top of a table whose cells are short
+                      numbers set the whole thing's width. These come from
+                      ESPN's own box score, so the logo travels with the side
+                      and needs no matching back to our team rows. */}
                   <tr>
                     <th scope="col" />
                     {espn.teamStats.map((side) => (
-                      <th scope="col" key={side.teamId} className="text-center">
-                        {side.team}
+                      <th
+                        scope="col"
+                        key={side.teamId}
+                        className="text-center"
+                        title={side.team}
+                      >
+                        <TeamLogo
+                          team={{ logoUrl: side.logoUrl, abbreviation: side.team }}
+                          size={28}
+                        />
+                        <span className="visually-hidden">{side.team}</span>
                       </th>
                     ))}
                   </tr>
@@ -458,23 +490,6 @@ export default function GameDetailPage() {
                   </div>
                 </Col>
               ))}
-            </Row>
-          </Card.Body>
-        </Card>
-      )}
-
-      {(espn?.againstTheSpread?.length > 0 || espn?.attendance != null) && (
-        <Card className="shadow-sm mb-4">
-          <Card.Body>
-            <h2 className="h6 text-uppercase text-body-secondary mb-3">Around the game</h2>
-            <Row className="g-3">
-              {(espn.againstTheSpread ?? []).map((row) => (
-                <Stat key={row.teamId} label={`${row.team} ATS`} value={row.summary} />
-              ))}
-              <Stat
-                label="Attendance"
-                value={espn.attendance != null ? espn.attendance.toLocaleString() : null}
-              />
             </Row>
           </Card.Body>
         </Card>
@@ -588,28 +603,27 @@ export default function GameDetailPage() {
                 <thead>
                   <tr>
                     <th scope="col">Member</th>
-                    <th scope="col">Market</th>
+                    <th scope="col" title="Spread, Over/Under or Winner">Mkt</th>
                     <th scope="col">Pick</th>
                     <th scope="col">Line</th>
-                    <th scope="col">Result</th>
                   </tr>
                 </thead>
                 <tbody>
                   {detail.memberPicks.map((pick) => (
-                    <tr key={`${pick.userId}-${pick.market}`}>
-                      <td>{pick.displayName}</td>
-                      <td className="text-body-secondary">{marketLabel(pick.market)}</td>
+                    // The row's tint is the result - see pickRowStyle. The
+                    // title keeps it available to anyone who cannot separate
+                    // the colours.
+                    <tr
+                      key={`${pick.userId}-${pick.market}`}
+                      style={pickRowStyle(pick.result)}
+                      title={pick.result === 'PENDING' ? 'Not yet graded' : pick.result}
+                    >
                       <td>
-                        {pick.market === 'TOTAL'
-                          ? pick.selection.charAt(0) + pick.selection.slice(1).toLowerCase()
-                          : pick.selection === 'HOME'
-                            ? game.homeTeamName
-                            : game.awayTeamName}
+                        <MemberName displayName={pick.displayName} username={pick.username} />
                       </td>
-                      <td>{formatLine(pick.lockedLine, pick.selection)}</td>
-                      <td>
-                        <ResultBadge result={pick.result} />
-                      </td>
+                      <td className="text-body-secondary">{marketAbbr(pick.market)}</td>
+                      <td>{pickSide(game, pick)}</td>
+                      <td>{formatLineBare(pick.lockedLine, pick.selection)}</td>
                     </tr>
                   ))}
                 </tbody>

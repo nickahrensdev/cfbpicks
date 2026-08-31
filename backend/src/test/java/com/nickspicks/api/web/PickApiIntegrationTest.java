@@ -4,9 +4,17 @@ import com.nickspicks.api.IntegrationTest;
 import com.nickspicks.api.game.Game;
 import com.nickspicks.api.game.GameRepository;
 import com.nickspicks.api.game.GameStatus;
+import com.nickspicks.api.group.Group;
+import com.nickspicks.api.group.GroupMember;
+import com.nickspicks.api.group.GroupMemberRepository;
+import com.nickspicks.api.group.GroupRepository;
+import com.nickspicks.api.group.GroupRole;
+import com.nickspicks.api.group.TestGroups;
+import com.nickspicks.api.user.AppUser;
 import com.nickspicks.api.pick.PickRepository;
-import com.nickspicks.api.pick.WeeklyEntryRepository;
+import com.nickspicks.api.pick.CadenceEntryRepository;
 import com.nickspicks.api.user.AppUserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -34,15 +42,36 @@ class PickApiIntegrationTest extends IntegrationTest {
     private PickRepository picks;
 
     @Autowired
-    private WeeklyEntryRepository entries;
+    private CadenceEntryRepository entries;
 
     @Autowired
     private AppUserRepository users;
+
+    @Autowired
+    private GroupRepository groups;
+
+    @Autowired
+    private GroupMemberRepository groupMembers;
+
+    private Group group;
+
+    /**
+     * The member owns a weekly ten-pick league, so these tests exercise the
+     * same rules the site had before groups - just addressed by group id.
+     */
+    @BeforeEach
+    void createGroup() {
+        users.save(new AppUser(MEMBER, "nick@example.com", "nick", "nick"));
+        group = groups.save(new Group(MEMBER, TestGroups.weeklyPickem()));
+        groupMembers.save(new GroupMember(group.getId(), MEMBER, GroupRole.OWNER));
+    }
 
     @Override
     protected void cleanUp() {
         picks.deleteAll();
         entries.deleteAll();
+        groupMembers.deleteAll();
+        groups.deleteAll();
         games.deleteAll();
         users.deleteAll();
     }
@@ -52,6 +81,7 @@ class PickApiIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/picks")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/games")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/leaderboard")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/groups/mine")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -94,7 +124,7 @@ class PickApiIntegrationTest extends IntegrationTest {
     void createsAPickAndReportsRemainingSlots() throws Exception {
         Game game = openGame(500L);
 
-        mockMvc.perform(post("/api/picks").with(member())
+        mockMvc.perform(post("/api/picks?groupId=" + group.getId()).with(member())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"gameId": %d, "selection": "AWAY"}
@@ -104,7 +134,8 @@ class PickApiIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.pick.lockedLine").value(-7.5))
                 .andExpect(jsonPath("$.pick.result").value("PENDING"));
 
-        mockMvc.perform(get("/api/picks?season=2026&week=1").with(member()))
+        mockMvc.perform(get("/api/picks?groupId=" + group.getId() + "&season=2026&week=1")
+                        .with(member()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.picksUsed").value(1))
                 .andExpect(jsonPath("$.picksRemaining").value(9))
@@ -117,7 +148,7 @@ class PickApiIntegrationTest extends IntegrationTest {
         locked.setKickoff(Instant.now().plus(10, ChronoUnit.MINUTES));
         games.save(locked);
 
-        mockMvc.perform(post("/api/picks").with(member())
+        mockMvc.perform(post("/api/picks?groupId=" + group.getId()).with(member())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"gameId": %d, "selection": "HOME"}
@@ -133,7 +164,8 @@ class PickApiIntegrationTest extends IntegrationTest {
         soon.setKickoff(Instant.now().plus(5, ChronoUnit.MINUTES));
         games.save(soon);
 
-        mockMvc.perform(get("/api/games?season=2026&week=1").with(member()))
+        mockMvc.perform(get("/api/games?groupId=" + group.getId() + "&season=2026&week=1")
+                        .with(member()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.id == 502)].locked").value(false))
                 .andExpect(jsonPath("$[?(@.id == 503)].locked").value(true));
@@ -143,14 +175,15 @@ class PickApiIntegrationTest extends IntegrationTest {
     void hidesMemberPicksOnAGameThatHasNotStarted() throws Exception {
         Game game = openGame(504L);
 
-        mockMvc.perform(post("/api/picks").with(member())
+        mockMvc.perform(post("/api/picks?groupId=" + group.getId()).with(member())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"gameId": %d, "selection": "HOME"}
                                 """.formatted(game.getId())))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(get("/api/games/" + game.getId()).with(member()))
+        mockMvc.perform(get("/api/games/" + game.getId() + "?groupId=" + group.getId())
+                        .with(member()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.picksRevealed").value(false))
                 .andExpect(jsonPath("$.memberPicks").isEmpty())

@@ -2,13 +2,54 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Card, Col, Container, Form, Row, Table } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 
-import { EmptyState, ErrorNotice, Loading } from '../components/common.jsx';
+import { EmptyState, ErrorNotice, Loading, MemberName, NoGroupNotice } from '../components/common.jsx';
 import { useProfile } from '../auth/ProfileProvider.jsx';
 import { api } from '../api/client.js';
+import { useGroup } from '../auth/GroupProvider.jsx';
 
 const medal = (rank) => (rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null);
 
+const MARKET_LABELS = [
+  ['winner', 'Winner'],
+  ['spread', 'Spread'],
+  ['total', 'Over/Under'],
+];
+
+/** Trims trailing zeroes so 1.00 reads as 1 and 0.50 as 0.5. */
+const points = (value) => Number(value).toString();
+
+/**
+ * How this group turns results into points.
+ *
+ * <p>Scoring is per group now, so the Pts column is unreadable without it -
+ * two leagues showing "3.0" may have got there completely differently.
+ */
+function ScoringNote({ settings }) {
+  if (!settings) return null;
+
+  const live = MARKET_LABELS.filter(([key]) => settings[`${key}Enabled`]);
+  if (live.length === 0) return null;
+
+  return (
+    <p className="small text-body-secondary mb-3">
+      Scoring:{' '}
+      {live.map(([key, label], index) => (
+        <span key={key}>
+          {index > 0 && ' · '}
+          <span className="fw-semibold">{label}</span>{' '}
+          {points(settings[`${key}WinPoints`])} win /{' '}
+          {points(settings[`${key}LossPoints`])} loss /{' '}
+          {points(settings[`${key}PushPoints`])} push
+        </span>
+      ))}
+      . Ties on points break on most wins, then fewest losses.
+    </p>
+  );
+}
+
 export default function LeaderboardPage() {
+  const { groupId, hasNoGroups } = useGroup();
+
   const { profile } = useProfile();
   const navigate = useNavigate();
 
@@ -17,6 +58,7 @@ export default function LeaderboardPage() {
   const [week, setWeek] = useState(null);
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState([]);
+  const [scoring, setScoring] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -25,16 +67,24 @@ export default function LeaderboardPage() {
   }, []);
 
   const load = useCallback(async () => {
+    if (!groupId) return;
     setLoading(true);
     setError(null);
     try {
-      setRows(await api.leaderboard({ week: week ?? undefined }));
+      // The group's settings come along so the table can say how its points
+      // are worked out - with scoring configurable, "Pts" alone means nothing.
+      const [standings, detail] = await Promise.all([
+        api.leaderboard({ groupId, week: week ?? undefined }),
+        api.group(groupId).catch(() => null),
+      ]);
+      setScoring(detail?.settings ?? null);
+      setRows(standings);
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, [week]);
+  }, [groupId, week]);
 
   useEffect(() => {
     load();
@@ -43,8 +93,21 @@ export default function LeaderboardPage() {
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return rows;
-    return rows.filter((row) => row.displayName.toLowerCase().includes(term));
+    // Either name finds them - people search for whichever one they know.
+    return rows.filter(
+      (row) =>
+        (row.displayName ?? '').toLowerCase().includes(term) ||
+        (row.username ?? '').toLowerCase().includes(term),
+    );
   }, [rows, search]);
+
+  if (hasNoGroups) {
+    return (
+      <Container className="py-4 py-md-5">
+        <NoGroupNotice />
+      </Container>
+    );
+  }
 
   return (
     <Container className="py-4 py-md-5">
@@ -89,6 +152,8 @@ export default function LeaderboardPage() {
 
       <ErrorNotice error={error} onRetry={load} />
 
+      <ScoringNote settings={scoring} />
+
       {loading ? (
         <Loading label="Loading leaderboard" />
       ) : visible.length === 0 ? (
@@ -105,10 +170,11 @@ export default function LeaderboardPage() {
                   <th scope="col" className="text-center" title="Wins-losses-ties">
                     W-L-T
                   </th>
-                  <th scope="col" className="text-end" title="A win is 1, a tie is 0.5">
+                  {/* Point values are per group now, so the header cannot
+                      state them - the group's settings page does. */}
+                  <th scope="col" className="text-end" title="Points, scored by this group's rules">
                     Pts
                   </th>
-                  <th scope="col" className="text-end">Win %</th>
                 </tr>
               </thead>
               <tbody>
@@ -124,11 +190,18 @@ export default function LeaderboardPage() {
                       }
                     >
                       <td className="fw-semibold">{medal(row.rank) ?? row.rank}</td>
+                      {/* No "you" badge - the highlighted row already says
+                          which one is yours, and the badge only crowded the
+                          name it sat next to. */}
                       <td>
-                        {row.displayName}
-                        {isMe && (
-                          <Badge bg="primary-subtle" text="primary-emphasis" className="ms-2">
-                            you
+                        <MemberName displayName={row.displayName} username={row.username} stacked />
+                        {/* Out of the pool. Worth saying on the row rather than
+                            leaving it to be inferred from a record, since an
+                            eliminated member keeps their points and can still
+                            sit mid-table. */}
+                        {row.eliminated && (
+                          <Badge bg="danger-subtle" text="danger-emphasis" className="ms-2">
+                            out
                           </Badge>
                         )}
                       </td>
@@ -136,17 +209,22 @@ export default function LeaderboardPage() {
                       {/* Always all three segments, ties included - a column
                           that changes shape row to row is harder to scan than
                           one that reads the same way every time. */}
-                      <td className="text-center fw-semibold">
+                      {/* Charged minimums are inside this record already, so
+                          the note explains a W-L-T that would otherwise not
+                          add up to the picks beside it. */}
+                      <td
+                        className="text-center fw-semibold"
+                        title={row.penaltyLosses > 0
+                          ? `Includes ${row.penaltyLosses} loss${row.penaltyLosses === 1 ? '' : 'es'} `
+                            + 'charged for minimums not met'
+                          : undefined}
+                      >
                         {row.wins}-{row.losses}-{row.pushes}
+                        {row.penaltyLosses > 0 && <span className="text-warning-emphasis">*</span>}
                       </td>
                       {/* One decimal always, so the halves line up in a column
                           whose whole point is half-points. */}
                       <td className="text-end fw-semibold">{row.points.toFixed(1)}</td>
-                      <td className="text-end text-body-secondary">
-                        {row.winPercentage == null
-                          ? '-'
-                          : `${(row.winPercentage * 100).toFixed(1)}%`}
-                      </td>
                     </tr>
                   );
                 })}

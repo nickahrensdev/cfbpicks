@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Container, Form, Modal, Table } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
-import { EmptyState, ErrorNotice, Loading } from '../../components/common.jsx';
+import { EmptyState, ErrorNotice, Loading, memberName } from '../../components/common.jsx';
 import { useProfile } from '../../auth/ProfileProvider.jsx';
 import { api } from '../../api/client.js';
 
@@ -37,7 +37,8 @@ export default function AdminUsersPage() {
     if (!term) return users;
     return users.filter(
       (user) =>
-        user.displayName.toLowerCase().includes(term) ||
+        (user.displayName ?? '').toLowerCase().includes(term) ||
+        (user.username ?? '').toLowerCase().includes(term) ||
         (user.email ?? '').toLowerCase().includes(term),
     );
   }, [users, search]);
@@ -48,7 +49,7 @@ export default function AdminUsersPage() {
     try {
       await api.adminSetRole(user.id, role);
       await load();
-      setNotice({ variant: 'success', text: `${user.displayName} is now ${role.toLowerCase()}.` });
+      setNotice({ variant: 'success', text: `${memberName(user.displayName, user.username)} is now ${role.toLowerCase()}.` });
     } catch (err) {
       setNotice({ variant: 'danger', text: err.message });
     } finally {
@@ -63,7 +64,7 @@ export default function AdminUsersPage() {
       await api.adminDeleteUser(user.id);
       setConfirmDelete(null);
       await load();
-      setNotice({ variant: 'success', text: `${user.displayName} was removed.` });
+      setNotice({ variant: 'success', text: `${memberName(user.displayName, user.username)} was removed.` });
     } catch (err) {
       setNotice({ variant: 'danger', text: err.message });
     } finally {
@@ -104,6 +105,21 @@ export default function AdminUsersPage() {
                   <th scope="col">Member</th>
                   <th scope="col" className="d-none d-md-table-cell">Email</th>
                   <th scope="col" className="text-center">Picks</th>
+                  {/* Three counts that say what someone does here beyond
+                      picking: whether they start leagues, how many they play
+                      in, and how many people they brought. */}
+                  <th scope="col" className="text-center d-none d-lg-table-cell"
+                      title="Groups this member created">
+                    Created
+                  </th>
+                  <th scope="col" className="text-center d-none d-lg-table-cell"
+                      title="Groups this member is in">
+                    Joined
+                  </th>
+                  <th scope="col" className="text-center d-none d-lg-table-cell"
+                      title="People who first reached the site through one of their invite links">
+                    Referred
+                  </th>
                   <th scope="col">Role</th>
                   <th scope="col" className="text-end">Actions</th>
                 </tr>
@@ -115,7 +131,7 @@ export default function AdminUsersPage() {
                     <tr key={user.id}>
                       <td>
                         <Link to={`/members/${user.id}`} className="text-decoration-none">
-                          {user.displayName}
+                          {memberName(user.displayName, user.username)}
                         </Link>
                         {isMe && (
                           <Badge bg="primary-subtle" text="primary-emphasis" className="ms-2">
@@ -127,6 +143,15 @@ export default function AdminUsersPage() {
                         {user.email}
                       </td>
                       <td className="text-center">{user.totalPicks}</td>
+                      <td className="text-center d-none d-lg-table-cell text-body-secondary">
+                        {user.groupsCreated}
+                      </td>
+                      <td className="text-center d-none d-lg-table-cell text-body-secondary">
+                        {user.groupsJoined}
+                      </td>
+                      <td className="text-center d-none d-lg-table-cell text-body-secondary">
+                        {user.referrals}
+                      </td>
                       <td>
                         <Badge bg={user.role === 'ADMIN' ? 'primary' : 'secondary-subtle'}
                                text={user.role === 'ADMIN' ? undefined : 'secondary-emphasis'}>
@@ -172,10 +197,14 @@ export default function AdminUsersPage() {
         </Modal.Header>
         <Modal.Body>
           <p className="mb-0">
-            Delete <strong>{confirmDelete?.displayName}</strong>? This removes their{' '}
+            Delete <strong>{memberName(confirmDelete?.displayName, confirmDelete?.username)}</strong>? This removes their{' '}
             {confirmDelete?.totalPicks ?? 0} pick
             {confirmDelete?.totalPicks === 1 ? '' : 's'} and their activity history. It cannot be
             undone.
+          </p>
+          <p className="small text-body-secondary mt-3 mb-0">
+            Any group they own is deleted with them, along with every member&apos;s picks in it.
+            Move ownership first if the group should survive.
           </p>
           <p className="small text-body-secondary mt-3 mb-0">
             Their Supabase login is not removed - delete that separately in the Supabase dashboard

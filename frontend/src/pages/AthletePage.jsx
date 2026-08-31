@@ -64,9 +64,10 @@ export default function AthletePage() {
 
   const espn = athlete.espn;
 
-  // Our roster row and ESPN's profile overlap; take whichever has the value,
-  // preferring our own so the page does not change under a member when ESPN
-  // is unreachable.
+  // Both halves now come from ESPN - the flat fields are parsed out of its
+  // athlete resource, `espn` is the fuller biography beside them. The
+  // fallbacks stay because the two are populated independently: a player can
+  // have a birth city on one and not the other.
   const hometown =
     [athlete.homeCity, athlete.homeState].filter(Boolean).join(', ')
     || [espn?.birthCity, espn?.birthState].filter(Boolean).join(', ')
@@ -87,9 +88,9 @@ export default function AthletePage() {
             {/* ESPN's headshot when they have one, the team crest otherwise -
                 a player page with a blank space where a face goes reads as
                 broken rather than as missing data. */}
-            {espn?.headshotUrl ? (
+            {(athlete.headshotUrl ?? espn?.headshotUrl) ? (
               <img
-                src={espn.headshotUrl}
+                src={athlete.headshotUrl ?? espn?.headshotUrl}
                 alt=""
                 width={88}
                 height={64}
@@ -146,39 +147,6 @@ export default function AthletePage() {
         </Card.Body>
       </Card>
 
-      {athlete.seasons.length > 1 && (
-        <Card className="shadow-sm">
-          <Card.Body>
-            <h2 className="h6 text-uppercase text-body-secondary mb-3">Seasons</h2>
-            <div className="table-responsive">
-              <Table hover size="sm" className="align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th scope="col">Season</th>
-                    <th scope="col">Team</th>
-                    <th scope="col">Position</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {athlete.seasons.map((season) => (
-                    <tr key={season.season}>
-                      <td>{season.season}</td>
-                      <td>
-                        <TeamLink
-                          team={{ id: season.teamId, school: season.teamSchool }}
-                          name={season.teamSchool}
-                          logo={false}
-                        />
-                      </td>
-                      <td>{season.position}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
-          </Card.Body>
-        </Card>
-      )}
     </Container>
   );
 }

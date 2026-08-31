@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge, Card, Col, Container, Nav, Row, Table } from 'react-bootstrap';
 import { Link, useParams } from 'react-router-dom';
 
-import { AthleteLink, CoachLink, TeamLogo } from '../components/links.jsx';
+import { AthleteHeadshot, AthleteLink, CoachLink, TeamLogo } from '../components/links.jsx';
 import {
   BackButton,
   ErrorNotice,
@@ -398,8 +398,8 @@ export default function TeamPage() {
         )
       ) : team.roster.length === 0 ? (
         <p className="text-body-secondary">
-          No roster available. It is fetched the first time this page loads - if the data provider
-          was unreachable, try again shortly.
+          No roster available. It is read from the data provider each time this page loads - if
+          they were unreachable, reloading should bring it back.
         </p>
       ) : (
         <Row xs={1} sm={2} lg={3} className="g-2">
@@ -407,16 +407,26 @@ export default function TeamPage() {
             <Col key={player.id}>
               <Card className="h-100">
                 <Card.Body className="d-flex align-items-center gap-3 py-2">
-                  <Badge bg="secondary-subtle" text="secondary-emphasis" className="fs-6">
-                    {player.jersey ?? '-'}
-                  </Badge>
-                  <div className="flex-grow-1">
+                  {/* The face is what identifies a player on a roster; the
+                      number is a detail about them, so it moves to the end of
+                      the row where the eye lands last. */}
+                  <AthleteHeadshot url={player.headshotUrl} />
+                  <div className="flex-grow-1" style={{ minWidth: 0 }}>
                     <AthleteLink athlete={player} className="fw-semibold" />
                     <div className="small text-body-secondary">
                       {player.position}
                       {player.year && <> · {CLASS_YEARS[player.year] ?? player.year}</>}
                     </div>
                   </div>
+                  {player.jersey != null && (
+                    <span
+                      className="text-body-tertiary fw-semibold flex-shrink-0"
+                      style={{ fontVariantNumeric: 'tabular-nums' }}
+                      title={`Jersey ${player.jersey}`}
+                    >
+                      #{player.jersey}
+                    </span>
+                  )}
                 </Card.Body>
               </Card>
             </Col>

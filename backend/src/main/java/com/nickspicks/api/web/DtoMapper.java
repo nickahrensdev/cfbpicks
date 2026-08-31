@@ -1,6 +1,5 @@
 package com.nickspicks.api.web;
 
-import com.nickspicks.api.athlete.Athlete;
 import com.nickspicks.api.coach.Coach;
 import com.nickspicks.api.coach.CoachSeason;
 import com.nickspicks.api.espn.LiveScoreService;
@@ -99,12 +98,6 @@ public class DtoMapper {
         return teamId == null
                 ? null
                 : teams.findById(teamId).map(team -> teamSummary(team, ranks)).orElse(null);
-    }
-
-    public ApiDtos.AthleteSummary athleteSummary(Athlete athlete, ApiDtos.TeamSummary team) {
-        return new ApiDtos.AthleteSummary(athlete.getId(), athlete.getFirstName(),
-                athlete.getLastName(), athlete.getPosition(), athlete.getJersey(),
-                athlete.getYear(), team);
     }
 
     public ApiDtos.CoachSummary coachSummary(Coach coach) {

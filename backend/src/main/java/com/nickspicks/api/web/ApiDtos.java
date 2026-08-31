@@ -141,9 +141,19 @@ public final class ApiDtos {
             String position,
             Integer jersey,
             Integer year,
+            /** Null for the few players ESPN has no portrait of. */
+            String headshotUrl,
             TeamSummary team) {
     }
 
+    /**
+     * One player, read live from ESPN.
+     *
+     * <p>No season history: that only ever existed because rows accumulated
+     * per season in a table this app no longer keeps. ESPN addresses an athlete
+     * as they are now, and no single call reconstructs where they played
+     * before.
+     */
     public record AthleteDetail(
             String id,
             String firstName,
@@ -156,14 +166,11 @@ public final class ApiDtos {
             String homeCity,
             String homeState,
             String homeCountry,
-            Integer season,
+            String headshotUrl,
+            /** Resolved from our own team table, which is stored. Null if unknown. */
             TeamSummary team,
-            List<AthleteSeason> seasons,
-            /** Biography from ESPN. Null when they have no record there. */
+            /** The fuller ESPN biography - age, birth date, status, links. */
             EspnDtos.EspnAthlete espn) {
-    }
-
-    public record AthleteSeason(Integer season, String teamSchool, Integer teamId, String position) {
     }
 
     // --------------------------------------------------------------- coaches

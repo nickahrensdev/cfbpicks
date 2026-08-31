@@ -6,6 +6,59 @@ import { Link } from 'react-router-dom';
  * yourself writing a bare team name in JSX, use TeamLink instead.
  */
 
+/**
+ * A player's portrait, or a placeholder when there is none.
+ *
+ * <p>ESPN has a headshot for nearly every player but not quite all - one in a
+ * sampled squad of 120 had none - so the fallback is a real case rather than
+ * defensive padding. It is a neutral silhouette rather than initials: a roster
+ * is scanned by face, and letters in a circle read as a different kind of
+ * thing entirely.
+ *
+ * <p>The image is cropped to a circle and top-anchored, because these portraits
+ * are head-and-shoulders and centring them cuts off the chin.
+ */
+export function AthleteHeadshot({ url, size = 44, className = '' }) {
+  const shared = {
+    width: size,
+    height: size,
+    className: `rounded-circle flex-shrink-0 bg-secondary-subtle ${className}`,
+  };
+
+  if (!url) {
+    return (
+      <span
+        {...shared}
+        className={`${shared.className} d-inline-flex align-items-center justify-content-center text-secondary-emphasis`}
+        style={{ width: size, height: size }}
+        aria-hidden="true"
+      >
+        {/* Bootstrap Icons is not a dependency here, so the silhouette is
+            inline SVG rather than a font glyph. */}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width={size * 0.58}
+          height={size * 0.58}
+          viewBox="0 0 16 16"
+          fill="currentColor"
+        >
+          <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm2 1H6a4 4 0 0 0-4 4 2 2 0 0 0 2 2h8a2 2 0 0 0 2-2 4 4 0 0 0-4-4Z" />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <img
+      {...shared}
+      src={url}
+      alt=""
+      loading="lazy"
+      style={{ width: size, height: size, objectFit: 'cover', objectPosition: 'top center' }}
+    />
+  );
+}
+
 export function TeamLogo({ team, size = 24, className = '' }) {
   if (!team?.logoUrl) {
     return (

@@ -41,7 +41,12 @@ public final class EspnDtos {
             boolean active,
             String status,
             /** Their page on espn.com, for anything we do not mirror. */
-            String espnUrl) {
+            String espnUrl,
+            /**
+             * The team they are on, taken from the {@code $ref} URL ESPN
+             * returns instead of a plain id. Null if the shape changes.
+             */
+            Integer teamId) {
     }
 
     /**

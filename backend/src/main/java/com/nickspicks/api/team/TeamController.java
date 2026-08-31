@@ -1,7 +1,5 @@
 package com.nickspicks.api.team;
 
-import com.nickspicks.api.athlete.Athlete;
-import com.nickspicks.api.athlete.AthleteRepository;
 import com.nickspicks.api.coach.CoachRepository;
 import com.nickspicks.api.coach.CoachSeason;
 import com.nickspicks.api.coach.CoachSeasonRepository;
@@ -42,7 +40,6 @@ public class TeamController {
 
     private final EspnRosterService rosters;
     private final TeamRepository teams;
-    private final AthleteRepository athletes;
     private final CoachRepository coaches;
     private final CoachSeasonRepository coachSeasons;
     private final GameService gameService;
@@ -56,7 +53,7 @@ public class TeamController {
     private final TeamMatchupService matchupService;
     private final GroupService groups;
 
-    public TeamController(TeamRepository teams, AthleteRepository athletes, CoachRepository coaches,
+    public TeamController(TeamRepository teams, CoachRepository coaches,
                           CoachSeasonRepository coachSeasons,
                           EspnRosterService rosters, GameService gameService,
                           CurrentWeekResolver weeks, CurrentUserService currentUser,
@@ -68,7 +65,6 @@ public class TeamController {
         this.rankings = rankings;
         this.rosters = rosters;
         this.teams = teams;
-        this.athletes = athletes;
         this.coaches = coaches;
         this.coachSeasons = coachSeasons;
         this.gameService = gameService;
@@ -103,31 +99,18 @@ public class TeamController {
         int season = weeks.currentSeason();
         UUID userId = currentUser.resolveId(jwt);
 
-        // The roster is fetched the first time someone opens this page and
-        // never again that season. From ESPN rather than CFBD: this was the
-        // only user-triggered call against a metered API, and a member
-        // clicking through the league could spend hundreds of the thousand
-        // monthly calls on it. ESPN is unmetered and covers FCS too.
-        //
-        // Best-effort by construction - EspnRosterService returns 0 rather
-        // than throwing, so a provider outage degrades the page to an empty
-        // roster tab instead of breaking it.
-        if (!athletes.existsByTeamIdAndSeason(id, season)) {
-            rosters.ensureRoster(team, season);
-        }
-
         // Optional: without a group the schedule still renders, just without
         // the caller's picks marked on it.
         Group group = groupId == null ? null : groups.requirePlayable(groupId, userId);
 
         ApiDtos.TeamSummary summary = mapper.teamSummary(team);
 
-        List<ApiDtos.AthleteSummary> roster =
-                athletes.findAllByTeamIdAndSeasonOrderByJerseyAsc(id, season).stream()
-                        .sorted(Comparator.comparing(Athlete::getJersey,
-                                Comparator.nullsLast(Comparator.naturalOrder())))
-                        .map(athlete -> mapper.athleteSummary(athlete, summary))
-                        .toList();
+        // Read live from ESPN and not stored anywhere. Unmetered, cached for
+        // twelve hours in the client, and always current - the roster this
+        // replaced was frozen at whenever a team was first opened, so a
+        // transfer never showed. Empty rather than throwing if ESPN is down:
+        // that costs the tab, not the page.
+        List<ApiDtos.AthleteSummary> roster = rosters.roster(id, summary);
 
         List<ApiDtos.CoachSummary> staff = coachSeasons.findAllByTeamIdAndSeason(id, season).stream()
                 .map(CoachSeason::getCoachId)

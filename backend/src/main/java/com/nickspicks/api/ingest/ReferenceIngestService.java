@@ -1,7 +1,5 @@
 package com.nickspicks.api.ingest;
 
-import com.nickspicks.api.athlete.Athlete;
-import com.nickspicks.api.athlete.AthleteRepository;
 import com.nickspicks.api.cfbd.CfbdClient;
 import com.nickspicks.api.cfbd.CfbdDtos;
 import com.nickspicks.api.cfbd.CfbdSync;
@@ -53,7 +51,6 @@ public class ReferenceIngestService {
     private final CfbdClient cfbd;
     private final CfbdSyncRepository syncs;
     private final TeamRepository teams;
-    private final AthleteRepository athletes;
     private final CoachRepository coaches;
     private final CoachSeasonRepository coachSeasons;
     private final SeasonWeekRepository seasonWeeks;
@@ -62,7 +59,7 @@ public class ReferenceIngestService {
     private final AppProperties properties;
 
     public ReferenceIngestService(CfbdClient cfbd, CfbdSyncRepository syncs, TeamRepository teams,
-                                  AthleteRepository athletes, CoachRepository coaches,
+                                  CoachRepository coaches,
                                   CoachSeasonRepository coachSeasons,
                                   SeasonWeekRepository seasonWeeks,
                                   PollRankingRepository rankings, TeamRecordRepository teamRecords,
@@ -72,7 +69,6 @@ public class ReferenceIngestService {
         this.cfbd = cfbd;
         this.syncs = syncs;
         this.teams = teams;
-        this.athletes = athletes;
         this.coaches = coaches;
         this.coachSeasons = coachSeasons;
         this.seasonWeeks = seasonWeeks;

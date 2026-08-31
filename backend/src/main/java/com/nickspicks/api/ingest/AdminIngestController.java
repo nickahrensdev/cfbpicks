@@ -158,26 +158,6 @@ public class AdminIngestController {
         return queued(started);
     }
 
-    /**
-     * Re-fetch one team's roster, ignoring the "already asked" marker, run
-     * in the background. One API call. For a team whose first fetch failed,
-     * or whose data the provider has since corrected.
-     */
-    @PostMapping("/ingest/roster")
-    public ResponseEntity<Map<String, Object>> ingestRoster(
-            @AuthenticationPrincipal Jwt jwt, @RequestParam int teamId,
-            @RequestParam(required = false) Integer season) {
-        AppUser admin = currentUser.requireAdmin(jwt);
-        int year = season == null ? weeks.currentSeason() : season;
-
-        Team team = teams.findById(teamId)
-                .orElseThrow(() -> new NotFoundException("Team %d not found".formatted(teamId)));
-
-        DataLoadLog started = dataLoadLogs.start(DataLoadLog.Kind.ROSTER, year, null, teamId, admin);
-        asyncIngest.runRoster(started.getId(), team, year);
-        return queued(started);
-    }
-
     /** Acknowledges that a load was queued - the Data log tab has the result. */
     private ResponseEntity<Map<String, Object>> queued(DataLoadLog log) {
         Map<String, Object> body = new LinkedHashMap<>();

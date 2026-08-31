@@ -110,20 +110,4 @@ public class AsyncIngestService {
         }
     }
 
-    /**
-     * Re-fetches one team's roster, from ESPN like the team page does. Kept as
-     * an admin action for the case the lazy fetch cannot serve: a roster that
-     * loaded once and has since changed, which the sync marker would otherwise
-     * keep from ever being read again.
-     */
-    @Async
-    public void runRoster(Long logId, Team team, int season) {
-        try {
-            int players = rosters.refreshRoster(team, season);
-            logs.succeed(logId, "%d players".formatted(players));
-        } catch (Exception ex) {
-            log.warn("Roster ingest {} failed", logId, ex);
-            logs.fail(logId, ex.getMessage());
-        }
-    }
 }

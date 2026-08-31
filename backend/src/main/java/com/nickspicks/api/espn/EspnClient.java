@@ -107,7 +107,11 @@ public class EspnClient {
                 text(node.path("flag"), "href"),
                 node.path("active").asBoolean(false),
                 text(node.path("status"), "name"),
-                link(node, "playercard"));
+                link(node, "playercard"),
+                // Parsed from the $ref rather than followed - the id is
+                // already in the URL, so resolving it would be a second call
+                // for something we can read here.
+                EspnJson.teamIdFromRef(node));
     }
 
     private EspnDtos.EspnTeam toTeam(JsonNode node) {

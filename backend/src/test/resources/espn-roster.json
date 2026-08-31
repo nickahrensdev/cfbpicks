@@ -13,6 +13,10 @@
           "state": "OH",
           "country": "USA"
         },
+        "headshot": {
+          "href": "https://a.espncdn.com/i/headshots/college-football/players/full/5081820.png",
+          "alt": "David Adolph"
+        },
         "jersey": "82",
         "position": {
           "id": "1",
@@ -38,6 +42,10 @@
           "city": "Delaware",
           "state": "OH",
           "country": "USA"
+        },
+        "headshot": {
+          "href": "https://a.espncdn.com/i/headshots/college-football/players/full/5244752.png",
+          "alt": "Favour Akih"
         },
         "jersey": "29",
         "position": {
@@ -90,6 +98,10 @@
           "city": "Dublin",
           "state": "OH",
           "country": "USA"
+        },
+        "headshot": {
+          "href": "https://a.espncdn.com/i/headshots/college-football/players/full/5081820.png",
+          "alt": "David Adolph"
         },
         "jersey": "82",
         "position": {

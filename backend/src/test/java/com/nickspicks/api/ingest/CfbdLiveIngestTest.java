@@ -1,7 +1,6 @@
 package com.nickspicks.api.ingest;
 
 import com.nickspicks.api.IntegrationTest;
-import com.nickspicks.api.athlete.AthleteRepository;
 import com.nickspicks.api.coach.CoachRepository;
 import com.nickspicks.api.game.Game;
 import com.nickspicks.api.game.GameRepository;
@@ -48,9 +47,6 @@ class CfbdLiveIngestTest extends IntegrationTest {
 
     @Autowired
     private GameRepository games;
-
-    @Autowired
-    private AthleteRepository athletes;
 
     @Autowired
     private CoachRepository coaches;

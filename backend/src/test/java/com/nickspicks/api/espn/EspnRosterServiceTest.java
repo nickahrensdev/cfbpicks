@@ -2,18 +2,12 @@ package com.nickspicks.api.espn;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nickspicks.api.athlete.Athlete;
-import com.nickspicks.api.athlete.AthleteRepository;
-import com.nickspicks.api.cfbd.CfbdSyncRepository;
-import com.nickspicks.api.team.Team;
+import com.nickspicks.api.web.ApiDtos;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,120 +17,92 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Mapping ESPN's roster shape onto our athlete rows.
+ * Reading ESPN's roster shape into the summaries a team page renders.
  *
- * <p>The fixture is a real captured response rather than a hand-written one -
- * this is an undocumented API, and a payload someone invented would only prove
- * the mapping matches itself.
+ * <p>The fixture is a real captured response. For an undocumented API a
+ * hand-written payload would only prove the mapping matches itself.
  */
 class EspnRosterServiceTest {
 
-    private EspnSiteClient espn;
-    private AthleteRepository athletes;
-    private CfbdSyncRepository syncs;
+    private static final ApiDtos.TeamSummary OHIO_STATE = new ApiDtos.TeamSummary(
+            194, "Ohio State", "Buckeyes", "OSU", "Big Ten", null, null, null);
+
+    private EspnSiteClient site;
     private EspnRosterService service;
-
-    private final Map<Athlete.Key, Athlete> stored = new HashMap<>();
-    private final List<String> synced = new ArrayList<>();
-
-    private static final Team OHIO_STATE = team(194, "Ohio State");
 
     @BeforeEach
     void setUp() throws Exception {
-        espn = mock(EspnSiteClient.class);
-        athletes = mock(AthleteRepository.class);
-        syncs = mock(CfbdSyncRepository.class);
-        service = new EspnRosterService(espn, athletes, syncs);
+        site = mock(EspnSiteClient.class);
+        service = new EspnRosterService(site, mock(EspnClient.class));
 
         JsonNode body = new ObjectMapper().readTree(
                 getClass().getResourceAsStream("/espn-roster.json"));
-        when(espn.roster(anyInt(), any(Duration.class))).thenReturn(Optional.of(body));
-
-        when(athletes.findById(any())).thenAnswer(call ->
-                Optional.ofNullable(stored.get(call.getArgument(0))));
-        when(athletes.save(any(Athlete.class))).thenAnswer(call -> {
-            Athlete saved = call.getArgument(0);
-            stored.put(new Athlete.Key(saved.getId(), saved.getSeason()), saved);
-            return saved;
-        });
-        when(syncs.isSynced(any(), any())).thenAnswer(call -> synced.contains(call.getArgument(1)));
+        when(site.roster(anyInt(), any(Duration.class))).thenReturn(Optional.of(body));
     }
 
     @Test
-    void mapsEveryFieldTheCfbdRosterUsedToSupply() {
-        service.ensureRoster(OHIO_STATE, 2026);
+    void mapsEveryFieldTheRosterTabRenders() {
+        ApiDtos.AthleteSummary player = service.roster(194, OHIO_STATE).stream()
+                .filter(p -> p.id().equals("5081820"))
+                .findFirst()
+                .orElseThrow();
 
-        Athlete player = stored.get(new Athlete.Key("5081820", 2026));
-        assertThat(player).isNotNull();
-        assertThat(player.getFirstName()).isEqualTo("David");
-        assertThat(player.getLastName()).isEqualTo("Adolph");
-        assertThat(player.getPosition()).isEqualTo("WR");
-        // ESPN sends the jersey as a string and height/weight as decimals, in
-        // the same units the columns already document.
-        assertThat(player.getJersey()).isEqualTo(82);
-        assertThat(player.getHeight()).isEqualTo(77);
-        assertThat(player.getWeight()).isEqualTo(210);
-        assertThat(player.getYear()).isEqualTo(4);
-        assertThat(player.getHomeCity()).isEqualTo("Dublin");
-        assertThat(player.getHomeState()).isEqualTo("OH");
-        assertThat(player.getHomeCountry()).isEqualTo("USA");
+        assertThat(player.firstName()).isEqualTo("David");
+        assertThat(player.lastName()).isEqualTo("Adolph");
+        assertThat(player.position()).isEqualTo("WR");
+        // ESPN sends the jersey as a string and the class year nested.
+        assertThat(player.jersey()).isEqualTo(82);
+        assertThat(player.year()).isEqualTo(4);
+        assertThat(player.headshotUrl())
+                .isEqualTo("https://a.espncdn.com/i/headshots/college-football/players/full/5081820.png");
+        assertThat(player.team()).isEqualTo(OHIO_STATE);
     }
 
-    /** The team is ours, not ESPN's - the roster call knows only an id. */
+    /** One player in the fixture has none, as one in 120 does upstream. */
     @Test
-    void stampsOurOwnTeamOntoEveryPlayer() {
-        service.ensureRoster(OHIO_STATE, 2026);
-
-        assertThat(stored.values()).allSatisfy(player -> {
-            assertThat(player.getTeamId()).isEqualTo(194);
-            assertThat(player.getTeamSchool()).isEqualTo("Ohio State");
-            assertThat(player.getSeason()).isEqualTo(2026);
-        });
+    void leavesTheHeadshotNullWhenEspnHasNoPortrait() {
+        assertThat(service.roster(194, OHIO_STATE))
+                .anySatisfy(player -> assertThat(player.headshotUrl()).isNull());
     }
 
     /**
-     * ESPN can list the same player in more than one position group. The
-     * (id, season) key would fail on the second insert before the first has
-     * flushed, so duplicates are dropped rather than written twice.
+     * ESPN can list one player under two position groups, and the fixture
+     * repeats the first deliberately.
      */
     @Test
     void ignoresAPlayerListedTwice() {
-        int written = service.ensureRoster(OHIO_STATE, 2026);
+        List<ApiDtos.AthleteSummary> roster = service.roster(194, OHIO_STATE);
 
-        assertThat(written).isEqualTo(3);
-        assertThat(stored).hasSize(3);
+        assertThat(roster).hasSize(3);
+        assertThat(roster).extracting(ApiDtos.AthleteSummary::id).doesNotHaveDuplicates();
     }
 
+    /** Jersey order, unnumbered last - how a printed roster reads. */
     @Test
-    void marksTheTeamSyncedSoTheNextPageViewCostsNothing() {
-        service.ensureRoster(OHIO_STATE, 2026);
-        assertThat(synced).isEmpty();
-
-        // The marker is written through the repository; simulate it having
-        // been recorded and confirm the second call short-circuits.
-        synced.add("194:2026");
-        stored.clear();
-
-        assertThat(service.ensureRoster(OHIO_STATE, 2026)).isZero();
-        assertThat(stored).isEmpty();
+    void ordersByJerseyNumber() {
+        assertThat(service.roster(194, OHIO_STATE))
+                .extracting(ApiDtos.AthleteSummary::jersey)
+                .isSortedAccordingTo(java.util.Comparator.nullsLast(
+                        java.util.Comparator.naturalOrder()));
     }
 
     /**
-     * An outage must not mark the team done. Storing nothing and calling it
-     * synced would leave that roster permanently empty.
+     * A provider outage costs the roster tab, not the team page - so this
+     * answers empty rather than throwing.
      */
     @Test
-    void leavesTheTeamUnsyncedWhenEspnHasNothing() {
-        when(espn.roster(anyInt(), any(Duration.class))).thenReturn(Optional.empty());
+    void returnsNothingWhenEspnIsUnreachable() {
+        when(site.roster(anyInt(), any(Duration.class))).thenReturn(Optional.empty());
 
-        assertThat(service.ensureRoster(OHIO_STATE, 2026)).isZero();
-        assertThat(stored).isEmpty();
+        assertThat(service.roster(194, OHIO_STATE)).isEmpty();
     }
 
-    private static Team team(int id, String school) {
-        Team team = new Team();
-        team.setId(id);
-        team.setSchool(school);
-        return team;
+    /** An undocumented API changing shape must not read as a team with no players. */
+    @Test
+    void returnsNothingWhenThePayloadHasNoAthletesArray() throws Exception {
+        JsonNode empty = new ObjectMapper().readTree("{\"team\": {\"id\": \"194\"}}");
+        when(site.roster(anyInt(), any(Duration.class))).thenReturn(Optional.of(empty));
+
+        assertThat(service.roster(194, OHIO_STATE)).isEmpty();
     }
 }

@@ -24,7 +24,7 @@ import java.util.List;
  *
  * <p>Grading uses the pick's own {@code lockedLine}, never the game's
  * current line, so two members who picked the same side at different times can
- * legitimately get different results. A winner pick has no line at all and is
+ * legitimately get different results. A moneyline pick has no line at all and is
  * simply the final score.
  */
 @Service
@@ -51,7 +51,7 @@ public class GradingService {
         int comparison = switch (selection.market()) {
             case SPREAD -> gradeSpread(selection, lockedLine, homeScore, awayScore);
             case TOTAL -> gradeTotal(selection, lockedLine, homeScore, awayScore);
-            case WINNER -> gradeWinner(selection, homeScore, awayScore);
+            case MONEYLINE -> gradeMoneyline(selection, homeScore, awayScore);
         };
 
         if (comparison > 0) {
@@ -77,14 +77,14 @@ public class GradingService {
 
     /**
      * Straight up: no line, so {@code lockedLine} is not read - it is null for
-     * a winner pick.
+     * a moneyline pick.
      *
      * <p>A tie returns 0 and therefore pushes, which college football has not
      * produced since overtime arrived in 1996. The branch exists so a bad
      * score never silently becomes a loss, not because it will ever fire.
      */
-    private int gradeWinner(Selection selection, int homeScore, int awayScore) {
-        return selection == Selection.HOME_WINNER
+    private int gradeMoneyline(Selection selection, int homeScore, int awayScore) {
+        return selection == Selection.HOME_ML
                 ? Integer.compare(homeScore, awayScore)
                 : Integer.compare(awayScore, homeScore);
     }

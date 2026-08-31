@@ -24,7 +24,7 @@ import {
  * aria-label so nothing implies the total belongs to a particular team.
  */
 /** Short market badge -> the word used in the cancel button's label. */
-const MARKET_NAMES = { SPR: 'spread', 'O/U': 'total', WIN: 'winner' };
+const MARKET_NAMES = { SPR: 'spread', 'O/U': 'total', ML: 'moneyline' };
 
 export default function GameCard({
   game,
@@ -42,8 +42,8 @@ export default function GameCard({
 
   const spreadPick = game.mySpreadPick;
   const totalPick = game.myTotalPick;
-  const winnerPick = game.myWinnerPick;
-  const winnerPlayed = markets.winner;
+  const moneylinePick = game.myMoneylinePick;
+  const moneylinePlayed = markets.moneyline;
   const spreadPlayed = markets.spread;
   const totalPlayed = markets.total;
   const locked = game.locked;
@@ -101,22 +101,22 @@ export default function GameCard({
     );
   };
 
-  /** One team row: name, its winner and spread buttons, and one side of the total. */
+  /** One team row: name, its moneyline and spread buttons, and one side of the total. */
   const sideRow = (side, team, fallbackName, totalSide) => {
     const teamName = team?.school ?? fallbackName;
-    const winnerSide = side === 'HOME' ? 'HOME_WINNER' : 'AWAY_WINNER';
+    const moneylineSide = side === 'HOME' ? 'HOME_ML' : 'AWAY_ML';
     const spreadMine = spreadPick?.selection === side;
     const spreadLineMatches =
       spreadMine && String(spreadPick.lockedLine) === String(game.homeSpread);
     const totalMine = totalPick?.selection === totalSide;
     const totalLineMatches = totalMine && String(totalPick.lockedLine) === String(game.overUnder);
-    const winnerMine = winnerPick?.selection === winnerSide;
+    const moneylineMine = moneylinePick?.selection === moneylineSide;
     // Live scores come off the in-progress feed; once the game is final the
     // game itself carries them.
     const score = side === 'HOME'
       ? (live ? live.homeScore : game.homeScore)
       : (live ? live.awayScore : game.awayScore);
-    // Only the winner of a finished game is bolded. A tie bolds neither, and
+    // Only the moneyline of a finished game is bolded. A tie bolds neither, and
     // a game still being played bolds both - nobody has won it yet.
     const otherScore = side === 'HOME'
       ? (live ? live.awayScore : game.awayScore)
@@ -125,7 +125,15 @@ export default function GameCard({
 
     return (
       <div className="d-flex align-items-center gap-2">
-        <div className="flex-grow-1 text-truncate d-flex align-items-center gap-1">
+        {/* flex-basis 0 with min-width 0, so this column absorbs every bit of
+            squeeze rather than sizing to the team name. Without it a long name
+            ("Kennesaw State") pushed the third pick column off the card edge
+            once a group played all three markets. The buttons never shrink -
+            they carry numbers that have to stay legible. */}
+        <div
+          className="text-truncate d-flex align-items-center gap-1"
+          style={{ flex: '1 1 0', minWidth: 0 }}
+        >
           <TeamLink team={team} name={fallbackName} logoSize={22} />
           {/* A football beside whoever has the ball. Decorative - the score
               and the clock carry the state for a screen reader. */}
@@ -152,21 +160,21 @@ export default function GameCard({
             this member actually holds is shown by the picks panel below. */}
         {!scoreboard && (
           <>
-            {/* Only when the group plays winners. There is no line to show, so
+            {/* Only when the group plays moneylines. There is no line to show, so
                 the button says what it does rather than a number - and it is
                 never disabled for a missing line, because there is none. */}
-            {winnerPlayed && marketButton({
-              selection: winnerSide,
-              label: 'Win',
-              mine: winnerMine,
+            {moneylinePlayed && marketButton({
+              selection: moneylineSide,
+              label: 'ML',
+              mine: moneylineMine,
               // No line, so nothing can have moved away from it.
               lineMatches: true,
-              marketTaken: Boolean(winnerPick),
+              marketTaken: Boolean(moneylinePick),
               disabled: false,
-              ariaLabel: winnerMine
-                ? `Your winner pick: ${teamName}`
-                : winnerPick
-                  ? `${teamName} to win - cancel your current winner pick first`
+              ariaLabel: moneylineMine
+                ? `Your moneyline pick: ${teamName}`
+                : moneylinePick
+                  ? `${teamName} to win - cancel your current moneyline pick first`
                   : `Pick ${teamName} to win`,
             })}
 
@@ -289,14 +297,14 @@ export default function GameCard({
     return improved ? 'bg-warning-subtle' : 'pick-row--mine';
   };
 
-  const winnerRow = pickRow({
-    marketLabel: 'WIN',
-    pick: winnerPick,
+  const moneylineRow = pickRow({
+    marketLabel: 'ML',
+    pick: moneylinePick,
     currentLine: null,
-    // Nothing to re-lock onto: a winner pick has no number to improve.
+    // Nothing to re-lock onto: a moneyline pick has no number to improve.
     improved: false,
     format: (_line, selection) =>
-      `${selection === 'HOME_WINNER' ? game.homeTeamName : game.awayTeamName} to win`,
+      `${selection === 'HOME_ML' ? game.homeTeamName : game.awayTeamName} to win`,
     withTeamName: false,
   });
   const spreadRow = pickRow({
@@ -382,13 +390,28 @@ export default function GameCard({
               along with the columns they label. */}
           {!scoreboard && (
             <div className="d-flex align-items-center gap-2" aria-hidden="true">
-              <div className="flex-grow-1" />
-              <div className="pick-col text-center small fw-semibold text-body-tertiary text-uppercase lh-1">
-                SPR
-              </div>
-              <div className="pick-col text-center small fw-semibold text-body-tertiary text-uppercase lh-1">
-                O/U
-              </div>
+              {/* Same flex rule as the name column below, so the headings stay
+                  squarely over their buttons however long the names are. */}
+              <div style={{ flex: '1 1 0', minWidth: 0 }} />
+              {/* One heading per column actually rendered, in the same order
+                  the buttons are - moneyline, spread, total. It used to name
+                  only two, so a group playing all three had a column of ML
+                  buttons under no label at all. */}
+              {moneylinePlayed && (
+                <div className="pick-col text-center small fw-semibold text-body-tertiary text-uppercase lh-1">
+                  ML
+                </div>
+              )}
+              {spreadPlayed && (
+                <div className="pick-col text-center small fw-semibold text-body-tertiary text-uppercase lh-1">
+                  SPR
+                </div>
+              )}
+              {totalPlayed && (
+                <div className="pick-col text-center small fw-semibold text-body-tertiary text-uppercase lh-1">
+                  O/U
+                </div>
+              )}
             </div>
           )}
 

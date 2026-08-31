@@ -85,12 +85,12 @@ public class PickWindow {
      * Whether this market can be picked on this game at all.
      *
      * <p>A game can carry a spread and no total, or the reverse, so
-     * availability is per market rather than one flag for the card. The winner
+     * availability is per market rather than one flag for the card. The moneyline
      * market needs nothing posted - the teams are playing either way - so it
      * is always available on a scheduled game.
      */
     public boolean hasLine(Game game, Market market) {
-        return market == Market.WINNER || line(game, market) != null;
+        return market == Market.MONEYLINE || line(game, market) != null;
     }
 
     /** The game's current number for a market, or null for one with no line. */
@@ -99,7 +99,7 @@ public class PickWindow {
             case SPREAD -> game.getHomeSpread();
             case TOTAL -> game.getOverUnder();
             // Nothing to lock, nothing to move, nothing to re-lock onto.
-            case WINNER -> null;
+            case MONEYLINE -> null;
         };
     }
 
@@ -125,7 +125,7 @@ public class PickWindow {
      * <p>A sign error here hands out a "better line" button that quietly makes
      * a pick worse, so it is expressed once, here, and tested as a table.
      *
-     * <p>Never true for a winner pick: both numbers are null, so the guard
+     * <p>Never true for a moneyline pick: both numbers are null, so the guard
      * below returns false and no re-lock is ever offered.
      */
     public boolean isLineImproved(Pick pick, Game game) {
@@ -139,9 +139,9 @@ public class PickWindow {
         return switch (pick.getSelection()) {
             case HOME, UNDER -> current.compareTo(locked) > 0;
             case AWAY, OVER -> current.compareTo(locked) < 0;
-            // Unreachable - a winner pick has no locked line, so the guard
+            // Unreachable - a moneyline pick has no locked line, so the guard
             // above has already returned.
-            case HOME_WINNER, AWAY_WINNER -> false;
+            case HOME_ML, AWAY_ML -> false;
         };
     }
 }

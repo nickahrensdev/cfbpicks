@@ -192,7 +192,7 @@ export default function GamesPage() {
   const visibleGames = useMemo(() => {
     return games.filter((game) => {
       if (filters.mine
-          && !game.mySpreadPick && !game.myTotalPick && !game.myWinnerPick) {
+          && !game.mySpreadPick && !game.myTotalPick && !game.myMoneylinePick) {
         return false;
       }
       // Literal: a locked game is not actionable even if it was already

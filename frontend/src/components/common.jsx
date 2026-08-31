@@ -214,11 +214,11 @@ export function formatTotalLong(overUnder, side) {
 /**
  * Formats whichever line a pick was made against.
  *
- * <p>A winner pick has no line - it is played against the result, not a
+ * <p>A moneyline pick has no line - it is played against the result, not a
  * number - so there is nothing to format and it says so instead.
  */
 export function formatLine(line, selection) {
-  if (selection === 'HOME_WINNER' || selection === 'AWAY_WINNER') return 'To win';
+  if (selection === 'HOME_ML' || selection === 'AWAY_ML') return 'To win';
   return selection === 'OVER' || selection === 'UNDER'
     ? formatTotal(line, selection)
     : formatSpread(line, selection);
@@ -227,7 +227,7 @@ export function formatLine(line, selection) {
 /** Human label for a market. */
 export function marketLabel(market) {
   if (market === 'TOTAL') return 'Total';
-  if (market === 'WINNER') return 'Winner';
+  if (market === 'MONEYLINE') return 'Moneyline';
   return 'Spread';
 }
 
@@ -240,7 +240,7 @@ export function marketLabel(market) {
  */
 export function marketAbbr(market) {
   if (market === 'TOTAL') return 'O/U';
-  if (market === 'WINNER') return 'WIN';
+  if (market === 'MONEYLINE') return 'ML';
   return 'SPR';
 }
 
@@ -253,7 +253,7 @@ export function marketAbbr(market) {
  * same thing twice.
  */
 export function formatLineBare(line, selection) {
-  if (selection === 'HOME_WINNER' || selection === 'AWAY_WINNER') return 'To win';
+  if (selection === 'HOME_ML' || selection === 'AWAY_ML') return 'To win';
   if (line === null || line === undefined) return 'No line';
   return selection === 'OVER' || selection === 'UNDER'
     ? `${Number(line)}`
@@ -293,7 +293,7 @@ export function pickRowStyle(result) {
  * group plays has what it needs. A game with only one of the two lines is
  * still pickable - just not in every market.
  *
- * <p>The winner market needs nothing posted, so a group that plays winners can
+ * <p>The moneyline market needs nothing posted, so a group that plays moneylines can
  * pick any game that has not locked.
  *
  * <p>Defined once because the card's disabled buttons and the "hide
@@ -302,19 +302,19 @@ export function pickRowStyle(result) {
  */
 export function isPickable(game, markets = ALL_MARKETS) {
   if (game.locked) return false;
-  if (markets.winner) return true;
+  if (markets.moneyline) return true;
   return (markets.spread && game.homeSpread != null)
     || (markets.total && game.overUnder != null);
 }
 
 /** Every market, for callers with no group context to narrow it. */
-export const ALL_MARKETS = { winner: true, spread: true, total: true };
+export const ALL_MARKETS = { moneyline: true, spread: true, total: true };
 
 /** The markets a group plays, in the shape the board and card expect. */
 export function marketsOf(group) {
   return group
     ? {
-      winner: Boolean(group.winnerEnabled),
+      moneyline: Boolean(group.moneylineEnabled),
       spread: Boolean(group.spreadEnabled),
       total: Boolean(group.totalEnabled),
     }

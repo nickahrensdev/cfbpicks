@@ -11,7 +11,7 @@ import { Loading, handle } from './common.jsx';
 const SEARCH_FROM = 6;
 
 const MARKETS = [
-  ['winner', 'Winner'],
+  ['moneyline', 'Moneyline'],
   ['spread', 'Spread'],
   ['total', 'Over/Under'],
 ];

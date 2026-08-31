@@ -105,8 +105,8 @@ public class Group {
     @Column(name = "shareable_by_members", nullable = false)
     private boolean shareableByMembers;
 
-    @Column(name = "winner_enabled", nullable = false)
-    private boolean winnerEnabled;
+    @Column(name = "moneyline_enabled", nullable = false)
+    private boolean moneylineEnabled;
 
     @Column(name = "spread_enabled", nullable = false)
     private boolean spreadEnabled;
@@ -122,11 +122,11 @@ public class Group {
      * a period has not broken one yet - those are judged when the period
      * closes.
      */
-    @Column(name = "winner_min_per_cadence")
-    private Integer winnerMinPerCadence;
+    @Column(name = "moneyline_min_per_cadence")
+    private Integer moneylineMinPerCadence;
 
-    @Column(name = "winner_max_per_cadence")
-    private Integer winnerMaxPerCadence;
+    @Column(name = "moneyline_max_per_cadence")
+    private Integer moneylineMaxPerCadence;
 
     @Column(name = "spread_min_per_cadence")
     private Integer spreadMinPerCadence;
@@ -140,14 +140,14 @@ public class Group {
     @Column(name = "total_max_per_cadence")
     private Integer totalMaxPerCadence;
 
-    @Column(name = "winner_win_points", nullable = false)
-    private BigDecimal winnerWinPoints;
+    @Column(name = "moneyline_win_points", nullable = false)
+    private BigDecimal moneylineWinPoints;
 
-    @Column(name = "winner_loss_points", nullable = false)
-    private BigDecimal winnerLossPoints;
+    @Column(name = "moneyline_loss_points", nullable = false)
+    private BigDecimal moneylineLossPoints;
 
-    @Column(name = "winner_push_points", nullable = false)
-    private BigDecimal winnerPushPoints;
+    @Column(name = "moneyline_push_points", nullable = false)
+    private BigDecimal moneylinePushPoints;
 
     @Column(name = "spread_win_points", nullable = false)
     private BigDecimal spreadWinPoints;
@@ -216,22 +216,22 @@ public class Group {
         this.requireApproval = settings.requireApproval();
         this.shareableByMembers = settings.shareableByMembers();
 
-        this.winnerEnabled = settings.winnerEnabled();
+        this.moneylineEnabled = settings.moneylineEnabled();
         this.spreadEnabled = settings.spreadEnabled();
         this.totalEnabled = settings.totalEnabled();
 
         // A limit on a market nobody can play is dead configuration that would
         // reappear if the market were switched back on later.
-        this.winnerMinPerCadence = settings.winnerEnabled() ? settings.winnerMinPerCadence() : null;
-        this.winnerMaxPerCadence = settings.winnerEnabled() ? settings.winnerMaxPerCadence() : null;
+        this.moneylineMinPerCadence = settings.moneylineEnabled() ? settings.moneylineMinPerCadence() : null;
+        this.moneylineMaxPerCadence = settings.moneylineEnabled() ? settings.moneylineMaxPerCadence() : null;
         this.spreadMinPerCadence = settings.spreadEnabled() ? settings.spreadMinPerCadence() : null;
         this.spreadMaxPerCadence = settings.spreadEnabled() ? settings.spreadMaxPerCadence() : null;
         this.totalMinPerCadence = settings.totalEnabled() ? settings.totalMinPerCadence() : null;
         this.totalMaxPerCadence = settings.totalEnabled() ? settings.totalMaxPerCadence() : null;
 
-        this.winnerWinPoints = settings.winnerWinPoints();
-        this.winnerLossPoints = settings.winnerLossPoints();
-        this.winnerPushPoints = settings.winnerPushPoints();
+        this.moneylineWinPoints = settings.moneylineWinPoints();
+        this.moneylineLossPoints = settings.moneylineLossPoints();
+        this.moneylinePushPoints = settings.moneylinePushPoints();
         this.spreadWinPoints = settings.spreadWinPoints();
         this.spreadLossPoints = settings.spreadLossPoints();
         this.spreadPushPoints = settings.spreadPushPoints();
@@ -318,7 +318,7 @@ public class Group {
     /** The most picks this market allows in one period, or null for no limit. */
     public Integer maxFor(com.nickspicks.api.pick.Market market) {
         return switch (market) {
-            case WINNER -> winnerMaxPerCadence;
+            case MONEYLINE -> moneylineMaxPerCadence;
             case SPREAD -> spreadMaxPerCadence;
             case TOTAL -> totalMaxPerCadence;
         };
@@ -327,18 +327,18 @@ public class Group {
     /** The fewest picks this market requires in one period, or null for none. */
     public Integer minFor(com.nickspicks.api.pick.Market market) {
         return switch (market) {
-            case WINNER -> winnerMinPerCadence;
+            case MONEYLINE -> moneylineMinPerCadence;
             case SPREAD -> spreadMinPerCadence;
             case TOTAL -> totalMinPerCadence;
         };
     }
 
-    public Integer getWinnerMinPerCadence() {
-        return winnerMinPerCadence;
+    public Integer getMoneylineMinPerCadence() {
+        return moneylineMinPerCadence;
     }
 
-    public Integer getWinnerMaxPerCadence() {
-        return winnerMaxPerCadence;
+    public Integer getMoneylineMaxPerCadence() {
+        return moneylineMaxPerCadence;
     }
 
     public Integer getSpreadMinPerCadence() {
@@ -389,8 +389,8 @@ public class Group {
         return multiplePicksPerGame;
     }
 
-    public boolean isWinnerEnabled() {
-        return winnerEnabled;
+    public boolean isMoneylineEnabled() {
+        return moneylineEnabled;
     }
 
     public boolean isSpreadEnabled() {
@@ -401,16 +401,16 @@ public class Group {
         return totalEnabled;
     }
 
-    public BigDecimal getWinnerWinPoints() {
-        return winnerWinPoints;
+    public BigDecimal getMoneylineWinPoints() {
+        return moneylineWinPoints;
     }
 
-    public BigDecimal getWinnerLossPoints() {
-        return winnerLossPoints;
+    public BigDecimal getMoneylineLossPoints() {
+        return moneylineLossPoints;
     }
 
-    public BigDecimal getWinnerPushPoints() {
-        return winnerPushPoints;
+    public BigDecimal getMoneylinePushPoints() {
+        return moneylinePushPoints;
     }
 
     public BigDecimal getSpreadWinPoints() {

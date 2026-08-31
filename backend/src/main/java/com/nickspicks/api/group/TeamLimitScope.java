@@ -6,7 +6,7 @@ package com.nickspicks.api.group;
  * others, so the scope is configurable rather than assumed.
  */
 public enum TeamLimitScope {
-    WINNER,
+    MONEYLINE,
     SPREAD,
     BOTH
 }

@@ -84,13 +84,13 @@ class PickLimitsIntegrationTest extends IntegrationTest {
                 null, 2, null, null, null, null));
         UUID member = member(group, "capped");
 
-        picks.create(group, member, game(1L).getId(), Selection.HOME_WINNER);
-        picks.create(group, member, game(2L).getId(), Selection.AWAY_WINNER);
+        picks.create(group, member, game(1L).getId(), Selection.HOME_ML);
+        picks.create(group, member, game(2L).getId(), Selection.AWAY_ML);
 
         assertThatThrownBy(() ->
-                picks.create(group, member, game(3L).getId(), Selection.HOME_WINNER))
+                picks.create(group, member, game(3L).getId(), Selection.HOME_ML))
                 .isInstanceOf(WeeklyLimitReachedException.class)
-                .hasMessageContaining("2 winner picks for this week");
+                .hasMessageContaining("2 moneyline picks for this week");
 
         // The overall allowance is untouched - the member can still pick, just
         // not in the market they have used up. That is the entire point.
@@ -107,7 +107,7 @@ class PickLimitsIntegrationTest extends IntegrationTest {
 
         // One game, all three markets - each fills a different allowance.
         Game game = game(1L);
-        picks.create(group, member, game.getId(), Selection.HOME_WINNER);
+        picks.create(group, member, game.getId(), Selection.HOME_ML);
         picks.create(group, member, game.getId(), Selection.HOME);
         picks.create(group, member, game.getId(), Selection.OVER);
 
@@ -128,14 +128,14 @@ class PickLimitsIntegrationTest extends IntegrationTest {
                 null, 1, null, null, null, null));
         UUID member = member(group, "weekly");
 
-        picks.create(group, member, game(1L, 1).getId(), Selection.HOME_WINNER);
+        picks.create(group, member, game(1L, 1).getId(), Selection.HOME_ML);
 
         assertThatThrownBy(() ->
-                picks.create(group, member, game(2L, 1).getId(), Selection.HOME_WINNER))
+                picks.create(group, member, game(2L, 1).getId(), Selection.HOME_ML))
                 .isInstanceOf(WeeklyLimitReachedException.class);
 
         assertThatCode(() ->
-                picks.create(group, member, game(3L, 2).getId(), Selection.HOME_WINNER))
+                picks.create(group, member, game(3L, 2).getId(), Selection.HOME_ML))
                 .doesNotThrowAnyException();
     }
 
@@ -157,28 +157,28 @@ class PickLimitsIntegrationTest extends IntegrationTest {
         Game sameDay = game(2L, 1, saturday.plus(2, ChronoUnit.HOURS));
         Game nextDay = game(3L, 1, saturday.plus(1, ChronoUnit.DAYS));
 
-        picks.create(group, member, first.getId(), Selection.HOME_WINNER);
+        picks.create(group, member, first.getId(), Selection.HOME_ML);
 
         assertThatThrownBy(() ->
-                picks.create(group, member, sameDay.getId(), Selection.AWAY_WINNER))
+                picks.create(group, member, sameDay.getId(), Selection.AWAY_ML))
                 .isInstanceOf(WeeklyLimitReachedException.class);
 
         assertThatCode(() ->
-                picks.create(group, member, nextDay.getId(), Selection.HOME_WINNER))
+                picks.create(group, member, nextDay.getId(), Selection.HOME_ML))
                 .doesNotThrowAnyException();
     }
 
     @Test
     void aMaximumOfZeroClosesTheMarketOutright() {
         Group group = group(TestGroups.withMarketLimits(
-                "No winners", Cadence.WEEKLY, 10, true, true, true,
+                "No moneylines", Cadence.WEEKLY, 10, true, true, true,
                 null, 0, null, null, null, null));
-        UUID member = member(group, "nowinners");
+        UUID member = member(group, "nomoneylines");
 
         assertThatThrownBy(() ->
-                picks.create(group, member, game(1L).getId(), Selection.HOME_WINNER))
+                picks.create(group, member, game(1L).getId(), Selection.HOME_ML))
                 .isInstanceOf(WeeklyLimitReachedException.class)
-                .hasMessageContaining("does not allow winner picks");
+                .hasMessageContaining("does not allow moneyline picks");
     }
 
     // ------------------------------------------------------- team pick limit
@@ -214,7 +214,7 @@ class PickLimitsIntegrationTest extends IntegrationTest {
                 .isInstanceOf(InvalidPickException.class);
     }
 
-    /** A scope of SPREAD leaves winner picks on that team alone, and vice versa. */
+    /** A scope of SPREAD leaves moneyline picks on that team alone, and vice versa. */
     @Test
     void onlyCountsMarketsTheScopeNames() {
         Group group = group(teamLimited(1, TeamLimitScope.SPREAD));
@@ -222,9 +222,9 @@ class PickLimitsIntegrationTest extends IntegrationTest {
 
         picks.create(group, member, sameHomeTeam(1L, 1).getId(), Selection.HOME);
 
-        // Same team, but a winner pick - out of scope, so it is allowed.
+        // Same team, but a moneyline pick - out of scope, so it is allowed.
         assertThatCode(() ->
-                picks.create(group, member, sameHomeTeam(2L, 2).getId(), Selection.HOME_WINNER))
+                picks.create(group, member, sameHomeTeam(2L, 2).getId(), Selection.HOME_ML))
                 .doesNotThrowAnyException();
 
         assertThatThrownBy(() ->
@@ -272,7 +272,7 @@ class PickLimitsIntegrationTest extends IntegrationTest {
 
         picks.create(group, member, game.getId(), Selection.HOME);
         picks.create(group, member, game.getId(), Selection.OVER);
-        picks.create(group, member, game.getId(), Selection.HOME_WINNER);
+        picks.create(group, member, game.getId(), Selection.HOME_ML);
 
         assertThat(pickRepository.findAllByGroupIdAndUserIdAndGameId(
                 group.getId(), member, game.getId())).hasSize(3);
@@ -288,9 +288,9 @@ class PickLimitsIntegrationTest extends IntegrationTest {
                 base.groupType(), base.cadence(), base.lengthType(), base.startSeason(),
                 base.lockLeadMinutes(), base.maxPicksPerCadence(), base.minPicksPerCadence(),
                 base.multiplePicksPerGame(), base.requireApproval(), base.shareableByMembers(),
-                base.winnerEnabled(), base.spreadEnabled(), base.totalEnabled(),
+                base.moneylineEnabled(), base.spreadEnabled(), base.totalEnabled(),
                 null, null, null, null, null, null,
-                base.winnerWinPoints(), base.winnerLossPoints(), base.winnerPushPoints(),
+                base.moneylineWinPoints(), base.moneylineLossPoints(), base.moneylinePushPoints(),
                 base.spreadWinPoints(), base.spreadLossPoints(), base.spreadPushPoints(),
                 base.totalWinPoints(), base.totalLossPoints(), base.totalPushPoints(),
                 base.strikesAllowed(), limit, scope);
@@ -304,9 +304,9 @@ class PickLimitsIntegrationTest extends IntegrationTest {
                 base.groupType(), base.cadence(), base.lengthType(), base.startSeason(),
                 base.lockLeadMinutes(), base.maxPicksPerCadence(), base.minPicksPerCadence(),
                 false, base.requireApproval(), base.shareableByMembers(),
-                base.winnerEnabled(), base.spreadEnabled(), base.totalEnabled(),
+                base.moneylineEnabled(), base.spreadEnabled(), base.totalEnabled(),
                 null, null, null, null, null, null,
-                base.winnerWinPoints(), base.winnerLossPoints(), base.winnerPushPoints(),
+                base.moneylineWinPoints(), base.moneylineLossPoints(), base.moneylinePushPoints(),
                 base.spreadWinPoints(), base.spreadLossPoints(), base.spreadPushPoints(),
                 base.totalWinPoints(), base.totalLossPoints(), base.totalPushPoints(),
                 base.strikesAllowed(), base.teamPickLimit(), base.teamPickLimitScope());

@@ -68,22 +68,22 @@ export const DEFAULT_SETTINGS = {
   requireApproval: false,
   shareableByMembers: false,
 
-  winnerEnabled: false,
+  moneylineEnabled: false,
   spreadEnabled: true,
   totalEnabled: true,
 
   // Null on every one of these means "no limit", which is what a group that
   // never touches this step should get.
-  winnerMinPerCadence: null,
-  winnerMaxPerCadence: null,
+  moneylineMinPerCadence: null,
+  moneylineMaxPerCadence: null,
   spreadMinPerCadence: null,
   spreadMaxPerCadence: null,
   totalMinPerCadence: null,
   totalMaxPerCadence: null,
 
-  winnerWinPoints: 1,
-  winnerLossPoints: 0,
-  winnerPushPoints: 0.5,
+  moneylineWinPoints: 1,
+  moneylineLossPoints: 0,
+  moneylinePushPoints: 0.5,
   spreadWinPoints: 1,
   spreadLossPoints: 0,
   spreadPushPoints: 0.5,
@@ -117,7 +117,7 @@ export function stepIssue(settings, stepIndex) {
     return 'Give the group a name to continue.';
   }
   if (key === 'scoring') {
-    if (!settings.winnerEnabled && !settings.spreadEnabled && !settings.totalEnabled) {
+    if (!settings.moneylineEnabled && !settings.spreadEnabled && !settings.totalEnabled) {
       return 'Turn on at least one pick option - a group with none has nothing to pick.';
     }
 
@@ -152,7 +152,7 @@ export function stepIssue(settings, stepIndex) {
 }
 
 const MARKETS = [
-  ['winner', 'Winner', 'Pick the team to win outright.'],
+  ['moneyline', 'Moneyline', 'Pick the team to win outright.'],
   ['spread', 'Spread', 'Pick a team against the posted line.'],
   ['total', 'Over/Under', 'Pick the game total over or under.'],
 ];
@@ -518,7 +518,7 @@ export default function GroupSettingsForm({
                 />
                 <Form.Text className="text-body-secondary d-block mb-2">
                   {help}
-                  {key === 'winner' && ' Configurable now; winner picks arrive in a later release.'}
+                  {key === 'moneyline' && ' Configurable now; moneyline picks arrive in a later release.'}
                 </Form.Text>
 
                 <Row className="g-2">
@@ -611,7 +611,7 @@ export default function GroupSettingsForm({
                   onChange={(event) => update({ teamPickLimitScope: event.target.value })}
                   disabled={disabled || value.teamPickLimit == null}
                 >
-                  <option value="WINNER">Winner picks only</option>
+                  <option value="MONEYLINE">Moneyline picks only</option>
                   <option value="SPREAD">Spread picks only</option>
                   <option value="BOTH">Both</option>
                 </Form.Select>

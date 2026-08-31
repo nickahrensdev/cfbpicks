@@ -129,7 +129,7 @@ public final class ApiDtos {
             Integer homeScore,
             String awayTeam,
             Integer awayScore,
-            String winner) {
+            String moneyline) {
     }
 
     // ------------------------------------------------------------- athletes
@@ -223,7 +223,7 @@ public final class ApiDtos {
             /** The caller's own picks on this game - at most one per market. */
             PickSummary mySpreadPick,
             PickSummary myTotalPick,
-            PickSummary myWinnerPick,
+            PickSummary myMoneylinePick,
             /**
              * The current line is strictly better for the side the caller
              * took, so re-locking can only help. False when there is no pick.
@@ -436,7 +436,7 @@ public final class ApiDtos {
              * which pick buttons to draw at all - offering one the group has
              * turned off is a button that can only fail.
              */
-            boolean winnerEnabled,
+            boolean moneylineEnabled,
             boolean spreadEnabled,
             boolean totalEnabled,
             /** Who made the group. Null once their account is gone. */

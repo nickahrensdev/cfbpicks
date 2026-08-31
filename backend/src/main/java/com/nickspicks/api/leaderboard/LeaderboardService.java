@@ -52,9 +52,9 @@ public class LeaderboardService {
                    coalesce(s.total_wins, 0)     as total_wins,
                    coalesce(s.total_losses, 0)   as total_losses,
                    coalesce(s.total_pushes, 0)   as total_pushes,
-                   coalesce(s.winner_wins, 0)    as winner_wins,
-                   coalesce(s.winner_losses, 0)  as winner_losses,
-                   coalesce(s.winner_pushes, 0)  as winner_pushes,
+                   coalesce(s.moneyline_wins, 0)    as moneyline_wins,
+                   coalesce(s.moneyline_losses, 0)  as moneyline_losses,
+                   coalesce(s.moneyline_pushes, 0)  as moneyline_pushes,
                    coalesce(c.penalty_losses, 0) as penalty_losses,
                    coalesce(c.penalty_points, 0) as penalty_points
             from group_member gm
@@ -68,9 +68,9 @@ public class LeaderboardService {
                        count(*) filter (where p.result = 'WIN'  and p.market = 'TOTAL')  as total_wins,
                        count(*) filter (where p.result = 'LOSS' and p.market = 'TOTAL')  as total_losses,
                        count(*) filter (where p.result = 'PUSH' and p.market = 'TOTAL')  as total_pushes,
-                       count(*) filter (where p.result = 'WIN'  and p.market = 'WINNER') as winner_wins,
-                       count(*) filter (where p.result = 'LOSS' and p.market = 'WINNER') as winner_losses,
-                       count(*) filter (where p.result = 'PUSH' and p.market = 'WINNER') as winner_pushes
+                       count(*) filter (where p.result = 'WIN'  and p.market = 'MONEYLINE') as moneyline_wins,
+                       count(*) filter (where p.result = 'LOSS' and p.market = 'MONEYLINE') as moneyline_losses,
+                       count(*) filter (where p.result = 'PUSH' and p.market = 'MONEYLINE') as moneyline_pushes
                 from pick p
                 join game g on g.id = p.game_id
                 where p.group_id = ?
@@ -128,9 +128,9 @@ public class LeaderboardService {
                         rs.getLong("total_wins"),
                         rs.getLong("total_losses"),
                         rs.getLong("total_pushes"),
-                        rs.getLong("winner_wins"),
-                        rs.getLong("winner_losses"),
-                        rs.getLong("winner_pushes"),
+                        rs.getLong("moneyline_wins"),
+                        rs.getLong("moneyline_losses"),
+                        rs.getLong("moneyline_pushes"),
                         rs.getLong("penalty_losses"),
                         rs.getBigDecimal("penalty_points")),
                 groupId, season, season, week, week,
@@ -144,9 +144,9 @@ public class LeaderboardService {
                 // A charged minimum counts as a loss, in the record and in the
                 // points alike - which is the whole point of charging it.
                 .map(row -> new Scored(row, points(group, row),
-                        row.spreadWins + row.totalWins + row.winnerWins,
-                        row.spreadLosses + row.totalLosses + row.winnerLosses + row.penaltyLosses,
-                        row.spreadPushes + row.totalPushes + row.winnerPushes))
+                        row.spreadWins + row.totalWins + row.moneylineWins,
+                        row.spreadLosses + row.totalLosses + row.moneylineLosses + row.penaltyLosses,
+                        row.spreadPushes + row.totalPushes + row.moneylinePushes))
                 .sorted(Comparator
                         .comparingDouble((Scored s) -> s.points).reversed()
                         .thenComparing(Comparator.comparingLong((Scored s) -> s.wins).reversed())
@@ -215,9 +215,9 @@ public class LeaderboardService {
                 .add(group.getTotalWinPoints().multiply(BigDecimal.valueOf(row.totalWins)))
                 .add(group.getTotalLossPoints().multiply(BigDecimal.valueOf(row.totalLosses)))
                 .add(group.getTotalPushPoints().multiply(BigDecimal.valueOf(row.totalPushes)))
-                .add(group.getWinnerWinPoints().multiply(BigDecimal.valueOf(row.winnerWins)))
-                .add(group.getWinnerLossPoints().multiply(BigDecimal.valueOf(row.winnerLosses)))
-                .add(group.getWinnerPushPoints().multiply(BigDecimal.valueOf(row.winnerPushes)))
+                .add(group.getMoneylineWinPoints().multiply(BigDecimal.valueOf(row.moneylineWins)))
+                .add(group.getMoneylineLossPoints().multiply(BigDecimal.valueOf(row.moneylineLosses)))
+                .add(group.getMoneylinePushPoints().multiply(BigDecimal.valueOf(row.moneylinePushes)))
                 // Already money, priced by the group's scoring when the period
                 // was settled - not re-derived, so changing the point values
                 // now cannot rewrite what a closed period cost.
@@ -228,7 +228,7 @@ public class LeaderboardService {
     private record Row(UUID userId, String displayName, String username, long totalPicks,
                        long spreadWins, long spreadLosses, long spreadPushes,
                        long totalWins, long totalLosses, long totalPushes,
-                       long winnerWins, long winnerLosses, long winnerPushes,
+                       long moneylineWins, long moneylineLosses, long moneylinePushes,
                        /** Minimums this member finished short of - see CadenceSettlementService. */
                        long penaltyLosses, BigDecimal penaltyPoints) {
     }

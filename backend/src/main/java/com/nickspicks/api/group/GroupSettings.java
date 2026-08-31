@@ -42,7 +42,7 @@ public record GroupSettings(
          */
         boolean shareableByMembers,
 
-        boolean winnerEnabled,
+        boolean moneylineEnabled,
         boolean spreadEnabled,
         boolean totalEnabled,
 
@@ -50,16 +50,16 @@ public record GroupSettings(
          * Per-market limits per period. Null means no limit; 0 is a real
          * maximum, so these are bounded below by 0 rather than 1.
          */
-        @Min(0) Integer winnerMinPerCadence,
-        @Min(0) Integer winnerMaxPerCadence,
+        @Min(0) Integer moneylineMinPerCadence,
+        @Min(0) Integer moneylineMaxPerCadence,
         @Min(0) Integer spreadMinPerCadence,
         @Min(0) Integer spreadMaxPerCadence,
         @Min(0) Integer totalMinPerCadence,
         @Min(0) Integer totalMaxPerCadence,
 
-        @NotNull BigDecimal winnerWinPoints,
-        @NotNull BigDecimal winnerLossPoints,
-        @NotNull BigDecimal winnerPushPoints,
+        @NotNull BigDecimal moneylineWinPoints,
+        @NotNull BigDecimal moneylineLossPoints,
+        @NotNull BigDecimal moneylinePushPoints,
         @NotNull BigDecimal spreadWinPoints,
         @NotNull BigDecimal spreadLossPoints,
         @NotNull BigDecimal spreadPushPoints,
@@ -76,7 +76,7 @@ public record GroupSettings(
      * together. Called by the service before anything is written.
      */
     public void validate() {
-        if (!winnerEnabled && !spreadEnabled && !totalEnabled) {
+        if (!moneylineEnabled && !spreadEnabled && !totalEnabled) {
             throw new GroupExceptions.InvalidGroupSettingsException(
                     "Turn on at least one pick option - a group with none has nothing to pick");
         }
@@ -87,7 +87,7 @@ public record GroupSettings(
                             .formatted(cadence == Cadence.DAILY ? "day" : "week"));
         }
 
-        requireMarketRange("winner", "winners", winnerMinPerCadence, winnerMaxPerCadence);
+        requireMarketRange("moneyline", "moneylines", moneylineMinPerCadence, moneylineMaxPerCadence);
         requireMarketRange("spread", "spreads", spreadMinPerCadence, spreadMaxPerCadence);
         requireMarketRange("over/under", "over/unders", totalMinPerCadence, totalMaxPerCadence);
         requireMarketMinimumsFit();
@@ -122,7 +122,7 @@ public record GroupSettings(
     /**
      * The per-market minimums have to fit inside the overall allowance.
      *
-     * <p>Requiring 3 spreads and 3 winners in a period that allows 5 picks
+     * <p>Requiring 3 spreads and 3 moneylines in a period that allows 5 picks
      * total is not a hard rule, it is an impossible one: every member would end
      * every period in breach however they picked. Better to refuse the settings
      * than to hand out an unavoidable penalty later.
@@ -131,7 +131,7 @@ public record GroupSettings(
         if (maxPicksPerCadence == null) {
             return;
         }
-        int required = required(winnerEnabled, winnerMinPerCadence)
+        int required = required(moneylineEnabled, moneylineMinPerCadence)
                 + required(spreadEnabled, spreadMinPerCadence)
                 + required(totalEnabled, totalMinPerCadence);
 

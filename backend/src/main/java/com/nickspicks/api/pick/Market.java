@@ -20,8 +20,8 @@ public enum Market {
      * A side to win the game outright.
      *
      * <p>The only market with no number: nothing is locked, nothing can move,
-     * and there is no better line to take later. A game is winner-pickable as
+     * and there is no better line to take later. A game is moneyline-pickable as
      * soon as it is scheduled, whether or not a bookmaker has posted anything.
      */
-    WINNER
+    MONEYLINE
 }

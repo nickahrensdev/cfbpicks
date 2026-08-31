@@ -412,82 +412,82 @@ class PickRulesIntegrationTest extends IntegrationTest {
         assertThat(picks.findRevealedForUser(group.getId(), user, 2026, null)).hasSize(2);
     }
 
-    // -------------------------------------------------------------- winner
+    // -------------------------------------------------------------- moneyline
 
     /**
-     * A winner pick locks nothing. That is the point of the market, and it is
+     * A moneyline pick locks nothing. That is the point of the market, and it is
      * what the nullable column and its check constraint exist for.
      */
     @Test
-    void aWinnerPickLocksNoLine() {
+    void aMoneylinePickLocksNoLine() {
         UUID user = member("outright");
-        Group winners = groups.save(new Group(user,
-                TestGroups.settings("Winners", Cadence.WEEKLY, 10, true, true, true)));
-        groupMembers.save(new GroupMember(winners.getId(), user, GroupRole.OWNER));
+        Group moneylines = groups.save(new Group(user,
+                TestGroups.settings("Moneylines", Cadence.WEEKLY, 10, true, true, true)));
+        groupMembers.save(new GroupMember(moneylines.getId(), user, GroupRole.OWNER));
 
         Game game = openGames(1).get(0);
-        Pick pick = picks.create(winners, user, game.getId(), Selection.HOME_WINNER);
+        Pick pick = picks.create(moneylines, user, game.getId(), Selection.HOME_ML);
 
-        assertThat(pick.getMarket()).isEqualTo(Market.WINNER);
+        assertThat(pick.getMarket()).isEqualTo(Market.MONEYLINE);
         assertThat(pick.getLockedLine()).isNull();
     }
 
     /**
-     * The winner market needs nothing posted - the teams are playing whether or
+     * The moneyline market needs nothing posted - the teams are playing whether or
      * not a bookmaker has an opinion - so a game with no lines at all is still
-     * winner-pickable while the other two markets are not.
+     * moneyline-pickable while the other two markets are not.
      */
     @Test
-    void aGameWithNoLinesCanStillBeWinnerPicked() {
+    void aGameWithNoLinesCanStillBeMoneylinePicked() {
         UUID user = member("no-lines");
-        Group winners = groups.save(new Group(user,
-                TestGroups.settings("Winners", Cadence.WEEKLY, 10, true, true, true)));
-        groupMembers.save(new GroupMember(winners.getId(), user, GroupRole.OWNER));
+        Group moneylines = groups.save(new Group(user,
+                TestGroups.settings("Moneylines", Cadence.WEEKLY, 10, true, true, true)));
+        groupMembers.save(new GroupMember(moneylines.getId(), user, GroupRole.OWNER));
 
         Game game = openGames(1).get(0);
         game.setHomeSpread(null);
         game.setOverUnder(null);
         games.save(game);
 
-        assertThatThrownBy(() -> picks.create(winners, user, game.getId(), Selection.HOME))
+        assertThatThrownBy(() -> picks.create(moneylines, user, game.getId(), Selection.HOME))
                 .isInstanceOf(PickExceptions.InvalidPickException.class);
-        assertThat(picks.create(winners, user, game.getId(), Selection.HOME_WINNER)).isNotNull();
+        assertThat(picks.create(moneylines, user, game.getId(), Selection.HOME_ML)).isNotNull();
     }
 
     /** All three markets are separate picks on the same game. */
     @Test
     void allThreeMarketsCanBeHeldOnOneGame() {
         UUID user = member("collector");
-        Group winners = groups.save(new Group(user,
-                TestGroups.settings("Winners", Cadence.WEEKLY, 10, true, true, true)));
-        groupMembers.save(new GroupMember(winners.getId(), user, GroupRole.OWNER));
+        Group moneylines = groups.save(new Group(user,
+                TestGroups.settings("Moneylines", Cadence.WEEKLY, 10, true, true, true)));
+        groupMembers.save(new GroupMember(moneylines.getId(), user, GroupRole.OWNER));
 
         Game game = openGames(1).get(0);
-        picks.create(winners, user, game.getId(), Selection.HOME);
-        picks.create(winners, user, game.getId(), Selection.OVER);
-        picks.create(winners, user, game.getId(), Selection.HOME_WINNER);
+        picks.create(moneylines, user, game.getId(), Selection.HOME);
+        picks.create(moneylines, user, game.getId(), Selection.OVER);
+        picks.create(moneylines, user, game.getId(), Selection.HOME_ML);
 
-        assertThat(pickRepository.findForUserWeek(winners.getId(), user, 2026, 1))
+        assertThat(pickRepository.findForUserWeek(moneylines.getId(), user, 2026, 1))
                 .extracting(Pick::getMarket)
-                .containsExactlyInAnyOrder(Market.SPREAD, Market.TOTAL, Market.WINNER);
+                .containsExactlyInAnyOrder(Market.SPREAD, Market.TOTAL, Market.MONEYLINE);
 
         // Still one per market, though.
         assertThatThrownBy(() ->
-                picks.create(winners, user, game.getId(), Selection.AWAY_WINNER))
+                picks.create(moneylines, user, game.getId(), Selection.AWAY_ML))
                 .isInstanceOf(PickExceptions.InvalidPickException.class)
-                .hasMessageContaining("already picked a winner");
+                .hasMessageContaining("already picked a moneyline");
     }
 
-    /** A group that does not play winners refuses one, as with any market. */
+    /** A group that does not play moneylines refuses one, as with any market. */
     @Test
-    void aWinnerPickIsRefusedWhenTheGroupDoesNotPlayIt() {
+    void aMoneylinePickIsRefusedWhenTheGroupDoesNotPlayIt() {
         UUID user = member("spread-only-league");
         Game game = openGames(1).get(0);
 
-        // The default fixture leaves the winner market off.
-        assertThatThrownBy(() -> picks.create(group, user, game.getId(), Selection.HOME_WINNER))
+        // The default fixture leaves the moneyline market off.
+        assertThatThrownBy(() -> picks.create(group, user, game.getId(), Selection.HOME_ML))
                 .isInstanceOf(PickExceptions.InvalidPickException.class)
-                .hasMessageContaining("does not play winners");
+                .hasMessageContaining("does not play moneylines");
     }
 
     // ------------------------------------------------------------- groups

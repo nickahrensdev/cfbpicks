@@ -203,7 +203,7 @@ public class CadenceSettlementService {
         return switch (market) {
             case SPREAD -> group.getSpreadLossPoints();
             case TOTAL -> group.getTotalLossPoints();
-            case WINNER -> group.getWinnerLossPoints();
+            case MONEYLINE -> group.getMoneylineLossPoints();
         };
     }
 
@@ -211,7 +211,7 @@ public class CadenceSettlementService {
         return switch (market) {
             case SPREAD -> group.isSpreadEnabled();
             case TOTAL -> group.isTotalEnabled();
-            case WINNER -> group.isWinnerEnabled();
+            case MONEYLINE -> group.isMoneylineEnabled();
         };
     }
 

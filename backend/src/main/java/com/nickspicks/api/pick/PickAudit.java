@@ -49,7 +49,7 @@ public class PickAudit {
     @Column(nullable = false)
     private Market market;
 
-    /** Null for a winner pick, which is played against no line. */
+    /** Null for a moneyline pick, which is played against no line. */
     @Column(name = "locked_line")
     private BigDecimal lockedLine;
 

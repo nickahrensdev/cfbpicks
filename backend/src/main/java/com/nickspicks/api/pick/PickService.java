@@ -145,7 +145,7 @@ public class PickService {
             boolean enabled = switch (market) {
                 case SPREAD -> group.isSpreadEnabled();
                 case TOTAL -> group.isTotalEnabled();
-                case WINNER -> group.isWinnerEnabled();
+                case MONEYLINE -> group.isMoneylineEnabled();
             };
             if (!enabled) {
                 continue;
@@ -196,7 +196,7 @@ public class PickService {
                 .isPresent()) {
             throw new InvalidPickException(switch (market) {
                 case TOTAL -> "You already picked the total on this game";
-                case WINNER -> "You already picked a winner on this game";
+                case MONEYLINE -> "You already picked a moneyline on this game";
                 case SPREAD -> "You already picked the spread on this game";
             });
         }
@@ -473,7 +473,7 @@ public class PickService {
         }
         return switch (scope) {
             case BOTH -> true;
-            case WINNER -> market == Market.WINNER;
+            case MONEYLINE -> market == Market.MONEYLINE;
             case SPREAD -> market == Market.SPREAD;
         };
     }
@@ -487,7 +487,7 @@ public class PickService {
 
     private String marketNoun(Market market) {
         return switch (market) {
-            case WINNER -> "winner";
+            case MONEYLINE -> "moneyline";
             case SPREAD -> "spread";
             case TOTAL -> "over/under";
         };
@@ -497,12 +497,12 @@ public class PickService {
         boolean enabled = switch (market) {
             case SPREAD -> group.isSpreadEnabled();
             case TOTAL -> group.isTotalEnabled();
-            case WINNER -> group.isWinnerEnabled();
+            case MONEYLINE -> group.isMoneylineEnabled();
         };
         if (!enabled) {
             throw new InvalidPickException(switch (market) {
                 case TOTAL -> "This group does not play the over/under";
-                case WINNER -> "This group does not play winners";
+                case MONEYLINE -> "This group does not play moneylines";
                 case SPREAD -> "This group does not play the spread";
             });
         }
@@ -537,7 +537,7 @@ public class PickService {
                                     group.getLockLeadMinutes()));
         }
         // Open, but this particular market has no number posted. Never fires
-        // for WINNER, which needs nothing posted.
+        // for MONEYLINE, which needs nothing posted.
         if (!window.hasLine(game, market)) {
             throw new InvalidPickException(market == Market.TOTAL
                     ? "No total is posted for this game yet"

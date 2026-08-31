@@ -52,7 +52,7 @@ public class Pick {
      * game's current line, so later movement cannot change a pick a member
      * already committed to.
      *
-     * <p>Null for a WINNER pick, which is played against no number at all. A
+     * <p>Null for a MONEYLINE pick, which is played against no number at all. A
      * check constraint keeps the two in step.
      */
     @Column(name = "locked_line")

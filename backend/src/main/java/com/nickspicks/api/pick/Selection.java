@@ -8,7 +8,7 @@ package com.nickspicks.api.pick;
  * passed in alongside. The database carries the pair as a column plus a check
  * constraint, which is the backstop for anything writing to it directly.
  *
- * <p>The winner market has its own constants rather than reusing HOME and
+ * <p>The moneyline market has its own constants rather than reusing HOME and
  * AWAY. Those already mean "this side against the spread", and a constant that
  * meant two different things depending on a market passed beside it would give
  * up the very guarantee this design exists for.
@@ -19,8 +19,8 @@ public enum Selection {
     AWAY(Market.SPREAD),
     OVER(Market.TOTAL),
     UNDER(Market.TOTAL),
-    HOME_WINNER(Market.WINNER),
-    AWAY_WINNER(Market.WINNER);
+    HOME_ML(Market.MONEYLINE),
+    AWAY_ML(Market.MONEYLINE);
 
     private final Market market;
 
@@ -41,8 +41,8 @@ public enum Selection {
      */
     public java.util.Optional<Boolean> isHomeSide() {
         return switch (this) {
-            case HOME, HOME_WINNER -> java.util.Optional.of(true);
-            case AWAY, AWAY_WINNER -> java.util.Optional.of(false);
+            case HOME, HOME_ML -> java.util.Optional.of(true);
+            case AWAY, AWAY_ML -> java.util.Optional.of(false);
             case OVER, UNDER -> java.util.Optional.empty();
         };
     }
@@ -54,8 +54,8 @@ public enum Selection {
             case AWAY -> HOME;
             case OVER -> UNDER;
             case UNDER -> OVER;
-            case HOME_WINNER -> AWAY_WINNER;
-            case AWAY_WINNER -> HOME_WINNER;
+            case HOME_ML -> AWAY_ML;
+            case AWAY_ML -> HOME_ML;
         };
     }
 }

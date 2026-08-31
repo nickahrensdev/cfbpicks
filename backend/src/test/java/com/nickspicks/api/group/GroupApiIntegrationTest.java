@@ -111,7 +111,7 @@ class GroupApiIntegrationTest extends IntegrationTest {
                                  "cadence": "WEEKLY", "lengthType": "PER_YEAR", "startSeason": 2026,
                                  "lockLeadMinutes": 30, "minPicksPerCadence": 1,
                                  "strikesAllowed": 2, "multiplePicksPerGame": true,
-                                 "winnerEnabled": false, "spreadEnabled": true, "totalEnabled": true,
+                                 "moneylineEnabled": false, "spreadEnabled": true, "totalEnabled": true,
                                  %s}
                                 """.formatted(POINTS)))
                 .andExpect(status().isBadRequest())
@@ -137,7 +137,7 @@ class GroupApiIntegrationTest extends IntegrationTest {
                  "cadence": "WEEKLY", "lengthType": "CONTINUOUS", "startSeason": 2026,
                  "lockLeadMinutes": 30, "minPicksPerCadence": 4, "strikesAllowed": 9,
                  "multiplePicksPerGame": true,
-                 "winnerEnabled": true, "spreadEnabled": true, "totalEnabled": true,
+                 "moneylineEnabled": true, "spreadEnabled": true, "totalEnabled": true,
                  %s}
                 """.formatted(POINTS));
 
@@ -156,7 +156,7 @@ class GroupApiIntegrationTest extends IntegrationTest {
                                  "cadence": "WEEKLY", "lengthType": "CONTINUOUS", "startSeason": 2026,
                                  "lockLeadMinutes": 30, "minPicksPerCadence": 1, "strikesAllowed": 2,
                                  "multiplePicksPerGame": true,
-                                 "winnerEnabled": true, "spreadEnabled": false, "totalEnabled": false,
+                                 "moneylineEnabled": true, "spreadEnabled": false, "totalEnabled": false,
                                  %s}
                                 """.formatted(POINTS)))
                 .andExpect(status().isBadRequest())
@@ -170,7 +170,7 @@ class GroupApiIntegrationTest extends IntegrationTest {
                                  "cadence": "WEEKLY", "lengthType": "CONTINUOUS", "startSeason": 2026,
                                  "lockLeadMinutes": 30, "minPicksPerCadence": 0,
                                  "multiplePicksPerGame": true,
-                                 "winnerEnabled": false, "spreadEnabled": false, "totalEnabled": false,
+                                 "moneylineEnabled": false, "spreadEnabled": false, "totalEnabled": false,
                                  %s}
                                 """.formatted(POINTS)))
                 .andExpect(status().isBadRequest())
@@ -188,7 +188,7 @@ class GroupApiIntegrationTest extends IntegrationTest {
                                  "cadence": "WEEKLY", "lengthType": "CONTINUOUS", "startSeason": 2026,
                                  "lockLeadMinutes": 30, "minPicksPerCadence": 0,
                                  "multiplePicksPerGame": true,
-                                 "winnerEnabled": true, "spreadEnabled": true, "totalEnabled": true,
+                                 "moneylineEnabled": true, "spreadEnabled": true, "totalEnabled": true,
                                  %s}
                                 """.formatted(POINTS)))
                 .andExpect(status().isBadRequest())
@@ -601,7 +601,7 @@ class GroupApiIntegrationTest extends IntegrationTest {
     }
 
     private static final String POINTS = """
-            "winnerWinPoints": 1, "winnerLossPoints": 0, "winnerPushPoints": 0.5,
+            "moneylineWinPoints": 1, "moneylineLossPoints": 0, "moneylinePushPoints": 0.5,
             "spreadWinPoints": 1, "spreadLossPoints": 0, "spreadPushPoints": 0.5,
             "totalWinPoints": 1, "totalLossPoints": 0, "totalPushPoints": 0.5
             """;
@@ -613,7 +613,7 @@ class GroupApiIntegrationTest extends IntegrationTest {
                  "cadence": "WEEKLY", "lengthType": "CONTINUOUS", "startSeason": 2026,
                  "lockLeadMinutes": 30, "minPicksPerCadence": 0,
                  "multiplePicksPerGame": true, "requireApproval": true,
-                 "winnerEnabled": true, "spreadEnabled": true, "totalEnabled": true,
+                 "moneylineEnabled": true, "spreadEnabled": true, "totalEnabled": true,
                  %s}
                 """.formatted(name,
                 password == null ? "" : "\"joinPassword\": \"" + password + "\",",
@@ -626,7 +626,7 @@ class GroupApiIntegrationTest extends IntegrationTest {
                  "cadence": "WEEKLY", "lengthType": "CONTINUOUS", "startSeason": 2026,
                  "lockLeadMinutes": 30, "minPicksPerCadence": 0,
                  "multiplePicksPerGame": true,
-                 "winnerEnabled": true, "spreadEnabled": true, "totalEnabled": true,
+                 "moneylineEnabled": true, "spreadEnabled": true, "totalEnabled": true,
                  %s}
                 """.formatted(name, visibility,
                 password == null ? "" : "\"joinPassword\": \"" + password + "\",",

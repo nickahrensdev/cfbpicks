@@ -10,7 +10,7 @@ import { useGroup } from '../auth/GroupProvider.jsx';
 const medal = (rank) => (rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null);
 
 const MARKET_LABELS = [
-  ['winner', 'Winner'],
+  ['moneyline', 'Moneyline'],
   ['spread', 'Spread'],
   ['total', 'Over/Under'],
 ];

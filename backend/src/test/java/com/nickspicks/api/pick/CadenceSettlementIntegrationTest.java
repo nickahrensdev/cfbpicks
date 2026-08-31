@@ -165,7 +165,7 @@ class CadenceSettlementIntegrationTest extends IntegrationTest {
 
         assertThat(penalties.findAllByGroupIdAndUserId(group.getId(), member))
                 .extracting(CadencePenalty::getMarket)
-                .containsExactlyInAnyOrder(Market.TOTAL, Market.WINNER);
+                .containsExactlyInAnyOrder(Market.TOTAL, Market.MONEYLINE);
     }
 
     /**
@@ -239,7 +239,7 @@ class CadenceSettlementIntegrationTest extends IntegrationTest {
     // ------------------------------------------------------------- fixtures
 
     /** A weekly pickem group with the given per-market minimums. */
-    private GroupSettings minimums(Integer spreadMin, Integer totalMin, Integer winnerMin,
+    private GroupSettings minimums(Integer spreadMin, Integer totalMin, Integer moneylineMin,
                                    Integer overall) {
         BigDecimal one = BigDecimal.ONE;
         BigDecimal zero = BigDecimal.ZERO;
@@ -250,7 +250,7 @@ class CadenceSettlementIntegrationTest extends IntegrationTest {
                 GroupType.PICKEM, Cadence.WEEKLY, LengthType.CONTINUOUS, 2026,
                 30, 10, overall == null ? 0 : overall, true, false, false,
                 true, true, true,
-                winnerMin, null, spreadMin, null, totalMin, null,
+                moneylineMin, null, spreadMin, null, totalMin, null,
                 one, zero, half,
                 one, zero, half,
                 one, zero, half,
@@ -273,7 +273,7 @@ class CadenceSettlementIntegrationTest extends IntegrationTest {
                 "Overall", null, Visibility.PUBLIC, null,
                 GroupType.PICKEM, Cadence.WEEKLY, LengthType.CONTINUOUS, 2026,
                 30, 10, minimum, true, false, false,
-                // Winner is off, so its 0-point loss is not the harshest the
+                // Moneyline is off, so its 0-point loss is not the harshest the
                 // group uses - the -2 on the two live markets is.
                 false, true, true,
                 null, null, null, null, null, null,

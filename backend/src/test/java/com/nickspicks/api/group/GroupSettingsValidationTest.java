@@ -27,18 +27,18 @@ class GroupSettingsValidationTest {
 
     @Test
     void rejectsAGroupWithNoPickOptions() {
-        assertThatThrownBy(() -> pickem().winner(false).spread(false).total(false).build().validate())
+        assertThatThrownBy(() -> pickem().moneyline(false).spread(false).total(false).build().validate())
                 .isInstanceOf(InvalidGroupSettingsException.class)
                 .hasMessageContaining("at least one pick option");
     }
 
     @Test
     void acceptsAnySinglePickOption() {
-        assertThatCode(() -> pickem().winner(true).spread(false).total(false).build().validate())
+        assertThatCode(() -> pickem().moneyline(true).spread(false).total(false).build().validate())
                 .doesNotThrowAnyException();
-        assertThatCode(() -> pickem().winner(false).spread(true).total(false).build().validate())
+        assertThatCode(() -> pickem().moneyline(false).spread(true).total(false).build().validate())
                 .doesNotThrowAnyException();
-        assertThatCode(() -> pickem().winner(false).spread(false).total(true).build().validate())
+        assertThatCode(() -> pickem().moneyline(false).spread(false).total(true).build().validate())
                 .doesNotThrowAnyException();
     }
 
@@ -118,14 +118,14 @@ class GroupSettingsValidationTest {
 
     @Test
     void rejectsPerMarketMinimumsThatDoNotFitInsideTheOverallAllowance() {
-        // 3 spreads and 3 winners is six picks a week, in a group that allows
+        // 3 spreads and 3 moneylines is six picks a week, in a group that allows
         // five. Every member would end every week in breach no matter what
         // they picked, so the settings are refused rather than the penalty
         // handed out later.
         assertThatThrownBy(() -> pickem()
                 .max(5)
                 .spreadRange(3, null)
-                .winnerRange(3, null)
+                .moneylineRange(3, null)
                 .build()
                 .validate())
                 .isInstanceOf(InvalidGroupSettingsException.class)
@@ -138,8 +138,8 @@ class GroupSettingsValidationTest {
         // otherwise valid group unsatisfiable.
         assertThatCode(() -> pickem()
                 .max(3)
-                .winner(false)
-                .winnerRange(10, null)
+                .moneyline(false)
+                .moneylineRange(10, null)
                 .build()
                 .validate())
                 .doesNotThrowAnyException();
@@ -151,7 +151,7 @@ class GroupSettingsValidationTest {
                 .max(5)
                 .spreadRange(3, null)
                 .totalRange(2, null)
-                .winner(false)
+                .moneyline(false)
                 .build()
                 .validate())
                 .doesNotThrowAnyException();
@@ -166,7 +166,7 @@ class GroupSettingsValidationTest {
     /** A maximum of zero is a real setting - that market is off in all but name. */
     @Test
     void acceptsAMaximumOfZero() {
-        assertThatCode(() -> pickem().winnerRange(null, 0).build().validate())
+        assertThatCode(() -> pickem().moneylineRange(null, 0).build().validate())
                 .doesNotThrowAnyException();
     }
 
@@ -185,7 +185,7 @@ class GroupSettingsValidationTest {
 
         private GroupType type = GroupType.PICKEM;
         private LengthType length = LengthType.CONTINUOUS;
-        private boolean winner = true;
+        private boolean moneyline = true;
         private boolean spread = true;
         private boolean total = true;
         private Integer max;
@@ -193,8 +193,8 @@ class GroupSettingsValidationTest {
         private Integer strikes;
         private Integer teamLimit;
         private TeamLimitScope scope;
-        private Integer winnerMin;
-        private Integer winnerMax;
+        private Integer moneylineMin;
+        private Integer moneylineMax;
         private Integer spreadMin;
         private Integer spreadMax;
         private Integer totalMin;
@@ -210,8 +210,8 @@ class GroupSettingsValidationTest {
             return this;
         }
 
-        Builder winner(boolean value) {
-            this.winner = value;
+        Builder moneyline(boolean value) {
+            this.moneyline = value;
             return this;
         }
 
@@ -240,9 +240,9 @@ class GroupSettingsValidationTest {
             return this;
         }
 
-        Builder winnerRange(Integer minimum, Integer maximum) {
-            this.winnerMin = minimum;
-            this.winnerMax = maximum;
+        Builder moneylineRange(Integer minimum, Integer maximum) {
+            this.moneylineMin = minimum;
+            this.moneylineMax = maximum;
             return this;
         }
 
@@ -272,8 +272,8 @@ class GroupSettingsValidationTest {
             return new GroupSettings("The Office", "A league", Visibility.PUBLIC, null,
                     type, Cadence.WEEKLY, length, 2026,
                     30, max, min, true, false, false,
-                    winner, spread, total,
-                    winnerMin, winnerMax, spreadMin, spreadMax, totalMin, totalMax,
+                    moneyline, spread, total,
+                    moneylineMin, moneylineMax, spreadMin, spreadMax, totalMin, totalMax,
                     one, zero, half, one, zero, half, one, zero, half,
                     strikes, teamLimit, scope);
         }

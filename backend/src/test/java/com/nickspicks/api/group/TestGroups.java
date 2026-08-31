@@ -30,8 +30,8 @@ public final class TestGroups {
     }
 
     public static GroupSettings settings(String name, Cadence cadence, Integer maxPicks,
-                                         boolean spread, boolean total, boolean winner) {
-        return withMarketLimits(name, cadence, maxPicks, spread, total, winner,
+                                         boolean spread, boolean total, boolean moneyline) {
+        return withMarketLimits(name, cadence, maxPicks, spread, total, moneyline,
                 null, null, null, null, null, null);
     }
 
@@ -41,8 +41,8 @@ public final class TestGroups {
      */
     public static GroupSettings withMarketLimits(
             String name, Cadence cadence, Integer maxPicks,
-            boolean spread, boolean total, boolean winner,
-            Integer winnerMin, Integer winnerMax,
+            boolean spread, boolean total, boolean moneyline,
+            Integer moneylineMin, Integer moneylineMax,
             Integer spreadMin, Integer spreadMax,
             Integer totalMin, Integer totalMax) {
 
@@ -54,8 +54,8 @@ public final class TestGroups {
                 name, null, Visibility.PUBLIC, null,
                 GroupType.PICKEM, cadence, LengthType.CONTINUOUS, 2026,
                 30, maxPicks, 0, true, false, false,
-                winner, spread, total,
-                winnerMin, winnerMax, spreadMin, spreadMax, totalMin, totalMax,
+                moneyline, spread, total,
+                moneylineMin, moneylineMax, spreadMin, spreadMax, totalMin, totalMax,
                 one, zero, half,
                 one, zero, half,
                 one, zero, half,

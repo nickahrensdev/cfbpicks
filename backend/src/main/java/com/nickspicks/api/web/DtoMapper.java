@@ -157,7 +157,7 @@ public class DtoMapper {
 
         Pick spreadPick = pickFor(myPicks, Market.SPREAD);
         Pick totalPick = pickFor(myPicks, Market.TOTAL);
-        Pick winnerPick = pickFor(myPicks, Market.WINNER);
+        Pick moneylinePick = pickFor(myPicks, Market.MONEYLINE);
         boolean open = window.isOpen(game, now, lockLeadMinutes);
 
         return new ApiDtos.GameSummary(
@@ -183,7 +183,7 @@ public class DtoMapper {
                 window.locksAt(game, lockLeadMinutes),
                 pickSummary(spreadPick),
                 pickSummary(totalPick),
-                pickSummary(winnerPick),
+                pickSummary(moneylinePick),
                 spreadPick != null && open && window.isLineImproved(spreadPick, game),
                 totalPick != null && open && window.isLineImproved(totalPick, game),
                 liveFor(live, game));

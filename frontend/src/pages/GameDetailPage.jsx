@@ -44,7 +44,7 @@ function movement(current, open) {
 function pickSide(game, pick) {
   if (pick.selection === 'OVER') return 'Over';
   if (pick.selection === 'UNDER') return 'Under';
-  const home = pick.selection === 'HOME' || pick.selection === 'HOME_WINNER';
+  const home = pick.selection === 'HOME' || pick.selection === 'HOME_ML';
   return home
     ? (game.homeTeam?.abbreviation ?? game.homeTeamName)
     : (game.awayTeam?.abbreviation ?? game.awayTeamName);
@@ -542,10 +542,10 @@ export default function GameDetailPage() {
                     const sameOrientation = meeting.awayTeam === game.awayTeamName;
                     const awayColScore = sameOrientation ? meeting.awayScore : meeting.homeScore;
                     const homeColScore = sameOrientation ? meeting.homeScore : meeting.awayScore;
-                    const awayColWon = meeting.winner != null
-                      && meeting.winner === (sameOrientation ? meeting.awayTeam : meeting.homeTeam);
-                    const homeColWon = meeting.winner != null
-                      && meeting.winner === (sameOrientation ? meeting.homeTeam : meeting.awayTeam);
+                    const awayColWon = meeting.moneyline != null
+                      && meeting.moneyline === (sameOrientation ? meeting.awayTeam : meeting.homeTeam);
+                    const homeColWon = meeting.moneyline != null
+                      && meeting.moneyline === (sameOrientation ? meeting.homeTeam : meeting.awayTeam);
 
                     return (
                       <tr key={`${meeting.season}-${index}`}>
@@ -603,7 +603,7 @@ export default function GameDetailPage() {
                 <thead>
                   <tr>
                     <th scope="col">Member</th>
-                    <th scope="col" title="Spread, Over/Under or Winner">Mkt</th>
+                    <th scope="col" title="Spread, Over/Under or Moneyline">Mkt</th>
                     <th scope="col">Pick</th>
                     <th scope="col">Line</th>
                   </tr>

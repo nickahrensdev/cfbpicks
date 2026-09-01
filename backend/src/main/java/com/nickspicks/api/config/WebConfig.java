@@ -19,21 +19,12 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        String[] origins = properties.getAllowedOrigins().toArray(String[]::new);
-
+        // Controllers only. Actuator endpoints have their own handler mapping
+        // that ignores this registry entirely - their CORS lives in
+        // management.endpoints.web.cors, in application.yml.
         registry.addMapping("/api/**")
-                .allowedOrigins(origins)
+                .allowedOrigins(properties.getAllowedOrigins().toArray(String[]::new))
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-                .allowedHeaders("*")
-                .maxAge(3600);
-
-        // The admin Data page reads /actuator/info from the browser, and the
-        // deployed frontend is a different origin from the API. Read-only and
-        // GET alone - health and info are the only actuator endpoints exposed,
-        // and nothing here should be writable cross-origin.
-        registry.addMapping("/actuator/**")
-                .allowedOrigins(origins)
-                .allowedMethods("GET", "OPTIONS")
                 .allowedHeaders("*")
                 .maxAge(3600);
     }

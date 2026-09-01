@@ -54,6 +54,21 @@ management:
     web:
       exposure:
         include: health,info
+      # Actuator does NOT use the CORS mapping in WebConfig. Its endpoints are
+      # served by their own handler mapping, which reads only these properties
+      # - so a mapping registered there silently does nothing here, and the
+      # preflight comes back 403 with no CORS headers at all.
+      #
+      # Same origins as the API, from the same environment variable, because
+      # the admin page calling this is the same app that calls /api.
+      cors:
+        allowed-origins: ${ALLOWED_ORIGINS:}
+        # GET is all that is exposed; nothing under /actuator is writable.
+        allowed-methods: GET,OPTIONS
+        # The client sends Authorization and Content-Type on every request,
+        # and any header it sends has to be named here or the preflight fails.
+        allowed-headers: "*"
+        max-age: 3600
   info:
     # What the admin Data page reports. build comes from the maven plugin's
     # build-info goal; the rest describe the machine actually serving, which

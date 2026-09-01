@@ -13,6 +13,15 @@ spring:
     # profile overrides those to reach the session pooler; that profile is not
     # active here.)
 
+management:
+  endpoints:
+    web:
+      cors:
+        allowed-origins:
+          - http://localhost:5173
+        allowed-methods: GET,OPTIONS
+        allowed-headers: "*"
+
 app:
   environment: test
   admin-emails:

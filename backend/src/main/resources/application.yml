@@ -54,9 +54,31 @@ management:
     web:
       exposure:
         include: health,info
+  info:
+    # What the admin Data page reports. build comes from the maven plugin's
+    # build-info goal; the rest describe the machine actually serving, which
+    # is the question being asked when someone opens that panel - "what is
+    # running right now, and is it what I deployed".
+    build:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+    env:
+      enabled: true
   endpoint:
     health:
       show-details: never
+
+# Surfaced by /actuator/info, which the admin Data page reads. The profile
+# name is the fact that panel exists to answer - a build looks identical
+# whether it came up on local or prod config, and it is the config that
+# decides which database it is pointed at.
+info:
+  app:
+    name: "@project.name@"
+    profile: ${app.environment}
 
 app:
   environment: unknown

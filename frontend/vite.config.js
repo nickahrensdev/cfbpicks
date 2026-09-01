@@ -24,6 +24,12 @@ export default defineConfig({
         target: proxyTarget,
         changeOrigin: true,
       },
+      // The admin Data page reads /actuator/info, which is not under /api and
+      // would otherwise be served by this dev server rather than the backend.
+      '/actuator': {
+        target: proxyTarget,
+        changeOrigin: true,
+      },
     },
   },
 });

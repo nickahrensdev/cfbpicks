@@ -58,6 +58,10 @@ export const api = {
   updateTheme: (theme, colorMode) =>
     request('/api/me/theme', { method: 'PUT', body: JSON.stringify({ theme, colorMode }) }),
   meta: () => request('/api/meta'),
+  // Not under /api: it is Spring's own actuator endpoint. The dev server
+  // proxies /actuator through to the backend and the API allows it CORS, so
+  // the same call works locally and against the deployed origin.
+  actuatorInfo: () => request('/actuator/info'),
 
   currentWeek: () => request('/api/weeks/current'),
   // Every board is scoped to a group: your picks on it, and that group's lock

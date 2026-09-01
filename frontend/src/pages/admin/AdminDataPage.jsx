@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Alert, Button, Card, Container, Form, ProgressBar } from 'react-bootstrap';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Button, Card, Col, Container, Form, ProgressBar, Row } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
 import { ErrorNotice } from '../../components/common.jsx';
@@ -47,6 +47,36 @@ function YearInput({ id, value, onChange, disabled }) {
  * this season's schedule stays current is a normal thing to want, and one
  * shared year box would make it two trips.
  */
+/** One labelled fact about the running backend. Absent values are omitted. */
+function InfoStat({ label, value }) {
+  if (value === null || value === undefined || value === '') return null;
+  return (
+    <Col xs={6} md={4}>
+      <div className="small text-body-secondary">{label}</div>
+      <div className="fw-semibold text-break">{value}</div>
+    </Col>
+  );
+}
+
+/**
+ * The build timestamp in the reader's own zone.
+ *
+ * <p>Actuator reports it as an ISO instant, which is unambiguous and almost
+ * unreadable - "was this the deploy I did after lunch" is the actual question.
+ */
+function formatBuildTime(value) {
+  if (!value) return null;
+  const when = new Date(value);
+  return Number.isNaN(when.getTime())
+    ? value
+    : when.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function osLabel(os) {
+  if (!os) return null;
+  return [os.name, os.version, os.arch].filter(Boolean).join(' ');
+}
+
 export default function AdminPage() {
   const [quota, setQuota] = useState(null);
   const [meta, setMeta] = useState(null);
@@ -54,6 +84,12 @@ export default function AdminPage() {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null);
   const [confirmingDeploy, setConfirmingDeploy] = useState(false);
+  // What the backend reports about itself. Its own error rather than the
+  // shared one: this panel failing says something specific - the API is not
+  // answering - and should not be mistaken for a data load having failed.
+  const [info, setInfo] = useState(null);
+  const [infoError, setInfoError] = useState(null);
+  const [infoBusy, setInfoBusy] = useState(false);
 
   // Baked into the bundle by the deploy workflow from a GitHub secret, so the
   // button below calls Render directly and the backend is not involved at all.
@@ -72,6 +108,25 @@ export default function AdminPage() {
   const [parts, setParts] = useState(['calendar', 'teams', 'coaches']);
 
   const refreshQuota = () => api.quota().then(setQuota).catch(setError);
+
+  const refreshInfo = useCallback(async () => {
+    setInfoBusy(true);
+    setInfoError(null);
+    try {
+      setInfo(await api.actuatorInfo());
+    } catch (err) {
+      // A build too old to carry build-info answers {} rather than failing,
+      // so an error here really does mean unreachable.
+      setInfo(null);
+      setInfoError(err.message ?? 'Could not reach the backend');
+    } finally {
+      setInfoBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshInfo();
+  }, [refreshInfo]);
 
   useEffect(() => {
     refreshQuota();
@@ -160,6 +215,57 @@ export default function AdminPage() {
   return (
     <Container className="py-4 py-md-5">
       <h1 className="h3 mb-4">Data admin</h1>
+
+      {/* What is actually running, straight from the backend's own
+          /actuator/info. The question this answers is "is the deployed build
+          the one I think it is" - so it reads on load rather than waiting to
+          be asked, and the refresh is for checking again after a deploy
+          without reloading the page. */}
+      <Card className="shadow-sm mb-4">
+        <Card.Body>
+          <div className="d-flex justify-content-between align-items-start gap-3 mb-2">
+            <div>
+              <div className="fw-semibold">Running backend</div>
+              <div className="small text-body-secondary">
+                Reported by the API itself at <code>/actuator/info</code>.
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline-secondary"
+              onClick={refreshInfo}
+              disabled={infoBusy}
+              className="flex-shrink-0"
+            >
+              {infoBusy ? 'Checking…' : 'Refresh'}
+            </Button>
+          </div>
+
+          {infoError ? (
+            <Alert variant="danger" className="py-2 small mb-0">
+              {infoError}
+            </Alert>
+          ) : !info ? (
+            <div className="small text-body-secondary">Checking…</div>
+          ) : Object.keys(info).length === 0 ? (
+            // A build packaged without the build-info goal answers {} rather
+            // than failing, which looks identical to a healthy empty response.
+            <div className="small text-body-secondary">
+              The backend answered, but reported nothing. That means it was built without build
+              information - redeploy from a build that includes it.
+            </div>
+          ) : (
+            <Row className="g-3">
+              <InfoStat label="Version" value={info.build?.version} />
+              <InfoStat label="Profile" value={info.app?.profile} />
+              <InfoStat label="Built" value={formatBuildTime(info.build?.time)} />
+              <InfoStat label="Java" value={info.java?.version} />
+              <InfoStat label="OS" value={osLabel(info.os)} />
+              <InfoStat label="Artifact" value={info.build?.artifact} />
+            </Row>
+          )}
+        </Card.Body>
+      </Card>
 
       <Card className="shadow-sm mb-4">
         <Card.Body>

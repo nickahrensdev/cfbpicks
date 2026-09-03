@@ -746,6 +746,8 @@ public class GroupService {
                                 .map(GroupMember::getRole)
                                 .orElse(null)),
                         group.isPersonal(),
+                        group.isPasswordProtected(),
+                        group.isRequireApproval(),
                         group.getCreatedAt()))
                 .sorted((a, b) -> a.name().compareToIgnoreCase(b.name()))
                 .toList();

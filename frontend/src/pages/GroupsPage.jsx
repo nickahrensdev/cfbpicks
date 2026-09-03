@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import ShareGroupButton from '../components/ShareGroupButton.jsx';
 import { useGroup } from '../auth/GroupProvider.jsx';
-import { ChevronIcon, EmptyState, ErrorNotice, Loading } from '../components/common.jsx';
+import { ApprovalIcon, ChevronIcon, EmptyState, ErrorNotice, Loading, LockIcon } from '../components/common.jsx';
 
 /** "Pick'em · Weekly · 4 members" - the line that tells two groups apart. */
 function describe(group) {
@@ -142,6 +142,31 @@ export default function GroupsPage() {
                             owner
                           </Badge>
                         )
+                      )}
+
+                      {/* How hard this group is to get into, as icons rather
+                          than words - two more text badges beside the name
+                          would crowd out the name itself.
+
+                          Only shown when the restriction is on: for a group
+                          you are already in, "no password" is not a fact
+                          worth a slot on the row. A personal board has
+                          neither, and shows nothing. */}
+                      {group.passwordRequired && (
+                        <span
+                          className="text-body-tertiary d-flex flex-shrink-0"
+                          title="Needs the group password to join"
+                        >
+                          <LockIcon />
+                        </span>
+                      )}
+                      {group.requireApproval && (
+                        <span
+                          className="text-body-tertiary d-flex flex-shrink-0"
+                          title="An owner has to approve people joining"
+                        >
+                          <ApprovalIcon />
+                        </span>
                       )}
                     </div>
                     <div className="small text-body-secondary text-truncate">

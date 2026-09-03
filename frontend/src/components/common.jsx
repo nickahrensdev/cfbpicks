@@ -415,6 +415,30 @@ export function ChevronIcon() {
   );
 }
 
+/**
+ * A person with a tick: joining needs an owner to approve it.
+ *
+ * <p>A person rather than a shield or a gate, because the thing standing in
+ * the way is somebody deciding - not a lock you can open by knowing something.
+ * That is what tells it apart from the padlock beside it.
+ */
+export function ApprovalIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="12"
+      height="12"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-4.5 6a.5.5 0 0 1-.5-.5A4.5 4.5 0 0 1 5.5 9h1a4.5 4.5 0 0 1 3.2 1.34l-.7.7A3.5 3.5 0 0 0 6.5 10h-1A3.5 3.5 0 0 0 2 13.5a.5.5 0 0 1-.5.5z" />
+      <path d="M15.35 8.15a.5.5 0 0 1 0 .7l-3.5 3.5a.5.5 0 0 1-.7 0l-1.75-1.75a.5.5 0 1 1 .7-.7l1.4 1.39 3.15-3.14a.5.5 0 0 1 .7 0" />
+    </svg>
+  );
+}
+
 /** Padlock. Decorative - the badge it sits in carries the accessible name via title. */
 export function LockIcon() {
   return (

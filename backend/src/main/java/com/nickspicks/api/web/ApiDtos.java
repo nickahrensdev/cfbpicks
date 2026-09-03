@@ -479,6 +479,15 @@ public final class ApiDtos {
              * nobody to invite and nothing to configure.
              */
             boolean personal,
+            /**
+             * Whether joining needs the group's password, and whether it needs
+             * an owner to approve it. The list shows these as icons so the
+             * terms of a group are readable without opening it.
+             *
+             * <p>Never the password itself - only that there is one.
+             */
+            boolean passwordRequired,
+            boolean requireApproval,
             Instant createdAt) {
     }
 

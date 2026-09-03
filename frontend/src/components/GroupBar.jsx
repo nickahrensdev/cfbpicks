@@ -180,24 +180,34 @@ export default function GroupBar() {
     <>
       <div className="group-bar border-bottom" data-sticky="group">
         <Container className="py-2 d-flex justify-content-between align-items-center gap-2">
+          {/* The name on its own read as a heading rather than as a
+              selection. Naming what it is above it says "this is the one you
+              are in", which is the whole point of the bar. */}
           <Button
             variant="link"
-            className="p-0 text-body text-decoration-none fw-semibold text-truncate"
+            className="p-0 text-body text-decoration-none text-start"
+            style={{ minWidth: 0 }}
             onClick={() => setInfo(true)}
             aria-haspopup="dialog"
             aria-label={`About ${group.name}`}
           >
-            {group.name}
+            <span className="d-block group-subline text-body-secondary fw-normal">
+              Current Group
+            </span>
+            <span className="d-block fw-semibold text-truncate">{group.name}</span>
           </Button>
 
+          {/* The swap arrows alone were guessable at best - the word says what
+              the icon only hints at, and gives the control a bigger target. */}
           <Button
             variant="link"
-            className="p-0 text-body-secondary flex-shrink-0 d-flex align-items-center"
+            className="p-0 text-body-secondary flex-shrink-0 d-flex align-items-center gap-1"
             onClick={() => setPicking(true)}
             aria-haspopup="dialog"
             aria-label="Change group"
             title="Change group"
           >
+            <span className="small">Change</span>
             <SwapIcon />
           </Button>
         </Container>

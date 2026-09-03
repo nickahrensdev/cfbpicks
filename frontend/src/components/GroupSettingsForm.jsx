@@ -61,6 +61,8 @@ export const DEFAULT_SETTINGS = {
   joinPassword: '',
 
   groupType: 'PICKEM',
+  // Not asked for on the form any more - a group starts in the year it is
+  // created, which is the only answer anyone was ever going to give.
   startSeason: new Date().getFullYear(),
   ...TYPE_DEFAULTS.PICKEM,
 
@@ -405,18 +407,13 @@ export default function GroupSettingsForm({
                 </Form.Select>
               </Setting>
             </Col>
-            <Col md={6}>
-              <Setting label="First season" help="The season this group starts playing.">
-                <Form.Control
-                  type="number"
-                  value={value.startSeason ?? ''}
-                  onChange={setNumber('startSeason')}
-                  min={2000}
-                  max={2100}
-                  disabled={disabled}
-                />
-              </Setting>
-            </Col>
+            {/* "First season" was here. It is still sent - the API requires
+                it - but nothing reads it back except one line in the group
+                info modal, so asking for it was a decision with no
+                consequence. New groups take the current year from
+                DEFAULT_SETTINGS; an existing one keeps whatever it was
+                created with, since the edit form round-trips the value it
+                loaded rather than re-defaulting it. */}
           </Row>
 
           <Row>

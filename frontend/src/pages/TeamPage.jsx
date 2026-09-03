@@ -19,6 +19,47 @@ const inches = (value) =>
 const CLASS_YEARS = { 1: 'FR', 2: 'SO', 3: 'JR', 4: 'SR', 5: 'GR' };
 
 /**
+ * Black or white text, whichever can actually be read on this team's colour.
+ *
+ * <p>The banner is painted in whatever hex the team ships, and hardcoding
+ * white text assumed every one of them is dark. Most are, but not all - a
+ * school on gold or silver got white on near-white. Uses the WCAG relative
+ * luminance so the answer is measured rather than guessed at.
+ */
+const HEX = /^#?([0-9a-f]{6})$/i;
+
+/**
+ * The team's colour, or the neutral default when it is unusable.
+ *
+ * <p>Four schools are stored with the literal string "#null" - a null colour
+ * concatenated onto a "#" somewhere upstream. Passing that through would set
+ * --team-color to an invalid value, and CSS treats an invalid variable as
+ * unset at computed-value time rather than falling back to the default in
+ * var(), so the banner would lose its fill entirely.
+ */
+function bannerColor(hex) {
+  return HEX.test(hex ?? '') ? hex : '#12141c';
+}
+
+function readableInk(hex) {
+  const parsed = HEX.exec(hex ?? '');
+  if (!parsed) return '#fff';
+
+  const value = parseInt(parsed[1], 16);
+  // sRGB channels, gamma-expanded to linear light before weighting.
+  const channel = (raw) => {
+    const c = raw / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance =
+    0.2126 * channel((value >> 16) & 255)
+    + 0.7152 * channel((value >> 8) & 255)
+    + 0.0722 * channel(value & 255);
+
+  return luminance > 0.4 ? '#101319' : '#fff';
+}
+
+/**
  * A number from the board, boxed by how it came in.
  *
  * <p>Green covered, red did not, no box while the game is unplayed or the
@@ -109,42 +150,54 @@ export default function TeamPage() {
   const venueName = team.venueName ?? espn?.venueName;
   const venueCity = team.venueCity ?? espn?.venueCity;
   const venueState = team.venueState ?? espn?.venueState;
-  const banner = team.color ?? espn?.color ?? '#12141c';
+  const banner = bannerColor(team.color ?? espn?.color);
+  const ink = readableInk(banner);
 
   return (
     <Container className="py-4 py-md-5">
       <BackButton className="mb-3" />
 
-      <div className="rounded-3 p-4 mb-4 text-white" style={{ background: banner }}>
-        <div className="d-flex align-items-center gap-3 flex-wrap">
-          <TeamLogo team={team} size={64} />
-          <div className="flex-grow-1">
-            <h1 className="h3 mb-1">
-              {team.rank != null && <span className="me-2 opacity-75">#{team.rank}</span>}
+      {/* The logo sits on a light disc rather than straight on the banner.
+          Team logos are supplied as the team's own colour on transparency,
+          and the banner is painted in that same colour - so TCU's mark was
+          being drawn in #4d1979 on #4d1979 and vanishing completely, leaving
+          a band of empty purple where it should have been. The disc
+          guarantees contrast whatever the school's colour turns out to be. */}
+      <div className="team-hero mb-4" style={{ '--team-color': banner, color: ink }}>
+        <div className="team-hero-body">
+          <span className="team-hero-crest">
+            <TeamLogo team={team} size={64} />
+          </span>
+
+          <div className="team-hero-text">
+            <div className="team-hero-eyebrow">
+              {espn?.abbreviation ?? team.abbreviation}
+              {team.conference && <> · {team.conference}</>}
+              {team.division && <> · {team.division}</>}
+            </div>
+
+            <h1 className="team-hero-name">
+              {team.rank != null && <span className="team-hero-rank">#{team.rank}</span>}
               {team.school} {team.mascot}
             </h1>
-            <div className="small opacity-75">
-              {espn?.abbreviation ?? team.abbreviation}
-              {' · '}
-              {team.conference}
-              {team.division && <> · {team.division}</>}
-              {venueName && (
-                <>
-                  {' '}
-                  · {venueName}
-                  {venueCity && `, ${venueCity}`} {venueState}
-                  {espn?.venueIndoor && ' · indoor'}
-                  {espn?.venueGrass === false && ' · turf'}
-                </>
-              )}
-            </div>
+
+            {venueName && (
+              <div className="team-hero-venue">
+                {venueName}
+                {venueCity && `, ${venueCity}`}
+                {venueState && ` ${venueState}`}
+                {espn?.venueIndoor && ' · indoor'}
+                {espn?.venueGrass === false && ' · turf'}
+              </div>
+            )}
           </div>
+
           {espn?.espnUrl && (
             <a
               href={espn.espnUrl}
               target="_blank"
               rel="noreferrer"
-              className="small text-white text-decoration-none opacity-75 align-self-start"
+              className="team-hero-link"
             >
               ESPN ↗
             </a>

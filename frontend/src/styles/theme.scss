@@ -409,6 +409,95 @@ body {
   vertical-align: baseline;
 }
 
+// Team page banner.
+//
+// The flat fill it replaced left the header reading as a coloured rectangle
+// with text dropped in the corner. The gradient is built from overlays rather
+// than color-mix so it needs no colour arithmetic and works on any --team-color
+// the schools happen to ship.
+.team-hero {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(0, 0, 0, 0.28)),
+    var(--team-color, #12141c);
+  border-radius: $border-radius-lg;
+  padding: 1.25rem;
+  overflow: hidden;
+}
+
+.team-hero-body {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+// The light disc behind the logo. Team marks are their own colour on
+// transparency, so on a banner of that same colour they disappear entirely -
+// this is what guarantees the logo is visible on every team.
+.team-hero-crest {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+}
+
+// min-width 0 so a long school name can ellipsize instead of forcing the
+// row to wrap - the wrap is what used to push the name under the logo and
+// open a band of empty colour above it.
+.team-hero-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.team-hero-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.team-hero-name {
+  font-size: clamp(1.35rem, 5vw, 1.9rem);
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0.15rem 0;
+}
+
+.team-hero-rank {
+  opacity: 0.7;
+  margin-right: 0.4rem;
+}
+
+.team-hero-venue {
+  font-size: 0.8125rem;
+  opacity: 0.8;
+}
+
+// Inherits the banner's ink colour, so it stays readable on a light team
+// colour where a hardcoded white would not.
+.team-hero-link {
+  align-self: flex-start;
+  flex-shrink: 0;
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  opacity: 0.8;
+
+  &:hover,
+  &:focus {
+    color: inherit;
+    opacity: 1;
+  }
+}
+
 .stat-tile {
   background: rgba(var(--bs-primary-rgb), 0.14);
   border-radius: $border-radius;

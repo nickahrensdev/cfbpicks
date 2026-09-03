@@ -32,7 +32,7 @@ export function formatDay(iso) {
  * arrows exist to save exactly that. The date field is still there for jumping
  * somewhere specific, including a day with nothing on.
  */
-export default function DaySelector({ value, onChange, days = [], compact = false }) {
+export default function DaySelector({ value, onChange, days = [], compact = false, size }) {
   if (!value) return null;
 
   // The list is sorted, so the neighbours are the first either side of today's
@@ -43,7 +43,7 @@ export default function DaySelector({ value, onChange, days = [], compact = fals
 
   const control = (
     <InputGroup
-      size={compact ? 'sm' : undefined}
+      size={size ?? (compact ? 'sm' : undefined)}
       // flex-nowrap: Bootstrap's input-group wraps by default, which
       // breaks the arrows onto their own lines when the toolbar is
       // tight. flex-shrink-0 keeps the toolbar from squeezing it there
@@ -67,7 +67,9 @@ export default function DaySelector({ value, onChange, days = [], compact = fals
         max={days[days.length - 1] ?? undefined}
         onChange={(event) => event.target.value && onChange(event.target.value)}
         aria-label="Game day"
-        style={{ maxWidth: '10rem' }}
+        // Wide enough for the date at the larger size the games board uses -
+        // at 10rem the native picker's own icon crowded the digits out.
+        style={{ maxWidth: size === 'lg' ? '13rem' : '10rem' }}
       />
       <Button
         variant="outline-secondary"

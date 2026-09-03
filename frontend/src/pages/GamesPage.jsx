@@ -22,6 +22,19 @@ const NO_FILTERS = {
   todayOnly: false,
 };
 
+/** Today as yyyy-mm-dd in the browser's own zone, not UTC. */
+const today = () => new Date().toLocaleDateString('en-CA');
+
+/**
+ * The day a daily board should open on: today when it has games, otherwise
+ * the next day that does - landing on an empty Tuesday would be a poor
+ * greeting. Falls back to the last day of the season once it is over.
+ */
+const currentGameDay = (days) => {
+  const now = today();
+  return days.find((value) => value >= now) ?? days[days.length - 1] ?? now;
+};
+
 export default function GamesPage() {
   const { groupId, group, hasNoGroups } = useGroup();
 
@@ -37,7 +50,14 @@ export default function GamesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [meta, setMeta] = useState(null);
-  const [week, setWeek] = useState(null);
+  // Seeded from the URL so returning here - from a game's details, or from a
+  // reload - lands on the period that was being read rather than snapping
+  // back to the current week. Read once, in the initialiser: after that the
+  // state is the source of truth and the URL is written from it below.
+  const [week, setWeek] = useState(() => {
+    const fromUrl = searchParams.get('week');
+    return fromUrl == null ? null : Number(fromUrl);
+  });
   const [games, setGames] = useState([]);
   const [filterOptions, setFilterOptions] = useState(null);
   const [filters, setFilters] = useState({
@@ -54,7 +74,7 @@ export default function GamesPage() {
   const [minPicks, setMinPicks] = useState(0);
   const [marketBudgets, setMarketBudgets] = useState([]);
   // Daily boards only: the selected day, and the days that have games.
-  const [day, setDay] = useState(null);
+  const [day, setDay] = useState(() => searchParams.get('date'));
   const [gameDays, setGameDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -71,7 +91,9 @@ export default function GamesPage() {
       .currentWeek()
       .then((data) => {
         setMeta(data);
-        setWeek(data.week);
+        // Only when the URL did not already name one - otherwise arriving
+        // back on this page would overwrite the week being returned to.
+        setWeek((current) => current ?? data.week);
       })
       .catch(setError);
   }, []);
@@ -83,13 +105,7 @@ export default function GamesPage() {
       .gameDays({ season: meta.season })
       .then((days) => {
         setGameDays(days);
-        setDay((current) => {
-          if (current) return current;
-          // Start on today when there are games, otherwise the next day that
-          // has some - landing on an empty Tuesday would be a poor greeting.
-          const today = new Date().toLocaleDateString('en-CA');
-          return days.find((value) => value >= today) ?? days[days.length - 1] ?? today;
-        });
+        setDay((current) => current ?? currentGameDay(days));
       })
       .catch(() => setGameDays([]));
   }, [daily, meta]);
@@ -178,16 +194,40 @@ export default function GamesPage() {
     return () => clearInterval(timer);
   }, [anyLive, busyGameId, daily, day, groupId, meta, week]);
 
-  // Keep "my picks" in the URL so the view survives a refresh and can be
-  // linked to, but reset the rest when the week changes.
+  // Reset the filters when the period changes - a spread band or a team
+  // chosen for one week rarely means anything for the next. "My picks" is the
+  // exception: it is a view of the board rather than a filter of one week's.
   useEffect(() => {
     setFilters((current) => ({ ...NO_FILTERS, mine: current.mine }));
   }, [week, day]);
 
-  const updateFilters = (next) => {
-    setFilters(next);
-    setSearchParams(next.mine ? { mine: '1' } : {}, { replace: true });
-  };
+  /**
+   * The period and the "my picks" view live in the URL so this page can be
+   * linked to, survive a reload, and - the reason it was added - be returned
+   * to by the browser's Back button showing the same week it was left on.
+   *
+   * <p>Written from state in one place rather than from each setter, so the
+   * two cannot disagree, and replaced rather than pushed: stepping through
+   * weeks should not fill the history with entries Back has to walk out of.
+   */
+  useEffect(() => {
+    const next = {};
+    if (filters.mine) next.mine = '1';
+    if (daily) {
+      if (day) next.date = day;
+    } else if (week !== null) {
+      next.week = String(week);
+    }
+    setSearchParams(next, { replace: true });
+  }, [daily, day, filters.mine, setSearchParams, week]);
+
+  const updateFilters = (next) => setFilters(next);
+
+  // Back to the period the season is actually on. Hidden when already there,
+  // so the control only appears when it has somewhere to go.
+  const nowPeriod = daily ? currentGameDay(gameDays) : meta?.week ?? null;
+  const atNow = daily ? day === nowPeriod : week === nowPeriod;
+  const jumpToNow = () => (daily ? setDay(nowPeriod) : setWeek(nowPeriod));
 
   const visibleGames = useMemo(() => {
     return games.filter((game) => {
@@ -393,16 +433,33 @@ export default function GamesPage() {
             picker, which is how you get to one that has some. */}
         <GameFilters
           weekSelector={
-            daily ? (
-              <DaySelector compact value={day} onChange={setDay} days={gameDays} />
-            ) : (
-              <WeekSelector
-                compact
-                weeks={meta?.availableWeeks}
-                current={week}
-                onChange={setWeek}
-              />
-            )
+            <>
+              {daily ? (
+                <DaySelector compact size="lg" value={day} onChange={setDay} days={gameDays} />
+              ) : (
+                <WeekSelector
+                  compact
+                  size="lg"
+                  weeks={meta?.availableWeeks}
+                  current={week}
+                  onChange={setWeek}
+                />
+              )}
+
+              {/* Browsing forward a few weeks and then finding the way back
+                  meant remembering which week "now" was. Only rendered when
+                  it would actually move the board. */}
+              {nowPeriod != null && !atNow && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="p-0 mt-1 text-decoration-none"
+                  onClick={jumpToNow}
+                >
+                  {daily ? `Jump to ${formatDay(nowPeriod)}` : `Jump to week ${nowPeriod}`}
+                </Button>
+              )}
+            </>
           }
           options={filterOptions}
           value={filters}

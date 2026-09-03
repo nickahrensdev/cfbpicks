@@ -130,8 +130,10 @@ export default function GameFilters({
           window changed, which is harder to use than a layout that simply
           always looks the same.
 
-          The period picker owns the first row. */}
-      <div className="d-flex align-items-center mb-3">{weekSelector}</div>
+          The period picker owns the first row, centred: it is what the whole
+          board is showing rather than one control among several, and
+          left-aligned it read as the first of the filters below it. */}
+      <div className="d-flex flex-column align-items-center mb-3">{weekSelector}</div>
 
       {/* Actions left; the count and refresh sit together on the right. The
           count describes the board below, and refresh is what re-reads it. */}

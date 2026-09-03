@@ -33,8 +33,10 @@ public class LineRefreshController {
      * @param enabled  whether refreshes are running at all. When false the
      *                 board says the lines are static rather than counting
      *                 down to something that will not happen.
-     * @param nextRunAt null until the job has run once - there is nothing to
-     *                  count down from before that.
+     * @param nextRunAt the next :00 or :30, computed from the schedule rather
+     *                  than from the last run - so the board counts down
+     *                  correctly before the job has ever fired, which it could
+     *                  not do while the schedule lived outside the app.
      */
     public record LineRefreshStatus(boolean enabled, int intervalSeconds,
                                     Instant lastRunAt, Instant nextRunAt) {
@@ -47,6 +49,6 @@ public class LineRefreshController {
                 job.isEnabled(),
                 job.getIntervalSeconds(),
                 job.getLastRunAt(),
-                job.nextRunAt());
+                LineRefreshScheduler.nextRun(java.time.Instant.now()));
     }
 }

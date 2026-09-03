@@ -252,20 +252,21 @@ export default function AdminPage() {
       <h1 className="h3 mb-4">Data admin</h1>
 
       {/* Scheduled jobs.
-          
-          The schedule lives in Supabase pg_cron, not in the app, so what this
-          switches is whether the endpoint acts when it is called - see V26 for
-          why the app does not rewrite its own schedule. Stopped means the
-          schedule still fires and the app declines, which is also why a
-          stopped job can still show a recent "last called". */}
+
+          The timer is in the backend and always runs; these buttons decide
+          whether it does any work when it fires - see LineRefreshScheduler.
+          That is why a job that is off still shows a recent "last called":
+          it was considered and skipped, which is a different thing from a
+          schedule that has stopped. */}
       <Card className="shadow-sm mb-4">
         <Card.Body>
           <div className="d-flex justify-content-between align-items-start gap-3 mb-3">
             <div>
               <div className="fw-semibold">Scheduled jobs</div>
               <div className="small text-body-secondary">
-                Called on a schedule from Supabase. Turning one off leaves the schedule running
-                and makes the app decline, so nothing is lost by stopping it.
+                Run by the backend on a timer. The timer fires either way - turning a job off
+                makes it skip its work rather than stopping the clock, so it starts again the
+                moment you turn it back on.
               </div>
             </div>
             <div className="d-flex gap-2 flex-shrink-0">
@@ -313,24 +314,38 @@ export default function AdminPage() {
                     <div className="small text-body-secondary">
                       {job.lastRunAt ? (
                         <>
-                          Last called {formatBuildTime(job.lastRunAt)} · {job.lastStatus}
+                          Last run {formatBuildTime(job.lastRunAt)} · {job.lastStatus}
                           {job.lastDetail ? ` · ${job.lastDetail}` : ''}
                         </>
                       ) : (
-                        'Never called'
+                        'Not run yet'
                       )}
                     </div>
                   </div>
 
-                  <Form.Check
-                    type="switch"
-                    id={`cron-${job.name}`}
-                    className="flex-shrink-0"
-                    checked={job.enabled}
-                    disabled={cronBusy}
-                    onChange={(event) => toggleCron(job.name, event.target.checked)}
-                    aria-label={`Enable the ${job.name} job`}
-                  />
+                  {/* Two buttons rather than a switch. A switch shows the
+                      state and the control in one glyph, and on a job that
+                      spends money the difference between "this is on" and "I
+                      am about to turn it on" should not be a shade of grey.
+                      The current state is the filled one. */}
+                  <div className="d-flex gap-1 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant={job.enabled ? 'success' : 'outline-secondary'}
+                      disabled={cronBusy || job.enabled}
+                      onClick={() => toggleCron(job.name, true)}
+                    >
+                      On
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={job.enabled ? 'outline-secondary' : 'danger'}
+                      disabled={cronBusy || !job.enabled}
+                      onClick={() => toggleCron(job.name, false)}
+                    >
+                      Off
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

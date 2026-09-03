@@ -129,3 +129,8 @@ app:
       - fcs
   cron:
     secret: ${CRON_SECRET:}
+    # POST /api/cron/lines is built and reachable, but does nothing until this
+    # is true - see CronController. Off deliberately: each call spends CFBD
+    # quota, so the schedule and the permission to spend are separate switches.
+    # Flip with APP_CRON_LINES_ENABLED=true once the pg_cron schedule exists.
+    lines-enabled: ${APP_CRON_LINES_ENABLED:false}

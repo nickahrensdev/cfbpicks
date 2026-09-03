@@ -44,4 +44,23 @@ class CronControllerIntegrationTest extends IntegrationTest {
         mockMvc.perform(post("/api/cron/espn-scores").header("X-Cron-Secret", "letmein"))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void theLineRefreshChecksTheSecretToo() throws Exception {
+        mockMvc.perform(post("/api/cron/lines"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/cron/lines").header("X-Cron-Secret", "wrong"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * The point of the flag: a schedule pointed at this endpoint before anyone
+     * has decided to spend CFBD quota on it must not spend any. If this ever
+     * returns 200 with the flag off, the job is billing the account.
+     */
+    @Test
+    void theLineRefreshDoesNothingWhileItIsTurnedOff() throws Exception {
+        mockMvc.perform(post("/api/cron/lines").header("X-Cron-Secret", "letmein"))
+                .andExpect(status().isServiceUnavailable());
+    }
 }

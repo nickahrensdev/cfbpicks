@@ -71,12 +71,20 @@ class GroupApiIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$[0].userId").value(ADMIN.toString()))
                 .andExpect(jsonPath("$[0].role").value("OWNER"));
 
+        // Two now: the league just created, and the personal board every
+        // account is given. The list is sorted by name, so "My Board" is
+        // first and "The Office" second.
         mockMvc.perform(get("/api/groups/mine").with(admin()))
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].name").value("The Office"))
-                .andExpect(jsonPath("$[0].manageable").value(true))
-                .andExpect(jsonPath("$[0].myRole").value("OWNER"))
-                .andExpect(jsonPath("$[0].memberCount").value(1));
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].name").value(PersonalGroups.NAME))
+                .andExpect(jsonPath("$[0].personal").value(true))
+                // Nothing to configure on a personal board, even for its owner.
+                .andExpect(jsonPath("$[0].manageable").value(false))
+                .andExpect(jsonPath("$[1].name").value("The Office"))
+                .andExpect(jsonPath("$[1].personal").value(false))
+                .andExpect(jsonPath("$[1].manageable").value(true))
+                .andExpect(jsonPath("$[1].myRole").value("OWNER"))
+                .andExpect(jsonPath("$[1].memberCount").value(1));
     }
 
     @Test
@@ -176,7 +184,7 @@ class GroupApiIntegrationTest extends IntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_GROUP_SETTINGS"));
 
-        assertThat(groups.findAll()).isEmpty();
+        assertThat(leagues()).isEmpty();
     }
 
     @Test
@@ -418,8 +426,10 @@ class GroupApiIntegrationTest extends IntegrationTest {
                         .content("{\"favorite\": true}"))
                 .andExpect(status().isNoContent());
 
+        // Index 1: "My Board" sorts before "Open League".
         mockMvc.perform(get("/api/groups/mine").with(member()))
-                .andExpect(jsonPath("$[0].favorite").value(true));
+                .andExpect(jsonPath("$[1].name").value("Open League"))
+                .andExpect(jsonPath("$[1].favorite").value(true));
 
         // A favourite is a property of one membership, not of the group.
         mockMvc.perform(get("/api/groups/mine").with(admin()))
@@ -554,7 +564,7 @@ class GroupApiIntegrationTest extends IntegrationTest {
         mockMvc.perform(delete("/api/groups/" + id).with(member()))
                 .andExpect(status().isForbidden());
 
-        assertThat(groups.findAll()).hasSize(1);
+        assertThat(leagues()).hasSize(1);
     }
 
     @Test
@@ -565,8 +575,10 @@ class GroupApiIntegrationTest extends IntegrationTest {
         mockMvc.perform(delete("/api/groups/" + id).with(admin()))
                 .andExpect(status().isNoContent());
 
-        assertThat(groups.findAll()).isEmpty();
-        assertThat(groupMembers.findAll()).isEmpty();
+        // Only the league went. Each account keeps its own personal board,
+        // and the membership row that goes with it.
+        assertThat(leagues()).isEmpty();
+        assertThat(groupMembers.findAll()).hasSize(2);
         // The members themselves survive - only the group did not.
         assertThat(users.findAll()).hasSize(2);
     }
@@ -576,6 +588,14 @@ class GroupApiIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/groups/mine")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/groups/search")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/admin/groups")).andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Groups that are actually leagues. Every account now also has a personal
+     * board, so findAll() no longer answers "the groups this test made".
+     */
+    private List<Group> leagues() {
+        return groups.findAll().stream().filter(group -> !group.isPersonal()).toList();
     }
 
     // ------------------------------------------------------------------ setup

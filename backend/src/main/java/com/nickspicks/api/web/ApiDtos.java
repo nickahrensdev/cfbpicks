@@ -473,6 +473,12 @@ public final class ApiDtos {
              * owner to have opted in.
              */
             boolean shareable,
+            /**
+             * A private board of one, created with the account. The UI drops
+             * the member, share and settings affordances for these - there is
+             * nobody to invite and nothing to configure.
+             */
+            boolean personal,
             Instant createdAt) {
     }
 
@@ -568,6 +574,8 @@ public final class ApiDtos {
              * refused.
              */
             boolean shareable,
+            /** See GroupSummary#personal. */
+            boolean personal,
             Instant createdAt,
             Instant updatedAt,
             /**

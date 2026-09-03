@@ -1,6 +1,7 @@
 package com.nickspicks.api.security;
 
 import com.nickspicks.api.config.AppProperties;
+import com.nickspicks.api.group.GroupService;
 import com.nickspicks.api.user.AppUser;
 import com.nickspicks.api.user.AppUserRepository;
 import com.nickspicks.api.user.Role;
@@ -24,22 +25,38 @@ public class CurrentUserService {
 
     private final AppUserRepository users;
     private final AppProperties properties;
+    private final GroupService personalGroups;
 
-    public CurrentUserService(AppUserRepository users, AppProperties properties) {
+    public CurrentUserService(AppUserRepository users, AppProperties properties,
+                              GroupService personalGroups) {
         this.users = users;
         this.properties = properties;
+        this.personalGroups = personalGroups;
     }
 
     @Transactional
     public AppUser resolve(Jwt jwt) {
         UUID id = UUID.fromString(jwt.getSubject());
 
-        AppUser user = users.findById(id).orElseGet(() -> {
+        boolean firstSight = false;
+        AppUser user = users.findById(id).orElse(null);
+
+        if (user == null) {
             String email = jwt.getClaimAsString("email");
-            return users.save(new AppUser(id, email == null ? "" : email,
+            user = users.save(new AppUser(id, email == null ? "" : email,
                     defaultDisplayName(jwt, email, id),
                     defaultUsername(jwt, email, id)));
-        });
+            firstSight = true;
+        }
+
+        // Every board in this app belongs to a group, so an account that has
+        // joined no league has nothing to pick at all. This gives it one of its
+        // own - see PersonalGroups. Only on first sight: doing it on every
+        // request would cost a query per call to answer "yes, still there",
+        // and the V24 backfill covers accounts that predate the feature.
+        if (firstSight) {
+            personalGroups.ensurePersonalGroup(user);
+        }
 
         // Bootstrap promotion: a configured admin email becomes ADMIN on any
         // request, so adding one to the config takes effect without touching

@@ -138,11 +138,16 @@ export default function GroupBar() {
       ? groups.filter((entry) => entry.name.toLowerCase().includes(term))
       : groups;
 
-    // The group you are in, then favourites, then the rest alphabetically.
-    // Current goes first because it is the fixed point you read the list
-    // against - "which am I in, and what else is there".
+    // The group you are in, then your own board, then favourites, then the
+    // rest alphabetically. Current goes first because it is the fixed point
+    // you read the list against - "which am I in, and what else is there".
+    //
+    // The personal board comes next because it is the one destination that is
+    // always there and always yours; sorted by name it would land under M,
+    // somewhere in the middle of however many leagues you have joined.
     return [...matched].sort((a, b) => {
       if ((a.id === groupId) !== (b.id === groupId)) return a.id === groupId ? -1 : 1;
+      if (a.personal !== b.personal) return a.personal ? -1 : 1;
       if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
       return a.name.localeCompare(b.name);
     });

@@ -105,6 +105,18 @@ public class Group {
     @Column(name = "shareable_by_members", nullable = false)
     private boolean shareableByMembers;
 
+    /**
+     * A private board of one, created with the account - see
+     * {@link PersonalGroups}.
+     *
+     * <p>Not part of {@link GroupSettings}, deliberately: settings are what a
+     * caller may send, and nothing a caller sends should be able to turn a
+     * league into a personal board or the other way round. It is set once, at
+     * creation, and {@link #apply} never touches it.
+     */
+    @Column(nullable = false)
+    private boolean personal;
+
     @Column(name = "moneyline_enabled", nullable = false)
     private boolean moneylineEnabled;
 
@@ -189,7 +201,12 @@ public class Group {
     }
 
     public Group(UUID createdBy, GroupSettings settings) {
+        this(createdBy, settings, false);
+    }
+
+    public Group(UUID createdBy, GroupSettings settings, boolean personal) {
         this.createdBy = createdBy;
+        this.personal = personal;
         apply(settings);
     }
 
@@ -369,12 +386,20 @@ public class Group {
      * caller to be an owner themselves, who could change the setting regardless.
      */
     public boolean isShareableBy(GroupRole role) {
+        // Nobody, including its owner. There is nothing to invite anyone to.
+        if (personal) {
+            return false;
+        }
         if (role == null) {
             return false;
         }
         return visibility == Visibility.PUBLIC
                 || shareableByMembers
                 || role == GroupRole.OWNER;
+    }
+
+    public boolean isPersonal() {
+        return personal;
     }
 
     public Integer getMaxPicksPerCadence() {

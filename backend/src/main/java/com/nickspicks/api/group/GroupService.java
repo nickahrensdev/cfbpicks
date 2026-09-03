@@ -103,6 +103,13 @@ public class GroupService {
      * A group can have several owners, and its creator need not still be one.
      */
     private boolean canManage(Group group, AppUser caller) {
+        // A personal board has no manageable settings at all - not for its
+        // owner, and not for staff. Saying so here rather than only at each
+        // mutation means the UI hides the controls instead of offering ones
+        // that would be refused.
+        if (group.isPersonal()) {
+            return false;
+        }
         return isAppAdmin(caller) || isOwner(group.getId(), caller.getId());
     }
 
@@ -140,10 +147,50 @@ public class GroupService {
         return group;
     }
 
+    /**
+     * The private board of one that comes with an account.
+     *
+     * <p>Called on first sight of a member - see {@code CurrentUserService} -
+     * and safe to call again: it answers the existing board rather than making
+     * a second. The unique index in V24 is the real guarantee, since two
+     * requests arriving together would both find nothing here.
+     *
+     * <p>Settings come from {@link PersonalGroups} and are never taken from a
+     * caller. There is no endpoint that reaches this.
+     */
+    @Transactional
+    public Group ensurePersonalGroup(AppUser owner) {
+        return groups.findByCreatedByAndPersonalTrue(owner.getId()).orElseGet(() -> {
+            Group group = groups.save(
+                    new Group(owner.getId(), PersonalGroups.settings(), true));
+            members.save(new GroupMember(group.getId(), owner.getId(), GroupRole.OWNER));
+            return group;
+        });
+    }
+
+    /**
+     * Refuses anything that would change a personal board or let someone else
+     * near it.
+     *
+     * <p>One method rather than a check per call site, so a path added later
+     * has an obvious thing to call - and so the reason is stated once.
+     */
+    private void refuseIfPersonal(Group group, String action) {
+        if (group.isPersonal()) {
+            throw new ForbiddenException(
+                    "Your own board cannot be %s - it always keeps its default settings"
+                            .formatted(action));
+        }
+    }
+
     @Transactional
     public Group update(UUID groupId, AppUser caller, GroupSettings settings) {
         settings.validate();
 
+        // Before requireManageable, which now answers "only the owner can
+        // change this group" for a personal board - true but unhelpful to the
+        // owner reading it. The specific reason should win.
+        refuseIfPersonal(require(groupId), "edited");
         Group group = requireManageable(groupId, caller);
 
         // The type is fixed once the group exists. Pickem and elimination score
@@ -162,6 +209,9 @@ public class GroupService {
     /** Members cascade with the group; so, later, will its picks. */
     @Transactional
     public void delete(UUID groupId, AppUser caller) {
+        // Losing it would leave the account with no board at all, and nothing
+        // recreates one after first sight.
+        refuseIfPersonal(require(groupId), "deleted");
         Group group = requireManageable(groupId, caller);
         groups.delete(group);
     }
@@ -196,6 +246,10 @@ public class GroupService {
      * the approval queue, and not joining twice.
      */
     private JoinOutcome admit(Group group, AppUser caller, String password) {
+        // Both join paths land here - search-and-join and a share link - so
+        // this one check covers them together.
+        refuseIfPersonal(group, "joined");
+
         if (members.existsByGroupIdAndUserId(group.getId(), caller.getId())) {
             throw new GroupExceptions.AlreadyMemberException("You are already in this group");
         }
@@ -254,6 +308,12 @@ public class GroupService {
     @Transactional
     public GroupShareLink shareLink(UUID groupId, AppUser caller) {
         Group group = require(groupId);
+        // Before the role checks below, because those let an app admin through
+        // whatever the group says - and a personal board is the one case where
+        // that must not hold. isShareableBy already returns false for one, but
+        // the admin bypass would step straight over it.
+        refuseIfPersonal(group, "shared");
+
         GroupRole role = members.findByGroupIdAndUserId(groupId, caller.getId())
                 .map(GroupMember::getRole)
                 .orElse(null);
@@ -398,6 +458,7 @@ public class GroupService {
      */
     @Transactional
     public void setMemberRole(UUID groupId, AppUser caller, UUID userId, GroupRole role) {
+        refuseIfPersonal(require(groupId), "changed");
         requireManageable(groupId, caller);
 
         GroupMember member = members.findByGroupIdAndUserId(groupId, userId)
@@ -418,6 +479,9 @@ public class GroupService {
     /** Admin and owner path: add someone directly, no password. */
     @Transactional
     public void addMember(UUID groupId, AppUser caller, UUID userId) {
+        // Closes the admin route in as well: a personal board has exactly one
+        // member and nobody - staff included - may add another.
+        refuseIfPersonal(require(groupId), "added to");
         requireManageable(groupId, caller);
 
         if (!users.existsById(userId)) {
@@ -437,6 +501,9 @@ public class GroupService {
     @Transactional
     public void removeMember(UUID groupId, AppUser caller, UUID userId) {
         Group group = require(groupId);
+        // Including leaving your own board, which would strand the group with
+        // no members and the account with nothing to pick in.
+        refuseIfPersonal(group, "left");
 
         boolean leavingSelf = caller.getId().equals(userId);
         if (!leavingSelf && !canManage(group, caller)) {
@@ -525,6 +592,7 @@ public class GroupService {
                                 JoinRequestStatus.PENDING)
                         : 0,
                 group.isShareableBy(myRole),
+                group.isPersonal(),
                 group.getCreatedAt(),
                 group.getUpdatedAt(),
                 settingsOf(group, manageable));
@@ -677,6 +745,7 @@ public class GroupService {
                         group.isShareableBy(Optional.ofNullable(mine.get(group.getId()))
                                 .map(GroupMember::getRole)
                                 .orElse(null)),
+                        group.isPersonal(),
                         group.getCreatedAt()))
                 .sorted((a, b) -> a.name().compareToIgnoreCase(b.name()))
                 .toList();

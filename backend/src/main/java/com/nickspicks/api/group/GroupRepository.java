@@ -18,6 +18,12 @@ public interface GroupRepository extends JpaRepository<Group, UUID> {
     List<Group> findAllByOrderByNameAsc();
 
     /**
+     * The account's own board, if it has been made yet. At most one exists -
+     * see the partial unique index in V24.
+     */
+    java.util.Optional<Group> findByCreatedByAndPersonalTrue(UUID createdBy);
+
+    /**
      * Group search. Private groups are unlisted, so this never returns one -
      * they are joined by an owner or admin adding you.
      *

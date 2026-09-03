@@ -493,6 +493,17 @@ body {
   border-top: 1px solid var(--bs-border-color);
 }
 
+// The settings tab row scrolls sideways rather than wrapping, but the native
+// scrollbar sat on top of the tabs and read as a stray line under them. The
+// row is short and obviously cut off, so the affordance is not needed.
+.settings-tabs {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 // Progress track for the group-creation stepper.
 //
 // Replaces a row of numbered pills that hid their labels below sm to fit,

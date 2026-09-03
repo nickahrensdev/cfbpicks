@@ -324,7 +324,7 @@ export default function GroupSettingsForm({
           variant="tabs"
           activeKey={tab}
           onSelect={setTab}
-          className="mb-3 flex-nowrap overflow-auto"
+          className="mb-3 flex-nowrap overflow-auto settings-tabs"
           // Belt and braces with the caller's own minmax(0, 1fr): a scroll
           // container still needs to be allowed to shrink below its content,
           // or it grows its parent instead of scrolling.
@@ -576,7 +576,13 @@ export default function GroupSettingsForm({
                 />
                 <Form.Text className="text-body-secondary d-block mb-2">
                   {help}
-                  {key === 'moneyline' && ' Configurable now; moneyline picks arrive in a later release.'}
+                  {/* "moneyline picks arrive in a later release" used to sit
+                      here. They arrived: Selection carries HOME_ML/AWAY_ML,
+                      GradingService settles them and the game card offers
+                      them. The note was telling people a live market was not
+                      built yet. */}
+                  {key === 'moneyline'
+                    && ' Easier to call than a spread, so it is usually worth fewer points.'}
                 </Form.Text>
 
                 <Row className="g-2">

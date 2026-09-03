@@ -160,9 +160,13 @@ export default function GroupDetailPage() {
       <div className="d-grid gap-3" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
         <BackButton fallback="/groups" label="Back to groups" />
 
-        <div className="d-flex justify-content-between align-items-start gap-3">
-          <div>
-            <h1 className="h3 mb-1">{settings.name}</h1>
+        {/* Stacked on a phone, side by side from sm up. Two buttons pinned to
+            the right squeezed the line beneath the name into a third of the
+            width, so "Created by @x - 2 members - you are a member" broke
+            across three lines while the space beside it sat empty. */}
+        <div className="d-flex flex-column flex-sm-row justify-content-between align-items-start gap-2 gap-sm-3">
+          <div style={{ minWidth: 0 }}>
+            <h1 className="h4 mb-1">{settings.name}</h1>
             <p className="text-body-secondary mb-0 small">
               {group.creatorName && `Created by ${handle(group.creatorName)} · `}
               {group.memberCount}{' '}
@@ -191,6 +195,17 @@ export default function GroupDetailPage() {
         {notice && (
           <Alert variant={notice.variant} dismissible onClose={() => setNotice(null)}>
             {notice.text}
+          </Alert>
+        )}
+
+        {/* Without this the page just looks broken: every control is disabled,
+            the Save button is gone and there is no delete. Saying it is a
+            personal board explains all of that at once. */}
+        {group.personal && (
+          <Alert variant="secondary" className="small mb-0">
+            This is your own board. Nobody else can see it, join it or be invited to it, and its
+            settings are fixed - every pick option is on, there are no limits, and picks close
+            five minutes before kickoff.
           </Alert>
         )}
 

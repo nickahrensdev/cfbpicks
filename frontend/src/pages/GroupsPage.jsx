@@ -111,12 +111,21 @@ export default function GroupsPage() {
                   <div className="flex-grow-1" style={{ minWidth: 0 }}>
                     <div className="d-flex align-items-center gap-2">
                       <span className="fw-semibold text-truncate">{group.name}</span>
-                      {group.myRole === 'OWNER' && (
-                        // Subtle, not solid primary. It labels the row; it is
-                        // not more important than the name it sits beside.
-                        <Badge bg="secondary-subtle" text="secondary-emphasis" className="fw-normal">
-                          owner
+                      {/* "personal" rather than "owner" for your own board.
+                          You do own it, but that is not the useful fact -
+                          nobody can join it, so ownership says nothing. */}
+                      {group.personal ? (
+                        <Badge bg="info-subtle" text="info-emphasis" className="fw-normal flex-shrink-0">
+                          personal
                         </Badge>
+                      ) : (
+                        group.myRole === 'OWNER' && (
+                          // Subtle, not solid primary. It labels the row; it is
+                          // not more important than the name it sits beside.
+                          <Badge bg="secondary-subtle" text="secondary-emphasis" className="fw-normal">
+                            owner
+                          </Badge>
+                        )
                       )}
                     </div>
                     <div className="small text-body-secondary text-truncate">

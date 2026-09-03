@@ -25,7 +25,7 @@ class GradingServiceTest {
     /** No line: the final score is the whole rule. */
     @Test
     void moneylinePicksGradeOnTheFinalScoreAlone() {
-        GradingService grading = new GradingService(null);
+        GradingService grading = new GradingService(null, null, null);
 
         assertThat(grading.grade(Selection.HOME_ML, null, 31, 20)).isEqualTo(PickResult.WIN);
         assertThat(grading.grade(Selection.HOME_ML, null, 20, 31)).isEqualTo(PickResult.LOSS);
@@ -40,7 +40,7 @@ class GradingServiceTest {
      */
     @Test
     void aMoneylinePickAndASpreadPickOnTheSameSideCanDisagree() {
-        GradingService grading = new GradingService(null);
+        GradingService grading = new GradingService(null, null, null);
 
         assertThat(grading.grade(Selection.HOME_ML, null, 24, 20)).isEqualTo(PickResult.WIN);
         assertThat(grading.grade(Selection.HOME, new BigDecimal("-7.5"), 24, 20))
@@ -54,13 +54,13 @@ class GradingServiceTest {
      */
     @Test
     void aTiedGameWouldPushAMoneylinePick() {
-        GradingService grading = new GradingService(null);
+        GradingService grading = new GradingService(null, null, null);
 
         assertThat(grading.grade(Selection.HOME_ML, null, 21, 21)).isEqualTo(PickResult.PUSH);
         assertThat(grading.grade(Selection.AWAY_ML, null, 21, 21)).isEqualTo(PickResult.PUSH);
     }
 
-    private final GradingService grading = new GradingService(null);
+    private final GradingService grading = new GradingService(null, null, null);
 
     @DisplayName("grades a pick against the locked spread")
     @ParameterizedTest(name = "{0} at {1}, {2}-{3} -> {4}")

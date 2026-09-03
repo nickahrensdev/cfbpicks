@@ -2,6 +2,8 @@ package com.nickspicks.api.ingest;
 
 import com.nickspicks.api.game.Game;
 import com.nickspicks.api.game.GameStatus;
+import com.nickspicks.api.group.GroupRepository;
+import com.nickspicks.api.pick.EliminationService;
 import com.nickspicks.api.pick.Pick;
 import com.nickspicks.api.pick.PickRepository;
 import com.nickspicks.api.pick.PickResult;
@@ -33,9 +35,32 @@ public class GradingService {
     private static final Logger log = LoggerFactory.getLogger(GradingService.class);
 
     private final PickRepository picks;
+    private final GroupRepository groups;
+    private final EliminationService eliminations;
 
-    public GradingService(PickRepository picks) {
+    public GradingService(PickRepository picks, GroupRepository groups,
+                          EliminationService eliminations) {
         this.picks = picks;
+        this.groups = groups;
+        this.eliminations = eliminations;
+    }
+
+    /**
+     * A loss here can be someone's last. Anyone who just went out is holding
+     * picks on games still to come, and those have to go with them - see
+     * EliminationService.
+     *
+     * <p>Only the members this game actually touched, and only their groups:
+     * a game grades across every league that played it, so the pairs are
+     * gathered from the picks rather than by asking every group in turn.
+     */
+    private void dropPicksOfAnyoneNowEliminated(Game game, List<Pick> graded) {
+        graded.stream()
+                .map(pick -> java.util.Map.entry(pick.getGroupId(), pick.getUserId()))
+                .distinct()
+                .forEach(pair -> groups.findById(pair.getKey()).ifPresent(group ->
+                        eliminations.dropFuturePicksIfEliminated(
+                                group, pair.getValue(), game.getSeason())));
     }
 
     /**
@@ -165,6 +190,8 @@ public class GradingService {
 
         log.info("Graded {} picks on game {} ({} {} - {} {})", targets.size(), game.getId(),
                 game.getAwayTeam(), game.getAwayScore(), game.getHomeTeam(), game.getHomeScore());
+
+        dropPicksOfAnyoneNowEliminated(game, targets);
         return targets.size();
     }
 }

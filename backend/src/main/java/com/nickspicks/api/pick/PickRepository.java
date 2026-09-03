@@ -54,6 +54,22 @@ public interface PickRepository extends JpaRepository<Pick, UUID> {
                                  @Param("season") Integer season);
 
     /**
+     * A member's picks on games that have not kicked off.
+     *
+     * <p>What an eliminated member is holding that can still be taken away.
+     * Bounded by kickoff rather than by result: a pick on a game already
+     * underway has been made and stands, whatever it finishes as.
+     */
+    @Query("""
+            select p from Pick p
+            where p.groupId = :groupId and p.userId = :userId
+              and p.gameId in (select g.id from Game g where g.kickoff > :now)
+            """)
+    List<Pick> findUnstartedForUser(@Param("groupId") UUID groupId,
+                                    @Param("userId") UUID userId,
+                                    @Param("now") java.time.Instant now);
+
+    /**
      * A member's picks on games kicking off in a window.
      *
      * <p>What a daily group's period looks like. A week has a column to filter

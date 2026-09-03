@@ -109,6 +109,37 @@ export default function AdminPage() {
 
   const refreshQuota = () => api.quota().then(setQuota).catch(setError);
 
+  const [cron, setCron] = useState([]);
+  const [cronBusy, setCronBusy] = useState(false);
+  const [cronError, setCronError] = useState(null);
+
+  const refreshCron = useCallback(async () => {
+    try {
+      setCron(await api.cronJobs());
+      setCronError(null);
+    } catch (err) {
+      setCronError(err.message ?? 'Could not read the scheduled jobs');
+    }
+  }, []);
+
+  /** Flips one job, or all of them, then re-reads rather than guessing. */
+  const toggleCron = async (name, enabled) => {
+    setCronBusy(true);
+    setCronError(null);
+    try {
+      if (name === null) {
+        setCron(await api.setAllCronJobs(enabled));
+      } else {
+        await api.setCronJob(name, enabled);
+        await refreshCron();
+      }
+    } catch (err) {
+      setCronError(err.message ?? 'Could not change the job');
+    } finally {
+      setCronBusy(false);
+    }
+  };
+
   const refreshInfo = useCallback(async () => {
     setInfoBusy(true);
     setInfoError(null);
@@ -127,6 +158,10 @@ export default function AdminPage() {
   useEffect(() => {
     refreshInfo();
   }, [refreshInfo]);
+
+  useEffect(() => {
+    refreshCron();
+  }, [refreshCron]);
 
   useEffect(() => {
     refreshQuota();
@@ -215,6 +250,93 @@ export default function AdminPage() {
   return (
     <Container className="py-4 py-md-5">
       <h1 className="h3 mb-4">Data admin</h1>
+
+      {/* Scheduled jobs.
+          
+          The schedule lives in Supabase pg_cron, not in the app, so what this
+          switches is whether the endpoint acts when it is called - see V26 for
+          why the app does not rewrite its own schedule. Stopped means the
+          schedule still fires and the app declines, which is also why a
+          stopped job can still show a recent "last called". */}
+      <Card className="shadow-sm mb-4">
+        <Card.Body>
+          <div className="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <div className="fw-semibold">Scheduled jobs</div>
+              <div className="small text-body-secondary">
+                Called on a schedule from Supabase. Turning one off leaves the schedule running
+                and makes the app decline, so nothing is lost by stopping it.
+              </div>
+            </div>
+            <div className="d-flex gap-2 flex-shrink-0">
+              <Button
+                size="sm"
+                variant="outline-danger"
+                disabled={cronBusy || cron.length === 0}
+                onClick={() => toggleCron(null, false)}
+              >
+                Stop all
+              </Button>
+              <Button
+                size="sm"
+                variant="outline-success"
+                disabled={cronBusy || cron.length === 0}
+                onClick={() => toggleCron(null, true)}
+              >
+                Start all
+              </Button>
+            </div>
+          </div>
+
+          {cronError && (
+            <Alert variant="danger" className="py-2 small">
+              {cronError}
+            </Alert>
+          )}
+
+          {cron.length === 0 ? (
+            <p className="small text-body-secondary mb-0">No scheduled jobs are configured.</p>
+          ) : (
+            <div className="group-list">
+              {cron.map((job) => (
+                <div key={job.name} className="group-row">
+                  <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="fw-semibold text-capitalize">{job.name}</span>
+                      <span className="small text-body-tertiary">
+                        every {Math.round(job.intervalSeconds / 60)} min
+                      </span>
+                    </div>
+                    {/* Last outcome, which is the thing that says whether it
+                        is actually working - an enabled job that has never
+                        run means the schedule is not calling it. */}
+                    <div className="small text-body-secondary">
+                      {job.lastRunAt ? (
+                        <>
+                          Last called {formatBuildTime(job.lastRunAt)} · {job.lastStatus}
+                          {job.lastDetail ? ` · ${job.lastDetail}` : ''}
+                        </>
+                      ) : (
+                        'Never called'
+                      )}
+                    </div>
+                  </div>
+
+                  <Form.Check
+                    type="switch"
+                    id={`cron-${job.name}`}
+                    className="flex-shrink-0"
+                    checked={job.enabled}
+                    disabled={cronBusy}
+                    onChange={(event) => toggleCron(job.name, event.target.checked)}
+                    aria-label={`Enable the ${job.name} job`}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </Card.Body>
+      </Card>
 
       {/* What is actually running, straight from the backend's own
           /actuator/info. The question this answers is "is the deployed build

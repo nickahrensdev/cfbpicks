@@ -37,6 +37,22 @@ public class DataLoadLogService {
         return logs.save(log);
     }
 
+    /**
+     * A run nobody pressed a button for.
+     *
+     * <p>triggered_by_name is not null - every row until now was written by a
+     * person - so a scheduled run carries a label rather than a null, and no
+     * reader of the log needs a special case for it.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public DataLoadLog startForCron(DataLoadLog.Kind kind, Integer season) {
+        DataLoadLog log = new DataLoadLog();
+        log.setKind(kind);
+        log.setSeason(season);
+        log.setTriggeredByName("Scheduled");
+        return logs.save(log);
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void succeed(Long id, String resultSummary) {
         logs.findById(id).ifPresent(log -> {

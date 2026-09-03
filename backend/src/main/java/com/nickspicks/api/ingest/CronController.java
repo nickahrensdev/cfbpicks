@@ -2,6 +2,8 @@ package com.nickspicks.api.ingest;
 
 import com.nickspicks.api.cfbd.CfbdUnavailableException;
 import com.nickspicks.api.config.AppProperties;
+import com.nickspicks.api.cron.CronJob;
+import com.nickspicks.api.cron.CronJobService;
 import com.nickspicks.api.season.CurrentWeekResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,13 +35,18 @@ public class CronController {
     private final EspnScoreIngestService espnScores;
     private final GameIngestService gameIngest;
     private final CurrentWeekResolver weeks;
+    private final CronJobService cronJobs;
+    private final DataLoadLogService dataLoadLogs;
 
     public CronController(AppProperties properties, EspnScoreIngestService espnScores,
-                          GameIngestService gameIngest, CurrentWeekResolver weeks) {
+                          GameIngestService gameIngest, CurrentWeekResolver weeks,
+                          CronJobService cronJobs, DataLoadLogService dataLoadLogs) {
         this.properties = properties;
         this.espnScores = espnScores;
         this.gameIngest = gameIngest;
         this.weeks = weeks;
+        this.cronJobs = cronJobs;
+        this.dataLoadLogs = dataLoadLogs;
     }
 
     @PostMapping("/espn-scores")
@@ -56,24 +63,20 @@ public class CronController {
     }
 
     /**
-     * Refreshes every posted betting line for the season - the same one
-     * season-wide {@code /lines} call the admin Data page makes, on a
-     * schedule instead of a button.
+     * Refreshes every posted betting line for the season.
      *
-     * <p>Season-wide rather than per-week because that is how CFBD charges
-     * for it: one call either way, so narrowing it would only fetch less for
-     * the same price.
+     * <p>Season-wide because that is how CFBD charges for it: one call either
+     * way, so narrowing it would fetch less for the same price.
      *
-     * <p>Gated by {@code app.cron.lines-enabled} on top of the shared secret,
-     * and that flag ships <em>off</em>. Every call spends real quota against a
-     * metered account, so bringing the schedule up and letting it spend money
-     * are kept as two separate decisions - a schedule pointed here before the
-     * flag is flipped gets a 503 it can be seen failing on, rather than
-     * quietly draining the month's allowance.
+     * <p>Whether it acts is a row in {@code cron_job}, not a config property,
+     * so it can be stopped from the admin page rather than by a redeploy. The
+     * schedule keeps calling either way and this declines - see V26 for why
+     * the app does not reach into pg_cron itself.
      *
-     * <p>To turn it on: set {@code APP_CRON_LINES_ENABLED=true}, then create
-     * the schedule in Supabase (pg_cron), the same way
-     * {@code /api/cron/espn-scores} is driven.
+     * <p>Every outcome is recorded twice over: on the job row, which is what
+     * the admin page and the board's countdown read, and as a row in the load
+     * log beside the manual buttons, so a cron run is visible in the same
+     * place as everything else that touches the data.
      */
     @PostMapping("/lines")
     public ResponseEntity<Object> lines(@RequestHeader(value = "X-Cron-Secret", required = false)
@@ -81,22 +84,37 @@ public class CronController {
         if (!authorized(providedSecret)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        if (!properties.getCron().isLinesEnabled()) {
-            log.info("Line cron called while app.cron.lines-enabled is false - not refreshing");
+        if (!cronJobs.isEnabled(CronJob.LINES)) {
+            // Recorded, so a stopped job still shows when it was last called -
+            // the difference between "turned off" and "not being called at
+            // all" is exactly what an admin needs to see when it looks broken.
+            cronJobs.record(CronJob.LINES, CronJob.Status.SKIPPED, "Turned off");
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("enabled", false,
                             "message", "Scheduled line refresh is turned off"));
         }
 
         int season = weeks.currentSeason();
+        DataLoadLog started = dataLoadLogs.startForCron(DataLoadLog.Kind.LINES, season);
+
         try {
             int updated = gameIngest.ingestLines(season);
+            String detail = "%d games updated".formatted(updated);
+            dataLoadLogs.succeed(started.getId(), detail);
+            cronJobs.record(CronJob.LINES, CronJob.Status.SUCCESS, detail);
             return ResponseEntity.ok(Map.of("season", season, "gamesUpdated", updated));
         } catch (CfbdUnavailableException ex) {
             // Upstream being down is not this endpoint failing, and a cron
             // caller retrying on a 5xx would only spend the quota again.
             log.warn("Line cron skipped: {}", ex.getMessage());
+            dataLoadLogs.fail(started.getId(), ex.getMessage());
+            cronJobs.record(CronJob.LINES, CronJob.Status.FAILED, ex.getMessage());
             return ResponseEntity.ok(Map.of("season", season, "skipped", ex.getMessage()));
+        } catch (RuntimeException ex) {
+            log.error("Line cron failed", ex);
+            dataLoadLogs.fail(started.getId(), ex.getMessage());
+            cronJobs.record(CronJob.LINES, CronJob.Status.FAILED, ex.getMessage());
+            throw ex;
         }
     }
 

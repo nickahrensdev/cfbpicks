@@ -208,4 +208,15 @@ export const api = {
     request(`/api/admin/settle${query({ season })}`, { method: 'POST' }),
   dataLoads: () => request('/api/admin/data-loads'),
 
+  // Scheduled jobs. The schedule itself lives in Supabase pg_cron; these only
+  // say whether the app acts when it is called - see V26.
+  cronJobs: () => request('/api/admin/cron'),
+  setCronJob: (name, enabled) =>
+    request(`/api/admin/cron/${name}`, { method: 'PUT', body: JSON.stringify({ enabled }) }),
+  setAllCronJobs: (enabled) =>
+    request('/api/admin/cron', { method: 'PUT', body: JSON.stringify({ enabled }) }),
+
+  // Member-facing: when the board's lines were last refreshed, and when next.
+  lineRefresh: () => request('/api/line-refresh'),
+
 };

@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import GameCard from '../components/GameCard.jsx';
 import GameFilters from '../components/GameFilters.jsx';
+import LineRefreshCountdown from '../components/LineRefreshCountdown.jsx';
 import WeekSelector from '../components/WeekSelector.jsx';
 import DaySelector, { formatDay } from '../components/DaySelector.jsx';
 import { EmptyState, ErrorNotice, Loading, isPickable, marketLabel, marketsOf } from '../components/common.jsx';
@@ -409,6 +410,12 @@ export default function GamesPage() {
                 · {daily ? formatDay(day) : `week ${week ?? '-'}`}
               </span>
             </span>
+
+            {/* Beside the budget rather than in the toolbar: both describe the
+                board as a whole, and this bar is the one thing that stays on
+                screen while a long slate is scrolled. Hidden on the narrowest
+                phones, where the budget and the progress bar have the row. */}
+            <LineRefreshCountdown className="d-none d-md-inline ms-auto" />
             {remaining != null && (
               <>
                 <ProgressBar

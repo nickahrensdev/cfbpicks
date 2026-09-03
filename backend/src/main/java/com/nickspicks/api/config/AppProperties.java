@@ -241,23 +241,5 @@ public class AppProperties {
             this.secret = secret;
         }
 
-        /**
-         * Whether {@code POST /api/cron/lines} will actually refresh lines.
-         *
-         * <p>Off by default, and deliberately separate from the secret: that
-         * endpoint spends CFBD quota on every call, so the schedule and the
-         * permission to run are two decisions rather than one. Turning it on
-         * without a schedule does nothing; scheduling it without turning it on
-         * gets a 503 and a log line rather than a silent bill.
-         */
-        private boolean linesEnabled = false;
-
-        public boolean isLinesEnabled() {
-            return linesEnabled;
-        }
-
-        public void setLinesEnabled(boolean linesEnabled) {
-            this.linesEnabled = linesEnabled;
-        }
     }
 }

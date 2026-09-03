@@ -23,7 +23,7 @@ import java.util.UUID;
 public class DataLoadLog {
 
     public enum Kind {
-        REFERENCE, GAMES, SCORES, RANKINGS, ROSTER, ATS
+        REFERENCE, GAMES, SCORES, RANKINGS, ROSTER, ATS, LINES
     }
 
     public enum Status {

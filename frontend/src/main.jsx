@@ -7,13 +7,16 @@ import { AuthProvider } from './auth/AuthProvider.jsx';
 import { ProfileProvider } from './auth/ProfileProvider.jsx';
 import { GroupProvider } from './auth/GroupProvider.jsx';
 import { applyTheme, cachedTheme } from './lib/theme.js';
+import { BASENAME } from './lib/appUrl.js';
 import './styles/theme.scss';
 import './styles/themes.css';
 
 // Same subpath Vite's `base` uses (see vite.config.js) - both have to agree
 // or a client-side navigation ends up one level off from where assets load.
 // Trailing slash trimmed: react-router wants "/cfbpicks", not "/cfbpicks/".
-const basename = (import.meta.env.VITE_BASE_PATH || '/').replace(/\/$/, '');
+// One definition, shared with appUrl() - a share link built against a
+// different idea of the base path than the router's is a link to nowhere.
+const basename = BASENAME;
 
 // Applied before the first render, from whatever was last known, so there is
 // no flash of the default theme while /api/me is still in flight.

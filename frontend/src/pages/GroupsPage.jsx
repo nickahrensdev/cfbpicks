@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Container } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
@@ -48,6 +48,22 @@ export default function GroupsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  /**
+   * Your own board first, then the leagues.
+   *
+   * <p>The server sorts by name, which buries "My Board" under M among
+   * however many leagues you have joined - and it is the one row that is
+   * always there, so it should be where you can always find it. Matches the
+   * order the group picker uses.
+   *
+   * <p>Only the personal flag is compared, and Array#sort is stable, so the
+   * alphabetical order the server sent survives within each half.
+   */
+  const ordered = useMemo(
+    () => [...mine].sort((a, b) => Number(b.personal) - Number(a.personal)),
+    [mine],
+  );
 
   if (loading) {
     return (
@@ -99,7 +115,7 @@ export default function GroupsPage() {
             // groups filled a phone screen when each was its own card with
             // its own padding and gap; as rows they read as one list and fit.
             <div className="group-list">
-              {mine.map((group) => (
+              {ordered.map((group) => (
                 <Link
                   key={group.id}
                   to={`/groups/${group.id}`}

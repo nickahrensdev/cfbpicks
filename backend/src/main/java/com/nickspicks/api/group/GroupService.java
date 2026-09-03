@@ -250,6 +250,16 @@ public class GroupService {
         // this one check covers them together.
         refuseIfPersonal(group, "joined");
 
+        // A league that has closed its doors. Both self-service routes are
+        // shut; an owner adding someone by hand is left open deliberately,
+        // since that is a decision being made rather than routed around, and
+        // it is the only way back in for someone who should have been let in.
+        if (group.isJoinsCloseAtStart() && group.hasStarted()) {
+            throw new GroupExceptions.JoinsClosedException(
+                    "This group closed to new members when it started on %s"
+                            .formatted(group.getStartsOn()));
+        }
+
         if (members.existsByGroupIdAndUserId(group.getId(), caller.getId())) {
             throw new GroupExceptions.AlreadyMemberException("You are already in this group");
         }
@@ -707,7 +717,9 @@ public class GroupService {
                 group.getTotalPushPoints(),
                 group.getStrikesAllowed(),
                 group.getTeamPickLimit(),
-                group.getTeamPickLimitScope());
+                group.getTeamPickLimitScope(),
+                group.getStartsOn(),
+                group.isJoinsCloseAtStart());
     }
 
     private List<GroupSummary> summaries(Collection<Group> found, AppUser caller) {

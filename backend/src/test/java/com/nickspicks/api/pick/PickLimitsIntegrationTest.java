@@ -76,6 +76,69 @@ class PickLimitsIntegrationTest extends IntegrationTest {
         users.deleteAll();
     }
 
+    // ---------------------------------------------------------- start date
+
+    /**
+     * A group that starts next week does not play this week's games.
+     *
+     * <p>The counterpart to settlement ignoring periods before the start date:
+     * without this, those games could be picked and scored but would never be
+     * counted toward a minimum - and in an elimination pool would contribute
+     * losses from before the pool existed.
+     */
+    @Test
+    void refusesPicksOnGamesBeforeTheGroupStarts() {
+        Group group = group(TestGroups.settings("Starts later", Cadence.WEEKLY, 10,
+                true, true, true));
+        // The shared fixture starts in 2000; move this one into the future.
+        group.apply(startingOn(group, LocalDate.now(CadencePeriod.GAME_DAY_ZONE).plusDays(7)));
+        group = groups.save(group);
+        UUID member = member(group, "early");
+
+        Game tomorrow = game(500L, 1, Instant.now().plus(1, ChronoUnit.DAYS));
+
+        Group saved = group;
+        assertThatThrownBy(() -> picks.create(saved, member, tomorrow.getId(), Selection.HOME))
+                .isInstanceOf(InvalidPickException.class)
+                .hasMessageContaining("games before then are not part of it");
+    }
+
+    @Test
+    void allowsPicksOnTheStartDayItself() {
+        Instant kickoff = Instant.now().plus(2, ChronoUnit.DAYS);
+        LocalDate startDay = kickoff.atZone(CadencePeriod.GAME_DAY_ZONE).toLocalDate();
+
+        Group group = group(TestGroups.settings("Starts that day", Cadence.WEEKLY, 10,
+                true, true, true));
+        group.apply(startingOn(group, startDay));
+        group = groups.save(group);
+        UUID member = member(group, "onthed");
+
+        Game opener = game(501L, 1, kickoff);
+
+        Group saved = group;
+        assertThatCode(() -> picks.create(saved, member, opener.getId(), Selection.HOME))
+                .doesNotThrowAnyException();
+    }
+
+    /** The group's own settings with a different start date. */
+    private GroupSettings startingOn(Group group, LocalDate startsOn) {
+        GroupSettings base = TestGroups.settings(group.getName(), group.getCadence(), 10,
+                true, true, true);
+        return new GroupSettings(
+                base.name(), base.description(), base.visibility(), base.joinPassword(),
+                base.groupType(), base.cadence(), base.lengthType(), base.startSeason(),
+                base.lockLeadMinutes(), base.maxPicksPerCadence(), base.minPicksPerCadence(),
+                base.multiplePicksPerGame(), base.requireApproval(), base.shareableByMembers(),
+                base.moneylineEnabled(), base.spreadEnabled(), base.totalEnabled(),
+                null, null, null, null, null, null,
+                base.moneylineWinPoints(), base.moneylineLossPoints(), base.moneylinePushPoints(),
+                base.spreadWinPoints(), base.spreadLossPoints(), base.spreadPushPoints(),
+                base.totalWinPoints(), base.totalLossPoints(), base.totalPushPoints(),
+                base.strikesAllowed(), base.teamPickLimit(), base.teamPickLimitScope(),
+                startsOn, false);
+    }
+
     // ------------------------------------------------------- per-market caps
 
     @Test
@@ -304,7 +367,8 @@ class PickLimitsIntegrationTest extends IntegrationTest {
                 base.moneylineWinPoints(), base.moneylineLossPoints(), base.moneylinePushPoints(),
                 base.spreadWinPoints(), base.spreadLossPoints(), base.spreadPushPoints(),
                 base.totalWinPoints(), base.totalLossPoints(), base.totalPushPoints(),
-                base.strikesAllowed(), limit, scope);
+                base.strikesAllowed(), limit, scope,
+                java.time.LocalDate.now(), false);
     }
 
     private GroupSettings singlePickPerGame() {
@@ -320,7 +384,8 @@ class PickLimitsIntegrationTest extends IntegrationTest {
                 base.moneylineWinPoints(), base.moneylineLossPoints(), base.moneylinePushPoints(),
                 base.spreadWinPoints(), base.spreadLossPoints(), base.spreadPushPoints(),
                 base.totalWinPoints(), base.totalLossPoints(), base.totalPushPoints(),
-                base.strikesAllowed(), base.teamPickLimit(), base.teamPickLimitScope());
+                base.strikesAllowed(), base.teamPickLimit(), base.teamPickLimitScope(),
+                java.time.LocalDate.now(), false);
     }
 
     /** Usernames are unique and cap at 20 characters, so owners are numbered. */

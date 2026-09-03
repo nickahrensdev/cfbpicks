@@ -69,7 +69,21 @@ public record GroupSettings(
 
         @Min(0) Integer strikesAllowed,
         @Min(1) Integer teamPickLimit,
-        TeamLimitScope teamPickLimitScope) {
+        TeamLimitScope teamPickLimitScope,
+
+        /**
+         * The first game day this group counts. Periods that finished before
+         * it are not settled, so a group can be started mid-season without
+         * charging everyone for the weeks it did not exist for.
+         *
+         * <p>Nullable on the way in only - {@code Group.apply} defaults an
+         * absent one to today, so a caller that does not care need not send a
+         * date and an older client keeps working.
+         */
+        java.time.LocalDate startsOn,
+
+        /** Whether joining is refused once {@link #startsOn} has arrived. */
+        boolean joinsCloseAtStart) {
 
     /**
      * Rejects combinations that are individually valid but nonsensical

@@ -106,6 +106,18 @@ public class Group {
     private boolean shareableByMembers;
 
     /**
+     * The first game day this group counts, in the zone the schedule is
+     * bucketed by - see CadencePeriod. Settlement ignores periods that closed
+     * before it, which is what lets a group start mid-season.
+     */
+    @Column(name = "starts_on", nullable = false)
+    private java.time.LocalDate startsOn;
+
+    /** Joining is refused from {@link #startsOn} onward. */
+    @Column(name = "joins_close_at_start", nullable = false)
+    private boolean joinsCloseAtStart;
+
+    /**
      * A private board of one, created with the account - see
      * {@link PersonalGroups}.
      *
@@ -231,6 +243,12 @@ public class Group {
         this.maxPicksPerCadence = settings.maxPicksPerCadence();
         this.multiplePicksPerGame = settings.multiplePicksPerGame();
         this.requireApproval = settings.requireApproval();
+        // Absent means "starts now". A caller that does not care about the
+        // date should not have to compute today's for itself.
+        this.startsOn = settings.startsOn() == null
+                ? java.time.LocalDate.now(com.nickspicks.api.pick.CadencePeriod.GAME_DAY_ZONE)
+                : settings.startsOn();
+        this.joinsCloseAtStart = settings.joinsCloseAtStart();
         this.shareableByMembers = settings.shareableByMembers();
 
         this.moneylineEnabled = settings.moneylineEnabled();
@@ -400,6 +418,27 @@ public class Group {
 
     public boolean isPersonal() {
         return personal;
+    }
+
+    public java.time.LocalDate getStartsOn() {
+        return startsOn;
+    }
+
+    public boolean isJoinsCloseAtStart() {
+        return joinsCloseAtStart;
+    }
+
+    /**
+     * Whether this group has begun, as the schedule reckons a day.
+     *
+     * <p>Compared in the game-day zone rather than the server's, so a group
+     * starting "on the 12th" begins when the 12th does for the games, not when
+     * it does for whatever machine happens to be asking.
+     */
+    public boolean hasStarted() {
+        return !java.time.LocalDate
+                .now(com.nickspicks.api.pick.CadencePeriod.GAME_DAY_ZONE)
+                .isBefore(startsOn);
     }
 
     public Integer getMaxPicksPerCadence() {

@@ -41,6 +41,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class CadenceSettlementIntegrationTest extends IntegrationTest {
 
+    /** Predates every fixture's schedule, so no period is skipped as too early. */
+    private static final java.time.LocalDate RUNNING_ALL_ALONG = java.time.LocalDate.of(2000, 1, 1);
+
     @Autowired
     private PickRepository pickRepository;
 
@@ -238,6 +241,70 @@ class CadenceSettlementIntegrationTest extends IntegrationTest {
 
     // ------------------------------------------------------------- fixtures
 
+    /**
+     * A group created after the season has begun is not answerable for the
+     * weeks it did not exist for.
+     *
+     * <p>Settlement builds its periods from the schedule, so without a start
+     * date it charged every closed week of the season the moment a group was
+     * created. In a points league that is a pile of unearned losses; in an
+     * elimination pool at two strikes it puts everyone out before a single
+     * pick can be made, which made starting one mid-season impossible.
+     */
+    @Test
+    void doesNotChargePeriodsThatFinishedBeforeTheGroupStarted() {
+        Instant lastWeek = Instant.now().minus(9, ChronoUnit.DAYS);
+        game(900L, 1, lastWeek);
+
+        // Starts today; week 1 is already behind it.
+        Group group = group(startingOn(java.time.LocalDate.now()));
+        UUID member = member(group, "latecomer");
+
+        settlement.settle(group, 2026);
+
+        assertThat(penalties.findAllByGroupIdAndPeriodKey(group.getId(), "2026-W01"))
+                .as("a week that ended before the group began is not its to charge")
+                .isEmpty();
+
+        // Recorded as settled all the same, so the skip is not recomputed on
+        // every run for the rest of the season.
+        assertThat(settlements.settledKeys(group.getId())).contains("2026-W01");
+        assertThat(member).isNotNull();
+    }
+
+    /** The other half: a week that is still running when the group starts. */
+    @Test
+    void stillChargesAPeriodTheGroupWasAliveFor() {
+        game(901L, 2, Instant.now().minus(2, ChronoUnit.HOURS));
+
+        Group group = group(startingOn(java.time.LocalDate.now().minusDays(1)));
+        UUID member = member(group, "present");
+
+        settlement.settle(group, 2026);
+
+        assertThat(penalties.findAllByGroupIdAndPeriodKey(group.getId(), "2026-W02"))
+                .anySatisfy(penalty -> assertThat(penalty.getUserId()).isEqualTo(member));
+    }
+
+    /** A weekly pickem group with an overall minimum and the given start date. */
+    private GroupSettings startingOn(java.time.LocalDate startsOn) {
+        BigDecimal one = BigDecimal.ONE;
+        BigDecimal zero = BigDecimal.ZERO;
+        BigDecimal half = new BigDecimal("0.5");
+
+        return new GroupSettings(
+                "Started", null, Visibility.PUBLIC, null,
+                GroupType.PICKEM, Cadence.WEEKLY, LengthType.CONTINUOUS, 2026,
+                30, 10, 1, true, false, false,
+                true, true, true,
+                null, null, null, null, null, null,
+                one, zero, half,
+                one, zero, half,
+                one, zero, half,
+                null, null, null,
+                startsOn, false);
+    }
+
     /** A weekly pickem group with the given per-market minimums. */
     private GroupSettings minimums(Integer spreadMin, Integer totalMin, Integer moneylineMin,
                                    Integer overall) {
@@ -254,7 +321,11 @@ class CadenceSettlementIntegrationTest extends IntegrationTest {
                 one, zero, half,
                 one, zero, half,
                 one, zero, half,
-                null, null, null);
+                null, null, null,
+                // Running since long before the fixtures' games, so nothing is
+                // skipped as predating the group - see startingOn() for the
+                // tests that are about the start date itself.
+                RUNNING_ALL_ALONG, false);
     }
 
     /**
@@ -280,7 +351,8 @@ class CadenceSettlementIntegrationTest extends IntegrationTest {
                 one, lossPoints, half,
                 one, lossPoints, half,
                 one, BigDecimal.ZERO, half,
-                null, null, null);
+                null, null, null,
+                RUNNING_ALL_ALONG, false);
     }
 
     private Group group(GroupSettings settings) {

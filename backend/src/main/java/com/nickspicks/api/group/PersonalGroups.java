@@ -107,6 +107,12 @@ public final class PersonalGroups {
                 one, zero, half,         // total
 
                 null,   // strikes are an elimination idea
-                null, null);
+                null, null,
+
+                // Starts today, and never closes: there is nobody to keep
+                // out, and no history to avoid being charged for either -
+                // this board has no minimum to fall short of.
+                LocalDate.now(),
+                false);
     }
 }

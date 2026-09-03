@@ -59,7 +59,8 @@ public final class TestGroups {
                 one, zero, half,
                 one, zero, half,
                 one, zero, half,
-                null, null, null);
+                null, null, null,
+                java.time.LocalDate.of(2000, 1, 1), false);
     }
 
     /** Scoring where a spread win is worth more than a total win. */
@@ -74,6 +75,7 @@ public final class TestGroups {
                 BigDecimal.ONE, loss, push,
                 spreadWin, loss, push,
                 totalWin, loss, push,
-                null, null, null);
+                null, null, null,
+                java.time.LocalDate.of(2000, 1, 1), false);
     }
 }

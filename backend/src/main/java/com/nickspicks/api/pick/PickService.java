@@ -530,6 +530,22 @@ public class PickService {
     }
 
     private void requireOpen(Group group, Game game, Market market) {
+        // Before the window check: a game the group is not playing at all is
+        // not "closed", it is not this group's game. Settlement ignores the
+        // periods before the start date, so allowing picks in them would mean
+        // picks that score but are never counted toward a minimum - and in an
+        // elimination pool, losses from before the pool began.
+        //
+        // Compared as game days, in the zone the schedule is bucketed by, so
+        // "the day it starts" means the whole of that day's slate.
+        if (game.getKickoff() != null
+                && game.getKickoff().atZone(CadencePeriod.GAME_DAY_ZONE).toLocalDate()
+                        .isBefore(group.getStartsOn())) {
+            throw new InvalidPickException(
+                    "This group starts on %s - games before then are not part of it"
+                            .formatted(group.getStartsOn()));
+        }
+
         if (!window.isOpen(game, group.getLockLeadMinutes())) {
             throw new PickWindowClosedException(
                     "Picks for %s at %s closed %d minutes before kickoff"

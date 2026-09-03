@@ -336,7 +336,8 @@ class GroupSettingsValidationTest {
                     moneyline, spread, total,
                     moneylineMin, moneylineMax, spreadMin, spreadMax, totalMin, totalMax,
                     one, zero, half, one, zero, half, one, zero, half,
-                    strikes, teamLimit, scope);
+                    strikes, teamLimit, scope,
+                    java.time.LocalDate.now(), false);
         }
     }
 }

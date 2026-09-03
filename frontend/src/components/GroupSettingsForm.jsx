@@ -61,6 +61,10 @@ export const DEFAULT_SETTINGS = {
   joinPassword: '',
 
   groupType: 'PICKEM',
+  // Today, in the browser's own zone. The server treats an absent date as
+  // "starts now" too, so this only makes the field show something sensible.
+  startsOn: new Date().toLocaleDateString('en-CA'),
+  joinsCloseAtStart: false,
   // Not asked for on the form any more - a group starts in the year it is
   // created, which is the only answer anyone was ever going to give.
   startSeason: new Date().getFullYear(),
@@ -417,6 +421,22 @@ export default function GroupSettingsForm({
             className="mb-3"
           />
 
+          <Form.Group className="mb-3">
+            <Form.Check
+              type="switch"
+              id="joins-close-at-start"
+              label="Stop accepting members once the group starts"
+              checked={value.joinsCloseAtStart}
+              onChange={(event) => update({ joinsCloseAtStart: event.target.checked })}
+              disabled={disabled}
+            />
+            <Form.Text className="text-body-secondary">
+              From the first day{value.startsOn ? ` (${value.startsOn})` : ''}, nobody can join by
+              search or by an invite link. An owner can still add someone by hand - closing the
+              doors should not lock out a member who was meant to be here.
+            </Form.Text>
+          </Form.Group>
+
           {/* Only meaningful for a private group. A public one is findable by
               search already, so sharing it adds convenience rather than
               access, and any member may do it. */}
@@ -522,6 +542,24 @@ export default function GroupSettingsForm({
                   value={value.lockLeadMinutes ?? ''}
                   onChange={setNumber('lockLeadMinutes')}
                   min={0}
+                  disabled={disabled}
+                />
+              </Setting>
+            </Col>
+            <Col md={6}>
+              {/* The setting that lets a group start mid-season. Games before
+                  this day are not the group's: they cannot be picked, and the
+                  weeks they fall in are not settled - so nobody is charged a
+                  minimum, or knocked out of an elimination pool, for a period
+                  the group did not exist for. */}
+              <Setting
+                label="First day"
+                help="Games before this are not part of the group. Leave it as today to start now."
+              >
+                <Form.Control
+                  type="date"
+                  value={value.startsOn ?? ''}
+                  onChange={(event) => update({ startsOn: event.target.value || null })}
                   disabled={disabled}
                 />
               </Setting>

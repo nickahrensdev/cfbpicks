@@ -24,6 +24,18 @@ public final class GroupExceptions {
         }
     }
 
+    /**
+     * The group stopped accepting members when it started.
+     *
+     * <p>Its own type rather than a bare Forbidden so the UI can say which of
+     * the several reasons a join can fail actually applied.
+     */
+    public static class JoinsClosedException extends RuntimeException {
+        public JoinsClosedException(String message) {
+            super(message);
+        }
+    }
+
     /** A password was supplied and it was wrong. */
     public static class PasswordIncorrectException extends RuntimeException {
         public PasswordIncorrectException(String message) {

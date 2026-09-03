@@ -77,6 +77,11 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "GROUP_PASSWORD_INCORRECT", ex.getMessage());
     }
 
+    @ExceptionHandler(GroupExceptions.JoinsClosedException.class)
+    public ProblemDetail handleJoinsClosed(GroupExceptions.JoinsClosedException ex) {
+        return problem(HttpStatus.FORBIDDEN, "GROUP_JOINS_CLOSED", ex.getMessage());
+    }
+
     @ExceptionHandler(GroupExceptions.AlreadyMemberException.class)
     public ProblemDetail handleAlreadyMember(GroupExceptions.AlreadyMemberException ex) {
         return problem(HttpStatus.CONFLICT, "ALREADY_A_MEMBER", ex.getMessage());

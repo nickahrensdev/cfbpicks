@@ -320,7 +320,8 @@ class GroupSharingIntegrationTest extends IntegrationTest {
                 one, zero, half,
                 one, zero, half,
                 one, zero, half,
-                null, null, null);
+                null, null, null,
+                java.time.LocalDate.now(), false);
     }
 
     private RequestPostProcessor owner() {

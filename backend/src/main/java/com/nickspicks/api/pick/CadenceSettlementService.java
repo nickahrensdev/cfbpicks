@@ -48,17 +48,20 @@ public class CadenceSettlementService {
     private final PickRepository picks;
     private final CadenceSettlementRepository settlements;
     private final CadencePenaltyRepository penalties;
+    private final EliminationService eliminations;
 
     public CadenceSettlementService(GroupRepository groups, GroupMemberRepository members,
                                     GameRepository games, PickRepository picks,
                                     CadenceSettlementRepository settlements,
-                                    CadencePenaltyRepository penalties) {
+                                    CadencePenaltyRepository penalties,
+                                    EliminationService eliminations) {
         this.groups = groups;
         this.members = members;
         this.games = games;
         this.picks = picks;
         this.settlements = settlements;
         this.penalties = penalties;
+        this.eliminations = eliminations;
     }
 
     /** @return how many periods were closed out across every group. */
@@ -105,11 +108,39 @@ public class CadenceSettlementService {
             if (alreadySettled.contains(period.getKey()) || !isClosed(period.getValue(), now)) {
                 continue;
             }
+            // A period that finished before the group began is not the group's
+            // to charge. Without this, creating a group mid-season handed
+            // every member a loss for each week it did not exist for - fatal
+            // in an elimination pool, where two of those put everyone out
+            // before the first pick could be made.
+            if (endedBeforeStart(group, period.getValue())) {
+                // Recorded as settled all the same, so the same skip is not
+                // recomputed on every run for the rest of the season.
+                settlements.save(new CadenceSettlement(group.getId(), period.getKey()));
+                continue;
+            }
             settlePeriod(group, period.getKey(), period.getValue());
             settlements.save(new CadenceSettlement(group.getId(), period.getKey()));
             closed++;
         }
         return closed;
+    }
+
+    /**
+     * Whether every game in this period had kicked off before the group's
+     * start date.
+     *
+     * <p>All rather than any: a week straddling the start date is still the
+     * group's week - the members could pick the rest of it - and charging it
+     * is right. Only a period wholly behind the start is skipped.
+     */
+    private boolean endedBeforeStart(Group group, List<Game> period) {
+        java.time.LocalDate start = group.getStartsOn();
+        return period.stream()
+                .map(Game::getKickoff)
+                .allMatch(kickoff -> kickoff.atZone(CadencePeriod.GAME_DAY_ZONE)
+                        .toLocalDate()
+                        .isBefore(start));
     }
 
     /** A period is closed once nothing in it can still be picked. */
@@ -148,6 +179,12 @@ public class CadenceSettlementService {
                 charge(group, userId, periodKey, null, overallMin - held.size(),
                         harshestLossPoints(group));
             }
+
+            // A charged minimum can be what puts someone out, so this is the
+            // other place elimination happens - and the other place someone
+            // can be left holding picks on games still to come.
+            eliminations.dropFuturePicksIfEliminated(
+                    group, userId, period.get(0).getSeason());
         }
     }
 

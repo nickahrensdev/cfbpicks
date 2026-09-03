@@ -91,6 +91,7 @@ public record GroupSettings(
         requireMarketRange("spread", "spreads", spreadMinPerCadence, spreadMaxPerCadence);
         requireMarketRange("over/under", "over/unders", totalMinPerCadence, totalMaxPerCadence);
         requireMarketMinimumsFit();
+        requireMarketMaximumsAllowMinimum();
 
         if ((teamPickLimit == null) != (teamPickLimitScope == null)) {
             throw new GroupExceptions.InvalidGroupSettingsException(
@@ -141,6 +142,48 @@ public record GroupSettings(
                             + "allows %d - no one could satisfy them all")
                             .formatted(required, periodNoun(), maxPicksPerCadence));
         }
+    }
+
+    /**
+     * The per-market maximums have to leave room for the overall minimum.
+     *
+     * <p>The mirror of {@link #requireMarketMinimumsFit()}, and impossible in
+     * the same way from the other direction: a group asking for 5 picks a week
+     * while capping spreads at 1, moneylines at 1 and over/unders at 1 lets a
+     * member pick at most 3, then charges them for the 2 they could not make.
+     *
+     * <p>Only checkable when every enabled market has a maximum - one market
+     * left open is an unbounded ceiling, and nothing can exceed it.
+     */
+    private void requireMarketMaximumsAllowMinimum() {
+        if (minPicksPerCadence <= 0) {
+            return;
+        }
+        if (openEnded(moneylineEnabled, moneylineMaxPerCadence)
+                || openEnded(spreadEnabled, spreadMaxPerCadence)
+                || openEnded(totalEnabled, totalMaxPerCadence)) {
+            return;
+        }
+
+        int available = allowed(moneylineEnabled, moneylineMaxPerCadence)
+                + allowed(spreadEnabled, spreadMaxPerCadence)
+                + allowed(totalEnabled, totalMaxPerCadence);
+
+        if (available < minPicksPerCadence) {
+            throw new GroupExceptions.InvalidGroupSettingsException(
+                    ("The per-market maximums only allow %d picks per %s, but the group asks for "
+                            + "at least %d - no one could reach it")
+                            .formatted(available, periodNoun(), minPicksPerCadence));
+        }
+    }
+
+    /** An enabled market with no maximum of its own. */
+    private boolean openEnded(boolean enabled, Integer max) {
+        return enabled && max == null;
+    }
+
+    private int allowed(boolean enabled, Integer max) {
+        return enabled && max != null ? max : 0;
     }
 
     private int required(boolean enabled, Integer min) {

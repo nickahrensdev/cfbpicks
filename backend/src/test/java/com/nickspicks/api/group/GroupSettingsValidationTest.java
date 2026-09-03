@@ -170,6 +170,67 @@ class GroupSettingsValidationTest {
                 .doesNotThrowAnyException();
     }
 
+    /**
+     * The mirror of the minimums-fit rule. Capping every market so tightly
+     * that the overall minimum cannot be reached is unsatisfiable in exactly
+     * the same way - every member would be charged for picks the rules never
+     * let them make.
+     */
+    @Test
+    void rejectsPerMarketMaximumsThatCannotReachTheOverallMinimum() {
+        assertThatThrownBy(() -> pickem()
+                .min(5)
+                .moneylineRange(null, 1)
+                .spreadRange(null, 1)
+                .totalRange(null, 1)
+                .build()
+                .validate())
+                .isInstanceOf(GroupExceptions.InvalidGroupSettingsException.class)
+                .hasMessageContaining("no one could reach it");
+    }
+
+    @Test
+    void acceptsPerMarketMaximumsThatExactlyMeetTheOverallMinimum() {
+        assertThatCode(() -> pickem()
+                .min(3)
+                .moneylineRange(null, 1)
+                .spreadRange(null, 1)
+                .totalRange(null, 1)
+                .build()
+                .validate())
+                .doesNotThrowAnyException();
+    }
+
+    /**
+     * One market left open is an unbounded ceiling, so the others being tight
+     * proves nothing - a member can always reach the minimum through it.
+     */
+    @Test
+    void ignoresTightMaximumsWhenAnyPlayedMarketHasNoMaximum() {
+        assertThatCode(() -> pickem()
+                .min(9)
+                .moneylineRange(null, 1)
+                .spreadRange(null, 1)
+                .totalRange(null, null)
+                .build()
+                .validate())
+                .doesNotThrowAnyException();
+    }
+
+    /** A maximum on a market nobody plays cannot stop anyone reaching it. */
+    @Test
+    void ignoresAMaximumOnAMarketTheGroupDoesNotPlay() {
+        assertThatCode(() -> pickem()
+                .min(2)
+                .moneyline(false)
+                .moneylineRange(null, 0)
+                .spreadRange(null, 1)
+                .totalRange(null, 1)
+                .build()
+                .validate())
+                .doesNotThrowAnyException();
+    }
+
     // ------------------------------------------------------------------ setup
 
     private static Builder pickem() {

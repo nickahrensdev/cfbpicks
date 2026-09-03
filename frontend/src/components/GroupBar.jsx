@@ -159,9 +159,20 @@ export default function GroupBar() {
 
   const settings = detail?.settings ?? null;
 
-  // The row the "Other groups" label goes above. Null when the only match is
-  // the current group, so the label never appears with nothing under it.
-  const firstOtherId = visible.find((entry) => entry.id !== groupId)?.id ?? null;
+  /*
+   * Three sections: where you are, your own board, and everywhere else.
+   *
+   * Each heading is pinned to the id of the first row that belongs under it,
+   * so a section with nothing in it renders no heading at all - which is what
+   * happens to "Personal" when the board you are already in is the personal
+   * one, and to "Other groups" when you have joined no leagues.
+   *
+   * The sort above has already grouped them in this order, so the rows under
+   * each heading are contiguous.
+   */
+  const others = visible.filter((entry) => entry.id !== groupId);
+  const firstPersonalId = others.find((entry) => entry.personal)?.id ?? null;
+  const firstOtherId = others.find((entry) => !entry.personal)?.id ?? null;
 
   const choose = (id) => {
     selectGroup(id);
@@ -359,10 +370,16 @@ export default function GroupBar() {
                   {entry.id === groupId && (
                     <span className="text-body-secondary group-subline mb-1">Current</span>
                   )}
+                  {/* Its own section rather than sitting at the top of the
+                      leagues: it is not one of them, and nothing about it -
+                      members, sharing, settings - works the way theirs do. */}
+                  {entry.id === firstPersonalId && (
+                    <span className="text-body-secondary group-subline mb-1 mt-2">Personal</span>
+                  )}
                   {/* Labels the rest of the list, once, at whichever row is
-                      the first that is not the current one. */}
-                  {entry.id !== groupId && entry.id === firstOtherId && (
-                    <span className="text-body-secondary group-subline mb-1">Other groups</span>
+                      the first league that is not the current one. */}
+                  {entry.id === firstOtherId && (
+                    <span className="text-body-secondary group-subline mb-1 mt-2">Other groups</span>
                   )}
 
                   <div

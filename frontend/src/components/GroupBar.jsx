@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Container, Form, InputGroup, Modal } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
+import ShareGroupButton from './ShareGroupButton.jsx';
 import { api } from '../api/client.js';
 import { useGroup } from '../auth/GroupProvider.jsx';
 import { useStickyOffsets } from '../lib/stickyOffsets.js';
@@ -295,7 +296,16 @@ export default function GroupBar() {
             )
           )}
         </Modal.Body>
-        <Modal.Footer>
+        {/* Sharing sits opposite the page link rather than beside it: one
+            hands the group to someone else, the other goes further into it,
+            and they should not read as a pair of related actions.
+
+            Gated on group.shareable, which the summary already carries - a
+            public group any member may share, a private one only if its
+            owner opted in. Hidden rather than disabled, since a button that
+            would be refused explains nothing by being there. */}
+        <Modal.Footer className={group.shareable ? 'justify-content-between' : undefined}>
+          {group.shareable && <ShareGroupButton groupId={group.id} />}
           <Button
             as={Link}
             to={`/groups/${group.id}`}
@@ -390,8 +400,11 @@ export default function GroupBar() {
             </div>
           )}
 
+          {/* Straight to the search rather than to the groups list - the list
+              is what this modal already is, so sending them there would show
+              the same names again one screen further away. */}
           <Link
-            to="/groups"
+            to="/groups/find"
             className="small d-inline-block mt-3"
             onClick={() => setPicking(false)}
           >

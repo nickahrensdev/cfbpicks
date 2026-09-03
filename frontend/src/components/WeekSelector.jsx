@@ -33,7 +33,10 @@ export default function WeekSelector({
 
   const control = (
     <InputGroup
-      size={size ?? (compact ? 'sm' : undefined)}
+      // Undefined is Bootstrap's default (medium). `compact` used to force
+      // "sm" here, which is what made this read as one more filter button; it
+      // now only drops the wrapper and label, and size is the caller's call.
+      size={size}
       // flex-nowrap: Bootstrap's input-group wraps by default, which
       // breaks the arrows onto their own lines when the toolbar is
       // tight. flex-shrink-0 keeps the toolbar from squeezing it there

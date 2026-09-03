@@ -43,7 +43,9 @@ export default function DaySelector({ value, onChange, days = [], compact = fals
 
   const control = (
     <InputGroup
-      size={size ?? (compact ? 'sm' : undefined)}
+      // See WeekSelector: undefined is Bootstrap's medium, and `compact` no
+      // longer forces a size of its own.
+      size={size}
       // flex-nowrap: Bootstrap's input-group wraps by default, which
       // breaks the arrows onto their own lines when the toolbar is
       // tight. flex-shrink-0 keeps the toolbar from squeezing it there
@@ -69,7 +71,7 @@ export default function DaySelector({ value, onChange, days = [], compact = fals
         aria-label="Game day"
         // Wide enough for the date at the larger size the games board uses -
         // at 10rem the native picker's own icon crowded the digits out.
-        style={{ maxWidth: size === 'lg' ? '13rem' : '10rem' }}
+        style={{ maxWidth: size === "lg" ? "13rem" : "11rem" }}
       />
       <Button
         variant="outline-secondary"

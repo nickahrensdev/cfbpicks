@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Card, Col, Container, Form, Row, Table } from 'react-bootstrap';
+import { Badge, Button, Card, Collapse, Container, Form, InputGroup, Table } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 
 import { EmptyState, ErrorNotice, Loading, MemberName, NoGroupNotice } from '../components/common.jsx';
@@ -25,25 +25,45 @@ const points = (value) => Number(value).toString();
  * two leagues showing "3.0" may have got there completely differently.
  */
 function ScoringNote({ settings }) {
+  const [open, setOpen] = useState(false);
+
   if (!settings) return null;
 
   const live = MARKET_LABELS.filter(([key]) => settings[`${key}Enabled`]);
   if (live.length === 0) return null;
 
   return (
-    <p className="small text-body-secondary mb-3">
-      Scoring:{' '}
-      {live.map(([key, label], index) => (
-        <span key={key}>
-          {index > 0 && ' · '}
-          <span className="fw-semibold">{label}</span>{' '}
-          {points(settings[`${key}WinPoints`])} win /{' '}
-          {points(settings[`${key}LossPoints`])} loss /{' '}
-          {points(settings[`${key}PushPoints`])} push
-        </span>
-      ))}
-      . Ties on points break on most wins, then fewest losses.
-    </p>
+    // Behind a disclosure. It is reference material - read once when you join
+    // a group, never again - and as a permanent paragraph of small grey text
+    // it pushed the standings themselves further down every single visit.
+    <div className="mb-3">
+      <Button
+        variant="link"
+        size="sm"
+        className="p-0 text-body-secondary text-decoration-none"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+        aria-controls="scoring-note"
+      >
+        How points work {open ? '▲' : '▼'}
+      </Button>
+
+      <Collapse in={open}>
+        <div id="scoring-note">
+          <div className="small text-body-secondary border-start border-3 ps-3 mt-2">
+            {live.map(([key, label]) => (
+              <div key={key}>
+                <span className="fw-semibold">{label}</span>{' '}
+                {points(settings[`${key}WinPoints`])} win /{' '}
+                {points(settings[`${key}LossPoints`])} loss /{' '}
+                {points(settings[`${key}PushPoints`])} push
+              </div>
+            ))}
+            <div className="mt-1">Ties on points break on most wins, then fewest losses.</div>
+          </div>
+        </div>
+      </Collapse>
+    </div>
   );
 }
 
@@ -90,6 +110,19 @@ export default function LeaderboardPage() {
     load();
   }, [load]);
 
+  /**
+   * Whether this period has any result in it yet.
+   *
+   * <p>Before anyone picks, every member ties on nothing and the server ranks
+   * them all first - which drew a gold medal on every row. Four golds is not
+   * a standing, it is a table that looks broken. Medals wait until there is
+   * something to be first at.
+   */
+  const started = useMemo(
+    () => rows.some((row) => row.totalPicks > 0 || row.points !== 0),
+    [rows],
+  );
+
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return rows;
@@ -111,44 +144,41 @@ export default function LeaderboardPage() {
 
   return (
     <Container className="py-4 py-md-5">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1 className="h3 mb-0">Leaderboard</h1>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h1 className="h4 mb-0">Leaderboard</h1>
         <Button variant="outline-secondary" size="sm" onClick={load} disabled={loading}>
           Refresh
         </Button>
       </div>
 
-      <Row className="g-3 mb-4">
-        <Col xs={12} sm={5} md={4}>
-          <Form.Label htmlFor="leaderboard-week" className="small fw-semibold mb-1">
-            Period
-          </Form.Label>
-          <Form.Select
-            id="leaderboard-week"
-            value={week ?? ''}
-            onChange={(e) => setWeek(e.target.value === '' ? null : Number(e.target.value))}
-          >
-            <option value="">Overall</option>
-            {(meta?.availableWeeks ?? []).map((option) => (
-              <option key={option} value={option}>
-                Week {option}
-              </option>
-            ))}
-          </Form.Select>
-        </Col>
-        <Col xs={12} sm={7} md={5}>
-          <Form.Label htmlFor="leaderboard-search" className="small fw-semibold mb-1">
-            Find a member
-          </Form.Label>
-          <Form.Control
-            id="leaderboard-search"
-            type="search"
-            placeholder="Search by name"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </Col>
-      </Row>
+      {/* One row, no stacked labels. Two full-width controls each under its
+          own heading took a third of a phone screen before a single standing
+          was visible; the select names itself ("Overall", "Week 3") and the
+          search has a placeholder, so the labels were only restating them. */}
+      <InputGroup className="mb-3">
+        <Form.Select
+          id="leaderboard-week"
+          aria-label="Period"
+          className="flex-grow-0 w-auto"
+          value={week ?? ''}
+          onChange={(e) => setWeek(e.target.value === '' ? null : Number(e.target.value))}
+        >
+          <option value="">Overall</option>
+          {(meta?.availableWeeks ?? []).map((option) => (
+            <option key={option} value={option}>
+              Week {option}
+            </option>
+          ))}
+        </Form.Select>
+        <Form.Control
+          id="leaderboard-search"
+          type="search"
+          placeholder="Find a member"
+          aria-label="Find a member"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </InputGroup>
 
       <ErrorNotice error={error} onRetry={load} />
 
@@ -160,6 +190,14 @@ export default function LeaderboardPage() {
         <EmptyState title={search ? 'No members match that search' : 'No members yet'} />
       ) : (
         <Card className="shadow-sm">
+          {/* A table of zeroes with no explanation reads as a broken page
+              rather than as a season that has not started. Said once, above
+              the table, instead of repeated down every row. */}
+          {!started && (
+            <div className="small text-body-secondary border-bottom px-3 py-2">
+              No picks {week ? 'in this week' : 'yet'} - everyone starts level.
+            </div>
+          )}
           <div className="table-responsive">
             <Table hover className="align-middle mb-0">
               <thead>
@@ -189,7 +227,9 @@ export default function LeaderboardPage() {
                         navigate(`/members/${row.userId}${week ? `?week=${week}` : ''}`)
                       }
                     >
-                      <td className="fw-semibold">{medal(row.rank) ?? row.rank}</td>
+                      <td className={started ? 'fw-semibold' : 'fw-semibold text-body-tertiary'}>
+                        {(started && medal(row.rank)) || row.rank}
+                      </td>
                       {/* No "you" badge - the highlighted row already says
                           which one is yours, and the badge only crowded the
                           name it sat next to. */}

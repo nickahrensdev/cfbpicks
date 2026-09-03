@@ -51,7 +51,7 @@ export default function LoginPage() {
 
     // Both fields are optional at the form; the API seeds anything left blank
     // from the email address, then makes the username unique if it collides.
-    const { error: authError } =
+    const { data, error: authError } =
       mode === 'signin'
         ? await signIn(email, password)
         : await signUp(email, password, displayName.trim(), username.trim());
@@ -59,9 +59,34 @@ export default function LoginPage() {
     if (authError) {
       setError(authError.message);
     } else if (mode === 'signup') {
-      // Supabase may require email confirmation depending on project settings.
-      setNotice('Account created. Check your email if confirmation is required, then sign in.');
-      setMode('signin');
+      // What actually happened, rather than a message covering every case.
+      //
+      // Sign-up has three outcomes and the response tells them apart, so the
+      // old "Account created. Check your email if confirmation is required"
+      // was both hedging about something knowable and, in one case, wrong:
+      // Supabase answers a duplicate address with a success, not an error, so
+      // an existing account was being congratulated on being created.
+      if (data?.session) {
+        // Already signed in - the redirect at the top of this component takes
+        // over on the next render, so there is nobody left to read a message.
+      } else if (data?.user && (data.user.identities?.length ?? 0) === 0) {
+        // The anti-enumeration response: a real user object with no identity
+        // attached, which is Supabase's way of not confirming out loud that
+        // the address is taken. Saying so plainly is the right trade here -
+        // this is a private league, and the alternative is someone retyping a
+        // password they already have while being told it worked.
+        setNotice({
+          variant: 'warning',
+          text: 'That email already has an account. Sign in below, or reset the password if you have forgotten it.',
+        });
+        setMode('signin');
+      } else {
+        setNotice({
+          variant: 'success',
+          text: `Confirm your email to finish. We sent a link to ${email} - open it, then sign in.`,
+        });
+        setMode('signin');
+      }
     }
     setBusy(false);
   };
@@ -80,7 +105,10 @@ export default function LoginPage() {
               </p>
 
               {error && <Alert variant="danger">{error}</Alert>}
-              {notice && <Alert variant="success">{notice}</Alert>}
+              {/* Carries its own variant: "check your email" and "that
+                  address is already taken" are both non-errors, but they are
+                  not the same kind of news and should not look identical. */}
+              {notice && <Alert variant={notice.variant}>{notice.text}</Alert>}
 
               <Form onSubmit={submit}>
                 {mode === 'signup' && (

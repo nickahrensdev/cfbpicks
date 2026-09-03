@@ -62,8 +62,13 @@ export default function SiteNav() {
                   {label}
                 </Nav.Link>
               ))}
+
+              {/* Desktop only. A dropdown inside an expanded burger menu is a
+                  menu inside a menu - it opens downward over the links below
+                  it and has to be dismissed before anything else can be
+                  read. On a phone the same links are listed flat instead. */}
               {isAdmin && (
-                <NavDropdown title="Admin" id="admin-menu">
+                <NavDropdown title="Admin" id="admin-menu" className="d-none d-lg-block">
                   {ADMIN_LINKS.map(({ to, label }) => (
                     <NavDropdown.Item key={to} as={NavLink} to={to}>
                       {label}
@@ -73,6 +78,24 @@ export default function SiteNav() {
               )}
             </Nav>
           )}
+
+          {/* The flat admin list the dropdown above stands in for on a phone,
+              under a heading so it is clear these are a different class of
+              destination rather than five more ordinary links. */}
+          {session && isAdmin && (
+            <div className="d-lg-none">
+              <div className="site-nav-heading">Admin</div>
+              <Nav>
+                {ADMIN_LINKS.map(({ to, label }) => (
+                  <Nav.Link key={to} as={NavLink} to={to}>
+                    {label}
+                  </Nav.Link>
+                ))}
+              </Nav>
+            </div>
+          )}
+
+          {session && <div className="site-nav-heading d-lg-none">Account</div>}
 
           <Nav className="ms-auto align-items-lg-center">
             {session ? (
@@ -91,11 +114,14 @@ export default function SiteNav() {
                     </Badge>
                   )}
                 </Nav.Link>
+                {/* Full width on a phone, where it is the last thing in a
+                    stacked menu and a button hugging its own text reads as
+                    unfinished; inline and small once the bar is horizontal. */}
                 <Button
                   variant="outline-light"
                   size="sm"
                   onClick={handleSignOut}
-                  className="mt-2 mt-lg-0"
+                  className="mt-2 mt-lg-0 w-100 w-lg-auto"
                 >
                   Sign out
                 </Button>

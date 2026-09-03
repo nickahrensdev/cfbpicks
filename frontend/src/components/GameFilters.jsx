@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Col, Collapse, Form, Row } from 'react-bootstrap';
+import { Button, Col, Form, Modal, Row } from 'react-bootstrap';
 
 import RangeSlider from './RangeSlider.jsx';
 
@@ -124,7 +124,11 @@ export default function GameFilters({
   const filtered = activeCount > 0 || value.mine;
 
   return (
-    <div className="mb-3">
+    // One panel rather than two rows floating in the page. The picker and the
+    // actions belong to each other - they are the controls for the board
+    // below - but with nothing tying them together they read as two unrelated
+    // strips separated by a band of empty page.
+    <div className="board-toolbar mb-3">
       {/* Two fixed rows rather than one that wraps at some widths and not
           others - the controls kept moving between lines as the board and the
           window changed, which is harder to use than a layout that simply
@@ -133,11 +137,11 @@ export default function GameFilters({
           The period picker owns the first row, centred: it is what the whole
           board is showing rather than one control among several, and
           left-aligned it read as the first of the filters below it. */}
-      <div className="d-flex flex-column align-items-center mb-3">{weekSelector}</div>
+      <div className="d-flex flex-column align-items-center">{weekSelector}</div>
 
       {/* Actions left; the count and refresh sit together on the right. The
           count describes the board below, and refresh is what re-reads it. */}
-      <div className="d-flex align-items-center gap-2">
+      <div className="board-toolbar-actions d-flex align-items-center gap-2">
         <div className="d-flex align-items-center gap-2 flex-nowrap">
           {/* text-nowrap so "My picks" never breaks across two lines, which
               made the whole row taller the moment it was switched on. */}
@@ -153,15 +157,15 @@ export default function GameFilters({
           </Button>
 
           {/* Icon only, so it needs an explicit name. The count stays visible
-              because a collapsed panel must never hide that the list is
-              filtered, and the solid variant shows it is open. */}
+              because the panel is a modal now and cannot be seen at the same
+              time as the board - the badge is the only thing on screen saying
+              the list below is filtered. */}
           <Button
             size="sm"
             className="control-btn"
-            variant={open || activeCount > 0 ? 'secondary' : 'outline-secondary'}
-            onClick={() => setOpen((current) => !current)}
-            aria-expanded={open}
-            aria-controls="game-filter-panel"
+            variant={activeCount > 0 ? 'secondary' : 'outline-secondary'}
+            onClick={() => setOpen(true)}
+            aria-haspopup="dialog"
             aria-label={activeCount > 0 ? `Filters, ${activeCount} active` : 'Filters'}
             title="Filters"
           >
@@ -199,9 +203,11 @@ export default function GameFilters({
         </div>
 
         <div className="ms-auto d-flex align-items-center gap-2 flex-nowrap">
-          {/* Nothing rather than "0 games" while a board is still loading. */}
+          {/* Nothing rather than "0 games" while a board is still loading.
+              Tertiary: it is a caption for the list below, not a control, and
+              at secondary it carried the same weight as the buttons. */}
           {totalCount > 0 && (
-            <span className="small text-body-secondary text-nowrap">
+            <span className="small text-body-tertiary text-nowrap">
               {resultCount === totalCount
                 ? `${totalCount} games`
                 : `${resultCount} of ${totalCount} games`}
@@ -224,9 +230,17 @@ export default function GameFilters({
         </div>
       </div>
 
-      <Collapse in={open}>
-        <div id="game-filter-panel">
-          <Row className="g-3 align-items-end pt-3 pb-1">
+      {/* A dialog rather than an inline panel. Expanded, the panel was taller
+          than a phone screen, so opening it pushed the board out of sight and
+          choosing a filter meant scrolling back up to see what it had done.
+          A modal keeps that decision in one place and hands the whole screen
+          back when it closes. */}
+      <Modal show={open} onHide={() => setOpen(false)} centered scrollable>
+        <Modal.Header closeButton>
+          <Modal.Title className="h5">Filters</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Row className="g-3 align-items-end">
             <Col xs={12} md={4}>
               <Form.Label htmlFor="filter-conference" className="small fw-semibold mb-1">
                 Conference
@@ -343,8 +357,39 @@ export default function GameFilters({
               </Col>
             )}
           </Row>
-        </div>
-      </Collapse>
+        </Modal.Body>
+        <Modal.Footer className="justify-content-between">
+          {/* Clearing is the other thing you come here to do, so it belongs
+              in the dialog as well as on the toolbar - and here it can say
+              how many it is clearing. Nothing to clear, nothing shown. */}
+          <Button
+            variant="link"
+            className="text-body-secondary text-decoration-none"
+            disabled={!filtered}
+            onClick={() =>
+              onChange({
+                conference: null,
+                teamId: null,
+                status: null,
+                minSpread: null,
+                maxSpread: null,
+                mine: false,
+                pickableOnly: false,
+                todayOnly: false,
+              })
+            }
+          >
+            Clear all
+          </Button>
+          {/* The filters apply as they are chosen - this only dismisses the
+              dialog, so it says Done rather than Apply. */}
+          <Button onClick={() => setOpen(false)}>
+            {resultCount === totalCount
+              ? 'Done'
+              : `Show ${resultCount} ${resultCount === 1 ? 'game' : 'games'}`}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }

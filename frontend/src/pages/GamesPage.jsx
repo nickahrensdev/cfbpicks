@@ -230,7 +230,7 @@ export default function GamesPage() {
   const jumpToNow = () => (daily ? setDay(nowPeriod) : setWeek(nowPeriod));
 
   const visibleGames = useMemo(() => {
-    return games.filter((game) => {
+    const matched = games.filter((game) => {
       if (filters.mine
           && !game.mySpreadPick && !game.myTotalPick && !game.myMoneylinePick) {
         return false;
@@ -268,6 +268,21 @@ export default function GamesPage() {
       }
       return true;
     });
+
+    // Finished games sink to the bottom. The board is a place to make picks,
+    // and a game that has ended is the one thing on it nobody can act on -
+    // by the back half of a Saturday the pickable games were buried under
+    // results. Sorted, not filtered: the scores are still worth reading, just
+    // not first.
+    //
+    // Canceled counts as finished for this purpose. It is equally
+    // unpickable, and grouping it with the results keeps the live and
+    // upcoming games in one unbroken run at the top.
+    //
+    // Only the done/not-done key is compared, and Array#sort is stable, so
+    // kickoff order - the order the server sent - survives inside each half.
+    const done = (game) => (game.status === 'FINAL' || game.status === 'CANCELED' ? 1 : 0);
+    return [...matched].sort((a, b) => done(a) - done(b));
   }, [games, filters, daily, markets]);
 
   /**
@@ -435,11 +450,10 @@ export default function GamesPage() {
           weekSelector={
             <>
               {daily ? (
-                <DaySelector compact size="lg" value={day} onChange={setDay} days={gameDays} />
+                <DaySelector compact value={day} onChange={setDay} days={gameDays} />
               ) : (
                 <WeekSelector
                   compact
-                  size="lg"
                   weeks={meta?.availableWeeks}
                   current={week}
                   onChange={setWeek}

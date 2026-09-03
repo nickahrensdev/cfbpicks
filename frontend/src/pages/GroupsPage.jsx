@@ -1,10 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Container, Form, InputGroup } from 'react-bootstrap';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Badge, Button, Container } from 'react-bootstrap';
+import { Link } from 'react-router-dom';
 
 import { api } from '../api/client.js';
 import ShareGroupButton from '../components/ShareGroupButton.jsx';
-import { EmptyState, ErrorNotice, handle, Loading, LockIcon, UnlockIcon } from '../components/common.jsx';
+import { useGroup } from '../auth/GroupProvider.jsx';
+import { ChevronIcon, EmptyState, ErrorNotice, Loading } from '../components/common.jsx';
+
+/** "Pick'em · Weekly · 4 members" - the line that tells two groups apart. */
+function describe(group) {
+  return [
+    group.groupType === 'ELIMINATION' ? 'Elimination' : "Pick'em",
+    group.cadence === 'DAILY' ? 'Daily' : 'Weekly',
+    `${group.memberCount} ${group.memberCount === 1 ? 'member' : 'members'}`,
+  ].join(' · ');
+}
 
 /**
  * The member's view of groups: the ones they are in, and the public ones they
@@ -14,75 +24,30 @@ import { EmptyState, ErrorNotice, handle, Loading, LockIcon, UnlockIcon } from '
  * arriving here either wants a group they already have or one they do not.
  */
 export default function GroupsPage() {
-  const [params, setParams] = useSearchParams();
-  const term = params.get('q') ?? '';
+  // Only to mark which row is the one every other page is showing. The list
+  // is otherwise identical whichever group is selected, and without this the
+  // bar above says "Current Group: X" while the list gives no sign which X is.
+  const { groupId: currentGroupId } = useGroup();
 
   const [mine, setMine] = useState([]);
-  const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
-
-  // Which group's password box is open, and what has been typed into it.
-  const [joining, setJoining] = useState(null);
-  const [password, setPassword] = useState('');
-  const [busyId, setBusyId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [groups, found] = await Promise.all([api.myGroups(), api.searchGroups({ q: term })]);
-      setMine(groups);
-      setResults(found);
+      setMine(await api.myGroups());
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, [term]);
+  }, []);
 
   useEffect(() => {
     load();
   }, [load]);
-
-  const join = async (group) => {
-    // An open group needs no password, so the first click joins outright; a
-    // locked one opens the box and the second click submits it.
-    if (group.passwordRequired && joining !== group.id) {
-      setJoining(group.id);
-      setPassword('');
-      return;
-    }
-
-    setBusyId(group.id);
-    setNotice(null);
-    try {
-      const result = await api.joinGroup(group.id, group.passwordRequired ? password : null);
-      setJoining(null);
-      setPassword('');
-
-      // A group that vets its members hands back a pending request rather
-      // than a membership, so the message has to say which happened.
-      setNotice(
-        result?.pending
-          ? {
-              variant: 'info',
-              text: `Your request to join ${group.name} is waiting for an owner to approve it.`,
-            }
-          : { variant: 'success', text: `You joined ${group.name}.` },
-      );
-      await load();
-    } catch (err) {
-      const text =
-        err.code === 'GROUP_PASSWORD_INCORRECT' || err.code === 'GROUP_PASSWORD_REQUIRED'
-          ? err.message
-          : `Could not join: ${err.message}`;
-      setNotice({ variant: 'danger', text });
-    } finally {
-      setBusyId(null);
-    }
-  };
 
   if (loading) {
     return (
@@ -94,176 +59,98 @@ export default function GroupsPage() {
 
   return (
     <Container className="py-4 py-md-5">
-      <div className="d-grid gap-4">
-        <div>
-          <h1 className="h3 mb-1">Groups</h1>
-          <p className="text-body-secondary mb-0">
-            Each group is its own league, with its own rules and its own leaderboard.
-          </p>
+      <div className="d-grid gap-4" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
+        {/* The action sits beside the heading rather than after the list.
+            It is how you get to the other half of this page's job, and at
+            the bottom it was below however many groups you happen to be in.
+            align-items-start so it lines up with the heading rather than
+            centring against the two-line blurb beside it. */}
+        <div className="d-flex justify-content-between align-items-start gap-3">
+          <div style={{ minWidth: 0 }}>
+            <h1 className="h4 mb-1">Groups</h1>
+            <p className="text-body-secondary small mb-0">
+              Each group is its own league, with its own rules and its own leaderboard.
+            </p>
+          </div>
+          <Button
+            as={Link}
+            to="/groups/find"
+            size="sm"
+            variant="outline-primary"
+            className="flex-shrink-0 text-nowrap"
+          >
+            Find a group
+          </Button>
         </div>
 
         <ErrorNotice error={error} onRetry={load} />
-        {notice && (
-          <Alert variant={notice.variant} dismissible onClose={() => setNotice(null)}>
-            {notice.text}
-          </Alert>
-        )}
 
         <section>
           <h2 className="h6 text-uppercase text-body-secondary mb-2">My groups</h2>
           {mine.length === 0 ? (
             <EmptyState title="You are not in a group yet">
-              <p className="mb-0">Find a public one below, or ask an owner to add you.</p>
-            </EmptyState>
-          ) : (
-            <div className="d-grid gap-2">
-              {mine.map((group) => (
-                <Card key={group.id} as={Link} to={`/groups/${group.id}`} className="text-decoration-none">
-                  <Card.Body className="d-flex justify-content-between align-items-center gap-3">
-                    <div>
-                      <div className="fw-semibold d-flex align-items-center gap-2">
-                        {group.name}
-                        {group.myRole === 'OWNER' && (
-                          <Badge bg="primary" className="fw-normal">
-                            owner
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="small text-body-secondary">
-                        {group.groupType === 'ELIMINATION' ? 'Elimination' : "Pick'em"} ·{' '}
-                        {group.cadence === 'DAILY' ? 'Daily' : 'Weekly'} · {group.memberCount}{' '}
-                        {group.memberCount === 1 ? 'member' : 'members'}
-                      </div>
-                    </div>
-                    <div className="d-flex align-items-center gap-3 flex-shrink-0">
-                      {/* The whole card is a link, so the button has to stop
-                          the click reaching it - sharing a group should not
-                          also navigate away from the list. */}
-                      {group.shareable && (
-                        <div
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                          }}
-                        >
-                          <ShareGroupButton groupId={group.id} />
-                        </div>
-                      )}
-                      <span aria-hidden="true" className="text-body-secondary">
-                        →
-                      </span>
-                    </div>
-                  </Card.Body>
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <h2 className="h6 text-uppercase text-body-secondary mb-2">Find a group</h2>
-
-          <Form
-            className="mb-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              load();
-            }}
-          >
-            <InputGroup>
-              <Form.Control
-                value={term}
-                onChange={(event) => setParams(event.target.value ? { q: event.target.value } : {})}
-                placeholder="Search public groups by name"
-                aria-label="Search public groups"
-              />
-              <Button type="submit" variant="outline-secondary">
-                Search
+              <p className="mb-3">Search the public ones, or ask an owner to add you.</p>
+              <Button as={Link} to="/groups/find">
+                Find a group
               </Button>
-            </InputGroup>
-          </Form>
-
-          {results.length === 0 ? (
-            <EmptyState title="No public groups match">
-              <p className="mb-0">Private groups are unlisted - an owner has to add you.</p>
             </EmptyState>
           ) : (
-            <div className="d-grid gap-2">
-              {results.map((group) => (
-                <Card key={group.id}>
-                  <Card.Body>
-                    <div className="d-flex justify-content-between align-items-start gap-3">
-                      <div>
-                        <div className="fw-semibold d-flex align-items-center gap-2">
-                          {group.name}
-                          <Badge
-                            bg="secondary-subtle"
-                            text="secondary-emphasis"
-                            title={group.passwordRequired ? 'Password required' : 'Open to anyone'}
-                          >
-                            {group.passwordRequired ? <LockIcon /> : <UnlockIcon />}
-                          </Badge>
-                        </div>
-                        {group.description && (
-                          <p className="mb-1 small">{group.description}</p>
-                        )}
-                        <div className="small text-body-secondary">
-                          {group.memberCount} {group.memberCount === 1 ? 'member' : 'members'}
-                          {group.creatorName && ` · created by ${handle(group.creatorName)}`}
-                        </div>
-                      </div>
-
-                      {group.alreadyMember ? (
-                        <Button as={Link} to={`/groups/${group.id}`} size="sm" variant="outline-secondary">
-                          Open
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          onClick={() => join(group)}
-                          disabled={busyId === group.id}
-                        >
-                          {busyId === group.id ? 'Joining…' : 'Join'}
-                        </Button>
+            // One bordered list rather than a stack of separate cards. Five
+            // groups filled a phone screen when each was its own card with
+            // its own padding and gap; as rows they read as one list and fit.
+            <div className="group-list">
+              {mine.map((group) => (
+                <Link
+                  key={group.id}
+                  to={`/groups/${group.id}`}
+                  className={`group-row ${group.id === currentGroupId ? 'group-row--current' : ''}`}
+                  aria-current={group.id === currentGroupId ? 'true' : undefined}
+                >
+                  {/* min-width 0 so a long group name ellipsizes instead of
+                      pushing the actions off the row. */}
+                  <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="fw-semibold text-truncate">{group.name}</span>
+                      {group.myRole === 'OWNER' && (
+                        // Subtle, not solid primary. It labels the row; it is
+                        // not more important than the name it sits beside.
+                        <Badge bg="secondary-subtle" text="secondary-emphasis" className="fw-normal">
+                          owner
+                        </Badge>
                       )}
                     </div>
+                    <div className="small text-body-secondary text-truncate">
+                      {group.id === currentGroupId && (
+                        <span className="text-primary fw-semibold">Current · </span>
+                      )}
+                      {describe(group)}
+                    </div>
+                  </div>
 
-                    {joining === group.id && (
-                      <Form
-                        className="mt-3"
-                        onSubmit={(event) => {
+                  <div className="d-flex align-items-center gap-2 flex-shrink-0">
+                    {/* The whole row is a link, so the button has to stop the
+                        click reaching it - sharing a group should not also
+                        navigate away from the list. */}
+                    {group.shareable && (
+                      <span
+                        onClick={(event) => {
                           event.preventDefault();
-                          join(group);
+                          event.stopPropagation();
                         }}
                       >
-                        <InputGroup size="sm">
-                          <Form.Control
-                            type="password"
-                            value={password}
-                            onChange={(event) => setPassword(event.target.value)}
-                            placeholder="Group password"
-                            aria-label={`Password for ${group.name}`}
-                            autoFocus
-                          />
-                          <Button type="submit" size="sm" disabled={busyId === group.id}>
-                            Join
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline-secondary"
-                            onClick={() => setJoining(null)}
-                          >
-                            Cancel
-                          </Button>
-                        </InputGroup>
-                      </Form>
+                        <ShareGroupButton groupId={group.id} iconOnly />
+                      </span>
                     )}
-                  </Card.Body>
-                </Card>
+                    <span className="text-body-tertiary d-flex">
+                      <ChevronIcon />
+                    </span>
+                  </div>
+                </Link>
               ))}
             </div>
           )}
         </section>
+
       </div>
     </Container>
   );

@@ -18,7 +18,52 @@ import { usePointerBlur } from '../lib/pointerFocus.js';
  * public group is findable by search anyway; a private one needs its owner to
  * have opted in.
  */
-export default function ShareGroupButton({ groupId, size = 'sm', variant = 'outline-secondary' }) {
+/** Three nodes joined by two lines. Decorative - the button carries the label. */
+function ShareIcon({ className = '' }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+      className={className}
+    >
+      <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5" />
+    </svg>
+  );
+}
+
+/** Confirmation tick, swapped in for the share glyph after a copy. */
+function CheckIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M13.485 1.929a1 1 0 0 1 .143 1.407l-7 8.5a1 1 0 0 1-1.49.083L2.153 8.933a1 1 0 1 1 1.394-1.433l2.21 2.152 6.34-7.7a1 1 0 0 1 1.388-.023z" />
+    </svg>
+  );
+}
+
+/**
+ * @param iconOnly drops the text label, for a dense list where the word
+ *                 "Share" costs more width than it earns. The accessible name
+ *                 moves to aria-label so the control is still announced.
+ */
+export default function ShareGroupButton({
+  groupId,
+  size = 'sm',
+  variant = 'outline-secondary',
+  iconOnly = false,
+}) {
   const blurOnPointer = usePointerBlur();
   const [state, setState] = useState('idle');
 
@@ -46,6 +91,12 @@ export default function ShareGroupButton({ groupId, size = 'sm', variant = 'outl
 
   const label = state === 'working' ? 'Copying…' : state === 'copied' ? 'Link copied' : 'Share';
 
+  // The glyph carries the meaning on its own once the label is gone, so the
+  // copied state swaps the icon rather than only the colour - a green button
+  // that still shows a share arrow does not say "done".
+  const glyph =
+    state === 'copied' ? <CheckIcon /> : <ShareIcon className={iconOnly ? '' : 'me-1'} />;
+
   return (
     <div className="d-inline-flex flex-column align-items-end">
       <Button
@@ -54,12 +105,16 @@ export default function ShareGroupButton({ groupId, size = 'sm', variant = 'outl
         onClick={share}
         onPointerUp={blurOnPointer}
         disabled={state === 'working'}
-        className="text-nowrap"
+        className={iconOnly ? 'control-btn' : 'text-nowrap'}
+        aria-label={iconOnly ? label : undefined}
+        title={iconOnly ? label : undefined}
       >
-        {state === 'working' && (
-          <Spinner as="span" size="sm" animation="border" className="me-2" />
+        {state === 'working' ? (
+          <Spinner as="span" size="sm" animation="border" className={iconOnly ? '' : 'me-2'} />
+        ) : (
+          glyph
         )}
-        {label}
+        {!iconOnly && label}
       </Button>
       {state !== 'idle' && state !== 'working' && state !== 'copied' && (
         <span className="small text-danger mt-1">{state}</span>

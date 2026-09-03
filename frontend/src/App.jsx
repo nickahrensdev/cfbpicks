@@ -13,6 +13,7 @@ import GameDetailPage from './pages/GameDetailPage.jsx';
 import MemberPicksPage from './pages/MemberPicksPage.jsx';
 import LeaderboardPage from './pages/LeaderboardPage.jsx';
 import GroupsPage from './pages/GroupsPage.jsx';
+import FindGroupPage from './pages/FindGroupPage.jsx';
 import GroupDetailPage from './pages/GroupDetailPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import TeamPage from './pages/TeamPage.jsx';
@@ -20,6 +21,7 @@ import AthletePage from './pages/AthletePage.jsx';
 import CoachPage from './pages/CoachPage.jsx';
 import AdminUsersPage from './pages/admin/AdminUsersPage.jsx';
 import AdminGroupsPage from './pages/admin/AdminGroupsPage.jsx';
+import AdminGroupCreatePage from './pages/admin/AdminGroupCreatePage.jsx';
 import AdminGroupEditPage from './pages/admin/AdminGroupEditPage.jsx';
 import AdminDataPage from './pages/admin/AdminDataPage.jsx';
 import DataLogPage from './pages/admin/DataLogPage.jsx';
@@ -62,6 +64,9 @@ export default function App() {
           <Route path="/members/:userId" element={guarded(<MemberPicksPage />)} />
           <Route path="/leaderboard" element={guarded(<LeaderboardPage />)} />
           <Route path="/groups" element={guarded(<GroupsPage />)} />
+          {/* Before /groups/:id, which would otherwise match "find" and try
+              to load a group whose id is the literal string. */}
+          <Route path="/groups/find" element={guarded(<FindGroupPage />)} />
           <Route path="/groups/:id" element={guarded(<GroupDetailPage />)} />
           <Route path="/profile" element={guarded(<ProfilePage />)} />
           <Route path="/teams/:id" element={guarded(<TeamPage />)} />
@@ -70,6 +75,8 @@ export default function App() {
 
           <Route path="/admin/members" element={adminOnly(<AdminUsersPage />)} />
           <Route path="/admin/groups" element={adminOnly(<AdminGroupsPage />)} />
+          {/* Before /admin/groups/:id, which would otherwise match "new". */}
+          <Route path="/admin/groups/new" element={adminOnly(<AdminGroupCreatePage />)} />
           <Route path="/admin/groups/:id" element={adminOnly(<AdminGroupEditPage />)} />
           <Route path="/admin/data" element={adminOnly(<AdminDataPage />)} />
           <Route path="/admin/data-log" element={adminOnly(<DataLogPage />)} />

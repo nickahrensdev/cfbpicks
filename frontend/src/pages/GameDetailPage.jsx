@@ -226,6 +226,82 @@ export default function GameDetailPage() {
         ? 1 - Number(espn.homeWinProbability)
         : Number(detail.awayWinProbability);
 
+  /**
+   * Who took what, extracted so it can sit directly under the game card.
+   *
+   * <p>It used to be the last thing on the page, below the line history, the
+   * ATS tables and the box score - which put the one section about this
+   * group's own members behind several screens of reference data. It is the
+   * reason a member opens this page during a game, so it goes near the top.
+   */
+  const memberPicksCard = (
+    <Card className="shadow-sm mb-4">
+      <Card.Body>
+        <h2 className="h6 text-uppercase text-body-secondary mb-3">Member picks</h2>
+
+        {!detail.picksRevealed ? (
+          <p className="text-body-secondary mb-0 small">
+            Everyone&apos;s picks appear once this game kicks off.
+            {game.mySpreadPick && (
+              <>
+                {' '}
+                You took{' '}
+                <strong>
+                  {game.mySpreadPick.selection === 'HOME'
+                    ? game.homeTeamName
+                    : game.awayTeamName}
+                </strong>{' '}
+                at {formatSpread(game.mySpreadPick.lockedLine, game.mySpreadPick.selection)}.
+              </>
+            )}
+            {game.myTotalPick && (
+              <>
+                {' '}
+                You took the{' '}
+                <strong>{game.myTotalPick.selection.toLowerCase()}</strong> at{' '}
+                {formatTotal(game.myTotalPick.lockedLine, game.myTotalPick.selection)}.
+              </>
+            )}
+          </p>
+        ) : detail.memberPicks.length === 0 ? (
+          <p className="text-body-secondary mb-0 small">Nobody picked this game.</p>
+        ) : (
+          <div className="table-responsive">
+            <Table hover size="sm" className="align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">Member</th>
+                  <th scope="col" title="Spread, Over/Under or Moneyline">Mkt</th>
+                  <th scope="col">Pick</th>
+                  <th scope="col">Line</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.memberPicks.map((pick) => (
+                  // The row's tint is the result - see pickRowStyle. The
+                  // title keeps it available to anyone who cannot separate
+                  // the colours.
+                  <tr
+                    key={`${pick.userId}-${pick.market}`}
+                    style={pickRowStyle(pick.result)}
+                    title={pick.result === 'PENDING' ? 'Not yet graded' : pick.result}
+                  >
+                    <td>
+                      <MemberName displayName={pick.displayName} username={pick.username} />
+                    </td>
+                    <td className="text-body-secondary">{marketAbbr(pick.market)}</td>
+                    <td>{pickSide(game, pick)}</td>
+                    <td>{formatLineBare(pick.lockedLine, pick.selection)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        )}
+      </Card.Body>
+    </Card>
+  );
+
   return (
     <Container className="py-4 py-md-5">
       <div className="d-flex justify-content-between align-items-center mb-3">
@@ -254,6 +330,8 @@ export default function GameDetailPage() {
           showDetailsLink={false}
         />
       </div>
+
+      {memberPicksCard}
 
       <Card className="shadow-sm mb-4">
         <Card.Body>
@@ -567,71 +645,6 @@ export default function GameDetailPage() {
         </Card>
       )}
 
-      <Card className="shadow-sm">
-        <Card.Body>
-          <h2 className="h6 text-uppercase text-body-secondary mb-3">Member picks</h2>
-
-          {!detail.picksRevealed ? (
-            <p className="text-body-secondary mb-0 small">
-              Everyone&apos;s picks appear once this game kicks off.
-              {game.mySpreadPick && (
-                <>
-                  {' '}
-                  You took{' '}
-                  <strong>
-                    {game.mySpreadPick.selection === 'HOME'
-                      ? game.homeTeamName
-                      : game.awayTeamName}
-                  </strong>{' '}
-                  at {formatSpread(game.mySpreadPick.lockedLine, game.mySpreadPick.selection)}.
-                </>
-              )}
-              {game.myTotalPick && (
-                <>
-                  {' '}
-                  You took the{' '}
-                  <strong>{game.myTotalPick.selection.toLowerCase()}</strong> at{' '}
-                  {formatTotal(game.myTotalPick.lockedLine, game.myTotalPick.selection)}.
-                </>
-              )}
-            </p>
-          ) : detail.memberPicks.length === 0 ? (
-            <p className="text-body-secondary mb-0 small">Nobody picked this game.</p>
-          ) : (
-            <div className="table-responsive">
-              <Table hover size="sm" className="align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th scope="col">Member</th>
-                    <th scope="col" title="Spread, Over/Under or Moneyline">Mkt</th>
-                    <th scope="col">Pick</th>
-                    <th scope="col">Line</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.memberPicks.map((pick) => (
-                    // The row's tint is the result - see pickRowStyle. The
-                    // title keeps it available to anyone who cannot separate
-                    // the colours.
-                    <tr
-                      key={`${pick.userId}-${pick.market}`}
-                      style={pickRowStyle(pick.result)}
-                      title={pick.result === 'PENDING' ? 'Not yet graded' : pick.result}
-                    >
-                      <td>
-                        <MemberName displayName={pick.displayName} username={pick.username} />
-                      </td>
-                      <td className="text-body-secondary">{marketAbbr(pick.market)}</td>
-                      <td>{pickSide(game, pick)}</td>
-                      <td>{formatLineBare(pick.lockedLine, pick.selection)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
-          )}
-        </Card.Body>
-      </Card>
     </Container>
   );
 }

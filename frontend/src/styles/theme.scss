@@ -409,6 +409,174 @@ body {
   vertical-align: baseline;
 }
 
+// The burger menu, expanded.
+//
+// It was a flat run of links with no separation between "pages", "admin
+// pages" and "your account", and the only sign of which page you were on was
+// a slight change in text colour. Everything here applies below lg, where the
+// menu is a stacked panel; the horizontal bar is left alone.
+@include media-breakpoint-down(lg) {
+  // Hangs over the page instead of growing the navbar and pushing everything
+  // down. The whole page shifting on every menu open lost your scroll position
+  // and shoved the board out from under your thumb; an overlay leaves the page
+  // exactly where it was.
+  //
+  // The containing block is the navbar itself, which is position: sticky and
+  // so already positioned - the Container in between is static and does not
+  // intercept it. left/right 0 makes the panel full-bleed rather than
+  // gutter-width.
+  .navbar .navbar-collapse {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    padding: 0.5rem 1rem 1rem;
+    background: var(--bs-dark);
+    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.35);
+
+    // A long menu on a short phone scrolls inside itself rather than running
+    // off the bottom of the screen with no way to reach the end.
+    max-height: calc(100dvh - var(--nav-height));
+    overflow-y: auto;
+  }
+
+  // Roomier targets, and an active state that is a filled pill rather than a
+  // shade of white you have to compare against its neighbours to notice.
+  .navbar .nav-link {
+    padding: 0.5rem 0.75rem;
+    border-radius: $border-radius;
+
+    &.active {
+      background: rgba(255, 255, 255, 0.12);
+      font-weight: 600;
+    }
+  }
+
+  // A hairline above each group rather than a heavier <hr>, which read as a
+  // page divider inside what is only a menu.
+  .site-nav-heading {
+    margin-top: 0.5rem;
+    padding: 0.75rem 0.75rem 0.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+// Bootstrap ships w-100 but no responsive w-*-auto, and the sign-out button
+// needs to stop being full width once the bar goes horizontal.
+@include media-breakpoint-up(lg) {
+  .w-lg-auto {
+    width: auto !important;
+  }
+}
+
+// The games board's controls: period picker above, actions below.
+//
+// They were two bare rows with a 1rem gap between them, which left the picker
+// floating in the middle of the page and the actions reading as a separate
+// strip that happened to be nearby. One tinted panel with a hairline between
+// the halves says they belong together and reclaims the dead band.
+.board-toolbar {
+  background: rgba(var(--bs-body-color-rgb), 0.03);
+  border: 1px solid var(--bs-border-color);
+  border-radius: $border-radius;
+  padding: 0.625rem 0.75rem;
+}
+
+.board-toolbar-actions {
+  margin-top: 0.625rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--bs-border-color);
+}
+
+// Progress track for the group-creation stepper.
+//
+// Replaces a row of numbered pills that hid their labels below sm to fit,
+// leaving a phone showing "1 → 2 → 3 → 4". The step is named above this
+// instead, and the bar only has to carry position.
+.stepper-track {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.stepper-seg {
+  flex: 1 1 0;
+}
+
+.stepper-seg-hit {
+  display: block;
+  width: 100%;
+  height: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bs-tertiary-bg);
+  cursor: pointer;
+
+  // A 4px bar is far below a usable touch target, so the hit area is grown
+  // downward with a transparent border rather than by making the bar taller.
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  background-clip: padding-box;
+  margin: -10px 0;
+
+  &.is-done {
+    background: rgba(var(--bs-primary-rgb), 0.55);
+  }
+
+  &.is-current {
+    background: var(--bs-primary);
+  }
+
+  // Steps not yet reached are not navigable, and should not look it.
+  &:disabled {
+    cursor: default;
+  }
+}
+
+// The member's own groups, as one bordered list.
+//
+// These were separate cards with a gap between them, which meant five groups
+// filled a phone screen and the page was mostly padding. Sharing one border
+// and splitting the rows with hairlines says "list" and fits roughly twice as
+// many before scrolling.
+.group-list {
+  border: 1px solid var(--bs-border-color);
+  border-radius: $border-radius;
+  overflow: hidden;
+}
+
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  color: var(--bs-body-color);
+  text-decoration: none;
+  background: var(--bs-card-bg);
+
+  & + & {
+    border-top: 1px solid var(--bs-border-color);
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(var(--bs-primary-rgb), 0.08);
+    color: var(--bs-body-color);
+  }
+}
+
+// The group every other page is currently showing. A left rule rather than a
+// badge - it marks the whole row without adding another thing to read at the
+// end of it.
+.group-row--current {
+  box-shadow: inset 3px 0 0 var(--bs-primary);
+}
+
 // Team page banner.
 //
 // The flat fill it replaced left the header reading as a coloured rectangle

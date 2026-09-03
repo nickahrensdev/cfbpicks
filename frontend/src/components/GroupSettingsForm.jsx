@@ -97,12 +97,32 @@ export const DEFAULT_SETTINGS = {
   teamPickLimitScope: null,
 };
 
-/** The sections, in the order the stepper walks them. */
+/**
+ * The sections, in the order the stepper walks them.
+ *
+ * <p>Five rather than four, and regrouped by what a setting <em>does</em>
+ * rather than where it happened to be added:
+ *
+ * <ul>
+ *   <li><b>Basics</b> - what the group is called.
+ *   <li><b>Access</b> - who can get in. Visibility and the join password used
+ *       to be here while approval and member sharing sat on Format, which
+ *       split one question across two screens.
+ *   <li><b>Format</b> - what kind of game it is, and when picks close.
+ *   <li><b>Scoring</b> - which markets are played and what each outcome pays.
+ *   <li><b>Limits</b> - every cap and floor in one place. These were spread
+ *       across three steps: the overall maximum on Format, the overall
+ *       minimum on Rules and the per-market ones on Scoring - so the check
+ *       that the minimums fit inside the maximum reported an error about a
+ *       field two steps behind the one being read.
+ * </ul>
+ */
 export const SETTINGS_STEPS = [
   ['basics', 'Basics'],
+  ['access', 'Access'],
   ['format', 'Format'],
   ['scoring', 'Scoring'],
-  ['rules', 'Rules'],
+  ['limits', 'Limits'],
 ];
 
 /**
@@ -118,13 +138,23 @@ export function stepIssue(settings, stepIndex) {
   if (key === 'basics' && !settings.name?.trim()) {
     return 'Give the group a name to continue.';
   }
-  if (key === 'scoring') {
-    if (!settings.moneylineEnabled && !settings.spreadEnabled && !settings.totalEnabled) {
-      return 'Turn on at least one pick option - a group with none has nothing to pick.';
-    }
+  if (key === 'scoring'
+      && !settings.moneylineEnabled && !settings.spreadEnabled && !settings.totalEnabled) {
+    return 'Turn on at least one pick option - a group with none has nothing to pick.';
+  }
 
+  // Every one of these now reads fields on the step it fires from. They used
+  // to run on Scoring while the cap they compared against lived on Format,
+  // so the message named a number that was not on screen.
+  if (key === 'limits') {
     const period = settings.cadence === 'DAILY' ? 'day' : 'week';
     const live = MARKETS.filter(([market]) => settings[`${market}Enabled`]);
+    const cap = settings.maxPicksPerCadence;
+    const floor = settings.minPicksPerCadence;
+
+    if (cap != null && cap !== '' && floor != null && floor !== '' && floor > cap) {
+      return `The fewest picks per ${period} cannot be more than the most.`;
+    }
 
     const backwards = live.find(([market]) => {
       const min = settings[`${market}MinPerCadence`];
@@ -138,7 +168,6 @@ export function stepIssue(settings, stepIndex) {
     // The same arithmetic the server does. Worth repeating here because the
     // stepper would otherwise walk someone to the end before mentioning that
     // their minimums add up to more picks than the group allows.
-    const cap = settings.maxPicksPerCadence;
     if (cap != null && cap !== '') {
       const required = live.reduce(
         (total, [market]) => total + (settings[`${market}MinPerCadence`] ?? 0),
@@ -147,6 +176,21 @@ export function stepIssue(settings, stepIndex) {
       if (required > cap) {
         return `The per-market minimums add up to ${required} picks per ${period}, but the group `
           + `only allows ${cap}. No one could satisfy them all.`;
+      }
+    }
+
+    // The same impossibility from the other side: maximums so tight that the
+    // overall minimum cannot be reached. Only checkable when every enabled
+    // market has a maximum - one left blank is an unbounded ceiling.
+    if (floor > 0 && live.length > 0
+        && live.every(([market]) => settings[`${market}MaxPerCadence`] != null)) {
+      const available = live.reduce(
+        (total, [market]) => total + settings[`${market}MaxPerCadence`],
+        0,
+      );
+      if (available < floor) {
+        return `The per-option maximums only allow ${available} picks per ${period}, but the `
+          + `group asks for at least ${floor}. No one could reach it.`;
       }
     }
   }
@@ -233,56 +277,64 @@ export default function GroupSettingsForm({
   return (
     <div>
       {stepper ? (
-        <ol className="list-unstyled d-flex align-items-center gap-2 mb-3">
-          {SETTINGS_STEPS.map(([key, label], index) => {
-            const current = index === step;
-            const reached = index <= furthest;
-            return (
-              <Fragment key={key}>
-                {/* flex-basis 0 rather than Bootstrap's flex-fill: `auto` would
-                    size each step to its own label, making "Scoring" wider than
-                    "Rules". Zero basis divides the row evenly instead, so the
-                    steps stay the same width as each other whatever they are
-                    called. */}
-                <li style={{ flex: '1 1 0' }}>
-                  <Button
+        /* A named progress track rather than a row of numbered pills.
+           The pills hid their labels below sm to fit, which left a phone
+           showing "1 → 2 → 3 → 4" - an accurate count of steps and no clue
+           what any of them was about. Naming the current step above a
+           segmented bar says where you are in words at every width, and adding
+           a fifth section costs the bar a segment rather than squeezing every
+           pill narrower. */
+        <div className="mb-3">
+          <div className="d-flex justify-content-between align-items-baseline mb-2 gap-2">
+            <span className="fw-semibold text-truncate">{SETTINGS_STEPS[step]?.[1]}</span>
+            <span className="small text-body-secondary text-nowrap">
+              Step {step + 1} of {SETTINGS_STEPS.length}
+            </span>
+          </div>
+
+          <ol className="stepper-track list-unstyled mb-0">
+            {SETTINGS_STEPS.map(([key, label], index) => {
+              const reached = index <= furthest;
+              return (
+                <li key={key} className="stepper-seg">
+                  <button
                     type="button"
-                    size="sm"
-                    variant={current ? 'primary' : reached ? 'outline-primary' : 'outline-secondary'}
                     disabled={!reached}
                     onClick={() => goToStep(index)}
-                    aria-current={current ? 'step' : undefined}
-                    className="w-100 d-flex align-items-center justify-content-center gap-2 text-nowrap"
-                  >
-                    <span className="fw-semibold">{index + 1}</span>
-                    {/* Four labels plus numbers do not fit a narrow phone, and a
-                        wrapped step row is worse than numbers alone. */}
-                    <span className="d-none d-sm-inline">{label}</span>
-                  </Button>
+                    aria-current={index === step ? 'step' : undefined}
+                    // The segment is a 4px bar, far too small to hit and with
+                    // no text of its own, so the name is the accessible one.
+                    aria-label={`Step ${index + 1}: ${label}`}
+                    title={label}
+                    className={[
+                      'stepper-seg-hit',
+                      index < step ? 'is-done' : '',
+                      index === step ? 'is-current' : '',
+                    ].join(' ')}
+                  />
                 </li>
-
-                {/* Its own item at a fixed width, so the arrows sit between the
-                    steps without eating into them - the steps keep dividing the
-                    row evenly between themselves. Decorative: the numbers and
-                    aria-current already carry the order. */}
-                {index < SETTINGS_STEPS.length - 1 && (
-                  <li
-                    aria-hidden="true"
-                    className="text-body-secondary small"
-                    style={{ flex: '0 0 auto' }}
-                  >
-                    →
-                  </li>
-                )}
-              </Fragment>
-            );
-          })}
-        </ol>
+              );
+            })}
+          </ol>
+        </div>
       ) : (
-        <Nav variant="tabs" activeKey={tab} onSelect={setTab} className="mb-3">
+        // flex-nowrap and a sideways scroll: five tabs no longer fit a phone,
+        // and a wrapped second row of tabs reads as a second toolbar.
+        <Nav
+          variant="tabs"
+          activeKey={tab}
+          onSelect={setTab}
+          className="mb-3 flex-nowrap overflow-auto"
+          // Belt and braces with the caller's own minmax(0, 1fr): a scroll
+          // container still needs to be allowed to shrink below its content,
+          // or it grows its parent instead of scrolling.
+          style={{ minWidth: 0 }}
+        >
           {SETTINGS_STEPS.map(([key, label]) => (
             <Nav.Item key={key}>
-              <Nav.Link eventKey={key}>{label}</Nav.Link>
+              <Nav.Link eventKey={key} className="text-nowrap">
+                {label}
+              </Nav.Link>
             </Nav.Item>
           ))}
         </Nav>
@@ -311,6 +363,17 @@ export default function GroupSettingsForm({
               disabled={disabled}
             />
           </Setting>
+
+        </Card>
+      )}
+
+      {activeKey === 'access' && (
+        <Card body>
+          <p className="text-body-secondary small">
+            Four separate gates, in the order someone meets them: whether they can find the group,
+            whether they need a password, whether you have to approve them, and whether members
+            can invite anyone at all.
+          </p>
 
           <Setting
             label="Visibility"
@@ -341,6 +404,38 @@ export default function GroupSettingsForm({
               placeholder="No password"
             />
           </Setting>
+
+          {/* Applies however someone arrives - search or a shared link - so
+              the setting means the same thing whichever route they took. */}
+          <Form.Check
+            type="switch"
+            id="require-approval"
+            label="An owner has to approve people joining"
+            checked={value.requireApproval}
+            onChange={(event) => update({ requireApproval: event.target.checked })}
+            disabled={disabled}
+            className="mb-3"
+          />
+
+          {/* Only meaningful for a private group. A public one is findable by
+              search already, so sharing it adds convenience rather than
+              access, and any member may do it. */}
+          {value.visibility === 'PRIVATE' && (
+            <Form.Group className="mb-0">
+              <Form.Check
+                type="switch"
+                id="shareable-by-members"
+                label="Let members share this private group"
+                checked={value.shareableByMembers}
+                onChange={(event) => update({ shareableByMembers: event.target.checked })}
+                disabled={disabled}
+              />
+              <Form.Text className="text-body-secondary">
+                Off by default: a private group is unlisted because you chose that, and a
+                member&apos;s link would let anyone holding it in. Owners can always share.
+              </Form.Text>
+            </Form.Group>
+          )}
         </Card>
       )}
 
@@ -431,66 +526,32 @@ export default function GroupSettingsForm({
                 />
               </Setting>
             </Col>
-            <Col md={6}>
-              <Setting
-                label={`Most picks per ${value.cadence === 'DAILY' ? 'day' : 'week'}`}
-                help="Leave blank for no limit."
-              >
-                <Form.Control
-                  type="number"
-                  value={value.maxPicksPerCadence ?? ''}
-                  onChange={setNumber('maxPicksPerCadence', { nullable: true })}
-                  min={1}
-                  placeholder="No limit"
-                  disabled={disabled}
-                />
-              </Setting>
-            </Col>
           </Row>
 
-          {/* Applies however someone arrives - search or a shared link - so
-              the setting means the same thing whichever route they took. */}
-          <Form.Check
-            type="switch"
-            id="require-approval"
-            label="An owner has to approve people joining"
-            checked={value.requireApproval}
-            onChange={(event) => update({ requireApproval: event.target.checked })}
-            disabled={disabled}
-            className="mb-3"
-          />
-
-          {/* Only meaningful for a private group. A public one is findable by
-              search already, so sharing it adds convenience rather than
-              access, and any member may do it. */}
-          {value.visibility === 'PRIVATE' && (
-            <Form.Group className="mb-3">
-              <Form.Check
-                type="switch"
-                id="shareable-by-members"
-                label="Let members share this private group"
-                checked={value.shareableByMembers}
-                onChange={(event) => update({ shareableByMembers: event.target.checked })}
-                disabled={disabled}
-              />
-              <Form.Text className="text-body-secondary">
-                Off by default: a private group is unlisted because you chose that, and a
-                member&apos;s link would let anyone holding it in. Owners can always share.
-              </Form.Text>
-            </Form.Group>
+          {/* Here rather than with the other numbers on Limits: strikes are
+              how this format ends, not a cap on picking. It is also the one
+              field that only exists for one of the two group types, so it
+              belongs beside the control that chooses them. */}
+          {isElimination && (
+            <div className="border-top pt-3 mt-1">
+              <Row>
+                <Col md={6}>
+                  <Setting
+                    label="Wrong picks allowed"
+                    help="How many losses before a member is out. Zero means one wrong pick ends it."
+                  >
+                    <Form.Control
+                      type="number"
+                      value={value.strikesAllowed ?? ''}
+                      onChange={setNumber('strikesAllowed')}
+                      min={0}
+                      disabled={disabled}
+                    />
+                  </Setting>
+                </Col>
+              </Row>
+            </div>
           )}
-
-          <Form.Check
-            type="switch"
-            id="multiple-picks-per-game"
-            label="Allow more than one pick on the same game"
-            checked={value.multiplePicksPerGame}
-            onChange={(event) => update({ multiplePicksPerGame: event.target.checked })}
-            disabled={disabled}
-          />
-          <Form.Text className="text-body-secondary">
-            For example taking the spread and the over on the same game.
-          </Form.Text>
         </Card>
       )}
 
@@ -538,90 +599,39 @@ export default function GroupSettingsForm({
                   ))}
                 </Row>
 
-                {/* Without these, a group playing all three markets on one
-                    scoring table has a dominant strategy: take heavy
-                    favourites to win and never touch a spread. The overall
-                    cap cannot fix that, because it does not care which
-                    market a pick came from. */}
-                <Row className="g-2 mt-1">
-                  {[
-                    ['Min', `Min per ${periodNoun}`],
-                    ['Max', `Max per ${periodNoun}`],
-                  ].map(([suffix, outcome]) => (
-                    <Col xs={6} key={suffix}>
-                      <Form.Label className="small mb-1">{outcome}</Form.Label>
-                      <Form.Control
-                        type="number"
-                        min="0"
-                        size="sm"
-                        placeholder="Any"
-                        value={value[`${key}${suffix}PerCadence`] ?? ''}
-                        onChange={setNumber(`${key}${suffix}PerCadence`, { nullable: true })}
-                        disabled={disabled || !enabled}
-                      />
-                    </Col>
-                  ))}
-                </Row>
-                <Form.Text className="text-body-secondary d-block">
-                  Blank means no limit. A minimum is checked when the {periodNoun} closes -
-                  falling short counts as a loss.
-                </Form.Text>
               </div>
             );
           })}
         </Card>
       )}
 
-      {activeKey === 'rules' && (
+      {activeKey === 'limits' && (
         <Card body>
+          <p className="text-body-secondary small">
+            Every cap and floor in one place. These used to be spread over three steps, which
+            made it hard to see whether they could all be met at once.
+          </p>
+
           <Row>
             <Col md={6}>
               <Setting
-                label="Times a team can be picked"
-                help="Leave blank to let members pick the same team as often as they like."
+                label={`Most picks per ${periodNoun}`}
+                help="Leave blank for no limit."
               >
                 <Form.Control
                   type="number"
-                  value={value.teamPickLimit ?? ''}
-                  onChange={(event) => {
-                    const raw = event.target.value;
-                    if (raw === '') {
-                      // The limit and its scope only mean anything together.
-                      update({ teamPickLimit: null, teamPickLimitScope: null });
-                      return;
-                    }
-                    update({
-                      teamPickLimit: Number(raw),
-                      teamPickLimitScope: value.teamPickLimitScope ?? 'BOTH',
-                    });
-                  }}
+                  value={value.maxPicksPerCadence ?? ''}
+                  onChange={setNumber('maxPicksPerCadence', { nullable: true })}
                   min={1}
                   placeholder="No limit"
                   disabled={disabled}
                 />
               </Setting>
             </Col>
-            <Col md={6}>
-              <Setting label="Counted against" help="Which pick options the limit applies to.">
-                <Form.Select
-                  value={value.teamPickLimitScope ?? ''}
-                  onChange={(event) => update({ teamPickLimitScope: event.target.value })}
-                  disabled={disabled || value.teamPickLimit == null}
-                >
-                  <option value="MONEYLINE">Moneyline picks only</option>
-                  <option value="SPREAD">Spread picks only</option>
-                  <option value="BOTH">Both</option>
-                </Form.Select>
-              </Setting>
-            </Col>
-          </Row>
-
-          {/* Applies to either group type. It was elimination-only back when
-              the only consequence of missing it was being knocked out; now an
-              unmet minimum is charged as losses, which a points league carries
-              perfectly well - and per-market minimums on the Scoring step
-              already work that way. */}
-          <Row>
+            {/* Applies to either group type. It was elimination-only back when
+                the only consequence of missing it was being knocked out; now an
+                unmet minimum is charged as losses, which a points league
+                carries perfectly well. */}
             <Col md={6}>
               <Setting
                 label={`Fewest picks per ${periodNoun}`}
@@ -640,32 +650,103 @@ export default function GroupSettingsForm({
             </Col>
           </Row>
 
-          {isElimination ? (
-            <div className="border-top pt-3 mt-3">
-              <p className="fw-semibold mb-3">Elimination</p>
-              <Row>
-                <Col md={6}>
-                  <Setting
-                    label="Wrong picks allowed"
-                    help="How many losses before a member is out. Zero means one wrong pick ends it."
-                  >
+          {/* Beside the overall allowance they have to fit inside, rather than
+              back on Scoring. Without per-market limits, a group playing all
+              three markets on one scoring table has a dominant strategy: take
+              heavy favourites to win and never touch a spread. The overall cap
+              cannot fix that, because it does not care which market a pick
+              came from. */}
+          <div className="border-top pt-3 mt-1">
+            <p className="fw-semibold mb-1">Per pick option</p>
+            <p className="text-body-secondary small">
+              Blank means no limit. A minimum is checked when the {periodNoun} closes - falling
+              short counts as a loss.
+            </p>
+
+            {/* Only the markets this group actually plays. A limit on a market
+                nobody can pick is a number with no effect, and three disabled
+                rows made the ones that mattered harder to find. */}
+            {MARKETS.filter(([key]) => value[`${key}Enabled`]).map(([key, label]) => (
+              <Row className="g-2 align-items-end mb-2" key={key}>
+                <Col xs={12} sm={4}>
+                  <span className="small fw-semibold">{label}</span>
+                </Col>
+                {[
+                  ['Min', `Min per ${periodNoun}`],
+                  ['Max', `Max per ${periodNoun}`],
+                ].map(([suffix, outcome]) => (
+                  <Col xs={6} sm={4} key={suffix}>
+                    <Form.Label className="small mb-1">{outcome}</Form.Label>
                     <Form.Control
                       type="number"
-                      value={value.strikesAllowed ?? ''}
-                      onChange={setNumber('strikesAllowed')}
-                      min={0}
+                      min="0"
+                      size="sm"
+                      placeholder="Any"
+                      value={value[`${key}${suffix}PerCadence`] ?? ''}
+                      onChange={setNumber(`${key}${suffix}PerCadence`, { nullable: true })}
                       disabled={disabled}
                     />
-                  </Setting>
-                </Col>
+                  </Col>
+                ))}
               </Row>
-            </div>
-          ) : (
-            <p className="text-body-secondary small border-top pt-3 mt-3 mb-0">
-              Strikes apply to elimination groups. Switch the group type on the Format tab to set
-              them.
-            </p>
-          )}
+            ))}
+          </div>
+
+          <div className="border-top pt-3 mt-3">
+            <Row>
+              <Col md={6}>
+                <Setting
+                  label="Times a team can be picked"
+                  help="Leave blank to let members pick the same team as often as they like."
+                >
+                  <Form.Control
+                    type="number"
+                    value={value.teamPickLimit ?? ''}
+                    onChange={(event) => {
+                      const raw = event.target.value;
+                      if (raw === '') {
+                        // The limit and its scope only mean anything together.
+                        update({ teamPickLimit: null, teamPickLimitScope: null });
+                        return;
+                      }
+                      update({
+                        teamPickLimit: Number(raw),
+                        teamPickLimitScope: value.teamPickLimitScope ?? 'BOTH',
+                      });
+                    }}
+                    min={1}
+                    placeholder="No limit"
+                    disabled={disabled}
+                  />
+                </Setting>
+              </Col>
+              <Col md={6}>
+                <Setting label="Counted against" help="Which pick options the limit applies to.">
+                  <Form.Select
+                    value={value.teamPickLimitScope ?? ''}
+                    onChange={(event) => update({ teamPickLimitScope: event.target.value })}
+                    disabled={disabled || value.teamPickLimit == null}
+                  >
+                    <option value="MONEYLINE">Moneyline picks only</option>
+                    <option value="SPREAD">Spread picks only</option>
+                    <option value="BOTH">Both</option>
+                  </Form.Select>
+                </Setting>
+              </Col>
+            </Row>
+
+            <Form.Check
+              type="switch"
+              id="multiple-picks-per-game"
+              label="Allow more than one pick on the same game"
+              checked={value.multiplePicksPerGame}
+              onChange={(event) => update({ multiplePicksPerGame: event.target.checked })}
+              disabled={disabled}
+            />
+            <Form.Text className="text-body-secondary">
+              For example taking the spread and the over on the same game.
+            </Form.Text>
+          </div>
         </Card>
       )}
     </div>

@@ -157,7 +157,10 @@ export default function AdminGroupEditPage() {
 
   return (
     <Container className="py-4 py-md-5">
-      <div className="d-grid gap-3">
+      {/* minmax(0, 1fr): grid items take their content as a minimum width,
+          so the settings tab row - which scrolls sideways - would otherwise
+          set this column's width and push the page past the viewport. */}
+      <div className="d-grid gap-3" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
         <BackButton fallback="/admin/groups" label="Back to groups" />
 
         <div>

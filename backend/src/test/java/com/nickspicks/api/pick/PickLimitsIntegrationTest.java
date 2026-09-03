@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -152,7 +153,17 @@ class PickLimitsIntegrationTest extends IntegrationTest {
         UUID member = member(group, "daily");
 
         // Both in week 1; the second is a day later.
-        Instant saturday = Instant.now().plus(3, ChronoUnit.DAYS);
+        //
+        // Anchored to midday in the zone CadencePeriod buckets by, not to the
+        // clock. Instant.now() plus two hours lands on the *next* game day
+        // whenever the suite runs late in the evening Eastern, which made this
+        // assertion fail for a couple of hours every night and pass the rest
+        // of the time. Midday leaves room for the +2h in either direction.
+        Instant saturday = LocalDate.now(CadencePeriod.GAME_DAY_ZONE)
+                .plusDays(3)
+                .atTime(12, 0)
+                .atZone(CadencePeriod.GAME_DAY_ZONE)
+                .toInstant();
         Game first = game(1L, 1, saturday);
         Game sameDay = game(2L, 1, saturday.plus(2, ChronoUnit.HOURS));
         Game nextDay = game(3L, 1, saturday.plus(1, ChronoUnit.DAYS));

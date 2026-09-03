@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Badge, Button, Spinner } from 'react-bootstrap';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
@@ -70,17 +70,34 @@ export function ConfirmButton({
   className = '',
 }) {
   const [armed, setArmed] = useState(false);
+  const buttonRef = useRef(null);
 
   useEffect(() => {
     if (!armed) return undefined;
-    const reset = () => setArmed(false);
-    // Capture phase, so the button's own click is not what disarms it.
-    window.addEventListener('click', reset, { capture: true, once: true });
-    return () => window.removeEventListener('click', reset, { capture: true });
+
+    /*
+     * Clicking anywhere else disarms - but the button's own click must not,
+     * which is what this used to get wrong. Capture runs window-first, so the
+     * confirming click disarmed the button and re-rendered it before React's
+     * delegated onClick ran; that handler then saw armed === false and simply
+     * re-armed. The button could never be confirmed, only toggled.
+     *
+     * Asking whether the click came from the button is reliable however React
+     * schedules the re-render, which comparing state across the two phases is
+     * not.
+     */
+    const reset = (event) => {
+      if (buttonRef.current?.contains(event.target)) return;
+      setArmed(false);
+    };
+
+    window.addEventListener('click', reset, true);
+    return () => window.removeEventListener('click', reset, true);
   }, [armed]);
 
   return (
     <Button
+      ref={buttonRef}
       variant={armed ? variant : `outline-${variant}`}
       size={size}
       disabled={disabled}
@@ -368,6 +385,32 @@ export function UnlockIcon() {
       focusable="false"
     >
       <path d="M11 1a2 2 0 0 0-2 2v4H3a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-.5V3a1.5 1.5 0 1 1 3 0v3h1V3a2 2 0 0 0-2-2z" />
+    </svg>
+  );
+}
+
+/**
+ * Points into a row. Decorative - the row's own link carries the name.
+ *
+ * <p>Shared so the member and admin group lists use one glyph rather than a
+ * text "→" in one and an SVG in the other.
+ */
+export function ChevronIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M6 3.5 10.5 8 6 12.5" />
     </svg>
   );
 }

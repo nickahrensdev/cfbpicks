@@ -153,7 +153,11 @@ export default function GroupDetailPage() {
 
   return (
     <Container className="py-4 py-md-5">
-      <div className="d-grid gap-3">
+      {/* minmax(0, 1fr): a grid item's automatic minimum size is its content,
+          so the settings tab row - which scrolls sideways rather than wrapping
+          - was setting the width of this whole column instead of scrolling
+          inside it, and pushing the page past the viewport. */}
+      <div className="d-grid gap-3" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
         <BackButton fallback="/groups" label="Back to groups" />
 
         <div className="d-flex justify-content-between align-items-start gap-3">

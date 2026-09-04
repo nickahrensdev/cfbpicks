@@ -51,7 +51,7 @@ const points = (value) => Number(value).toString();
  * join cares that it is a weekly pick'em with ten picks and no moneylines;
  * they do not care about the push value on a market the group has turned off.
  */
-function summarise(group, settings) {
+function summarise(settings) {
   if (!settings) return '';
 
   const markets = [
@@ -63,7 +63,7 @@ function summarise(group, settings) {
   const period = settings.cadence === 'DAILY' ? 'day' : 'week';
 
   const lines = [
-    `Join "${group.name}" on Nick's Picks`,
+    `Join "${settings.name}" on Nick's Picks`,
     '',
     [
       settings.groupType === 'ELIMINATION' ? 'Elimination' : "Pick'em",
@@ -155,7 +155,7 @@ export default function ShareGroupButton({
       ]);
       setDetail(group);
       setToken(share.token);
-      setMessage(summarise(group, group.settings));
+      setMessage(summarise(group.settings));
     } catch (err) {
       setError(err.message ?? 'Could not build a share link');
     }
@@ -179,13 +179,26 @@ export default function ShareGroupButton({
   // does not exist.
   const editable = Boolean(detail?.manageable);
 
-  /** Everything to send, assembled from whichever button was pressed. */
+  // GroupDetail carries no name of its own - it is part of the settings - so
+  // detail.name was undefined everywhere it was read.
+  const name = detail?.settings?.name ?? null;
+
+  /**
+   * Everything to send, assembled from whichever button was pressed.
+   *
+   * <p>The link leads. Most messaging apps preview the first URL in a message
+   * and truncate long text behind a tap, so a link under six lines of summary
+   * is one the recipient has to go looking for.
+   *
+   * <p>The password comes last, after the summary - it is what you reach for
+   * once you have decided to join, so it reads as the final step rather than
+   * a condition attached to the link.
+   */
   const compose = (withSummary) => {
-    const parts = [];
+    const parts = [url];
     if (withSummary && message.trim()) parts.push(message.trim());
-    if (url) parts.push(url);
     if (password && includePassword) parts.push(`Password: ${password}`);
-    return parts.join('\n\n');
+    return parts.filter(Boolean).join('\n\n');
   };
 
   /**
@@ -202,7 +215,7 @@ export default function ShareGroupButton({
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: detail?.name, text });
+        await navigator.share({ title: name ?? undefined, text });
         setState('idle');
         setOpen(false);
         return;
@@ -253,7 +266,7 @@ export default function ShareGroupButton({
 
       <Modal show={open} onHide={() => setOpen(false)} centered scrollable>
         <Modal.Header closeButton>
-          <Modal.Title className="h5">Share {detail?.name ?? 'this group'}</Modal.Title>
+          <Modal.Title className="h5">Share {name ?? 'this group'}</Modal.Title>
         </Modal.Header>
 
         <Modal.Body>

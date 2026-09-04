@@ -50,6 +50,24 @@ export function AuthProvider({ children }) {
             emailRedirectTo: redirectTo,
           },
         }),
+      /**
+       * A fresh confirmation link.
+       *
+       * <p>Links expire, and until now the only way to get another was to
+       * sign up again with the same address - which does resend, but nothing
+       * said so, and the form told people to sign in instead. That advice
+       * fails for an unconfirmed account.
+       *
+       * <p>redirectTo has to be passed here too: this mints a new link, and a
+       * link built without the base path lands on a 404 exactly like the
+       * original did.
+       */
+      resendConfirmation: (email, redirectTo) =>
+        supabase.auth.resend({
+          type: 'signup',
+          email,
+          options: { emailRedirectTo: redirectTo },
+        }),
       signOut: () => supabase.auth.signOut(),
     }),
     [session, loading],

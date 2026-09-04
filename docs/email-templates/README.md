@@ -22,6 +22,16 @@ Deliberate. The raw link carries a single-use credential, and printing it in
 the body invites it into screenshots and forwarded mail. The button is the
 only way in.
 
+## Expiry
+
+The footer says 24 hours because that is Supabase's default confirmation
+link lifetime (`MAILER_OTP_EXP`, 86400s). If that setting is changed, change
+the copy - a link that outlives what the email claims is merely confusing, but
+one that dies sooner sends people to a dead end believing they have time.
+
+Someone whose link has expired can send themselves another from the sign-in
+form; there is no need to sign up again.
+
 ## The trailing slash matters
 
 The links read `{{ .SiteURL }}confirm?…` with no slash of their own, because

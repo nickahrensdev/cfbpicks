@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { appUrl } from '../lib/appUrl.js';
 
 export default function LoginPage() {
-  const { session, signIn, signUp, configured } = useAuth();
+  const { session, signIn, signUp, resendConfirmation, configured } = useAuth();
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
@@ -23,6 +23,8 @@ export default function LoginPage() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
+  // Offered only once we know the account exists but is not confirmed.
+  const [canResend, setCanResend] = useState(false);
 
   if (session) {
     const destination = joinToken ? `/join/${joinToken}` : (location.state?.from ?? '/');
@@ -50,6 +52,10 @@ export default function LoginPage() {
     setError(null);
     setNotice(null);
 
+    // Where a confirmation link should land. Shared by signup and resend -
+    // a resent link built without the base path 404s exactly like the first.
+    const confirmTo = appUrl(joinToken ? `/join/${joinToken}` : '/');
+
     // Both fields are optional at the form; the API seeds anything left blank
     // from the email address, then makes the username unique if it collides.
     const { data, error: authError } =
@@ -58,11 +64,14 @@ export default function LoginPage() {
         // Someone who arrived from an invitation is sent back to it after
         // confirming, rather than to the board - the group they were invited
         // to is the whole reason they made an account.
-        : await signUp(email, password, displayName.trim(), username.trim(),
-                       appUrl(joinToken ? `/join/${joinToken}` : '/'));
+        : await signUp(email, password, displayName.trim(), username.trim(), confirmTo);
 
     if (authError) {
       setError(authError.message);
+      // The one error with an obvious remedy: their link expired, or they
+      // never opened it. Offer another rather than leaving them stuck on a
+      // message that only describes the problem.
+      setCanResend(authError.code === 'email_not_confirmed');
     } else if (mode === 'signup') {
       // What actually happened, rather than a message covering every case.
       //
@@ -80,10 +89,16 @@ export default function LoginPage() {
         // the address is taken. Saying so plainly is the right trade here -
         // this is a private league, and the alternative is someone retyping a
         // password they already have while being told it worked.
+        // Supabase answers identically whether the address is confirmed or
+        // not - that is the point of the obfuscation - so the message must
+        // not claim to know which. It used to say "sign in below", which is
+        // wrong for somebody who never confirmed, and signing in would fail.
         setNotice({
           variant: 'warning',
-          text: 'That email already has an account. Sign in below, or reset the password if you have forgotten it.',
+          text: 'That address is already registered. If you have not confirmed it yet, check '
+            + 'your email or send a new link below. Otherwise sign in.',
         });
+        setCanResend(true);
         setMode('signin');
       } else {
         setNotice({
@@ -92,6 +107,33 @@ export default function LoginPage() {
         });
         setMode('signin');
       }
+    }
+    setBusy(false);
+  };
+
+  /** Sends another confirmation link to whatever is in the email box. */
+  const resend = async () => {
+    if (!email.trim()) {
+      setError('Enter your email address first.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+
+    const { error: resendError } = await resendConfirmation(
+      email.trim(),
+      appUrl(joinToken ? `/join/${joinToken}` : '/'),
+    );
+
+    if (resendError) {
+      setError(resendError.message);
+    } else {
+      setNotice({
+        variant: 'success',
+        text: `New link sent to ${email.trim()}. It is good for 24 hours.`,
+      });
+      setCanResend(false);
     }
     setBusy(false);
   };
@@ -174,6 +216,17 @@ export default function LoginPage() {
                     required
                   />
                 </Form.Group>
+
+                {/* Only once something has told us the account exists and is
+                    unconfirmed. Offering it unprompted would invite people to
+                    spend the email quota on addresses that never signed up. */}
+                {canResend && (
+                  <div className="d-grid mb-3">
+                    <Button variant="outline-secondary" disabled={busy} onClick={resend}>
+                      Send a new confirmation link
+                    </Button>
+                  </div>
+                )}
 
                 <div className="d-grid">
                   <Button type="submit" disabled={busy}>

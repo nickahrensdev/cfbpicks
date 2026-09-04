@@ -121,7 +121,10 @@ export default function GameFilters({
     // Not counted on a daily board, where the control is hidden and the page
     // ignores it - a filter nobody can see or clear must not show as active.
     + (!daily && value.todayOnly ? 1 : 0);
-  const filtered = activeCount > 0 || value.mine;
+  // The search is visible on screen, so it is not counted on the funnel
+  // badge - that badge exists to reveal filters the panel is hiding. It does
+  // make the row "filtered" though, so Clear can reach it.
+  const filtered = activeCount > 0 || value.mine || Boolean(value.search?.trim());
 
   return (
     // One panel rather than two rows floating in the page. The picker and the
@@ -138,6 +141,25 @@ export default function GameFilters({
           board is showing rather than one control among several, and
           left-aligned it read as the first of the filters below it. */}
       <div className="d-flex flex-column align-items-center">{weekSelector}</div>
+
+      {/* Directly under the picker and above the board, because it narrows
+          what is on the board - and unlike the rest of the filters it is
+          reached often enough that burying it behind the funnel would be a
+          tap for the most common thing anyone does here.
+
+          Its own control rather than the team dropdown in the panel: that one
+          is exact and needs the list, this one takes "ohio", "osu" or half a
+          nickname and matches either side of the card. */}
+      <div className="mt-2">
+        <Form.Control
+          type="search"
+          size="sm"
+          value={value.search ?? ''}
+          onChange={(event) => update({ search: event.target.value })}
+          placeholder="Search teams"
+          aria-label="Search games by team"
+        />
+      </div>
 
       {/* Actions left; the count and refresh sit together on the right. The
           count describes the board below, and refresh is what re-reads it. */}
@@ -186,6 +208,7 @@ export default function GameFilters({
               className="p-0 ms-1 text-body-secondary text-nowrap"
               onClick={() =>
                 onChange({
+                  search: '',
                   conference: null,
                   teamId: null,
                   status: null,
@@ -368,6 +391,7 @@ export default function GameFilters({
             disabled={!filtered}
             onClick={() =>
               onChange({
+                search: '',
                 conference: null,
                 teamId: null,
                 status: null,

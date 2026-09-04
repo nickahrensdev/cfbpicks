@@ -24,6 +24,25 @@ const PREFIX = 'nickspicks.scroll:';
  *              browser clamps it to the bottom of nothing.
  */
 export function useScrollMemory(ready) {
+  /*
+   * Stop the browser restoring scroll as well.
+   *
+   * The default is "auto", which means on a Back navigation the browser
+   * restores the position it remembers - except in a single-page app the
+   * content has not rendered yet, so it restores onto an empty document and
+   * lands at the top. That attempt can be flushed *after* ours, which looked
+   * like the page briefly appearing in the right place and then jumping to
+   * the top.
+   *
+   * Set here rather than at startup so it is owned by the thing that replaces
+   * it, and left set: nothing else in the app relies on the browser's copy.
+   */
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+  }, []);
+
   const { key } = useLocation();
   const storageKey = `${PREFIX}${key}`;
   const restored = useRef(false);
@@ -46,16 +65,35 @@ export function useScrollMemory(ready) {
     if (!ready || restored.current) return;
     restored.current = true;
 
+    let saved = null;
     try {
-      const saved = window.sessionStorage.getItem(storageKey);
-      if (saved) {
+      saved = window.sessionStorage.getItem(storageKey);
+    } catch {
+      // As above.
+    }
+    if (!saved) return undefined;
+
+    /*
+     * Two frames, not one. The effect runs after React commits but before the
+     * browser has laid the cards out, so a scroll issued here is clamped to
+     * whatever height the page has at that instant - which on a long board is
+     * far less than where we are trying to get to. One frame gets us past the
+     * commit; the second gets us past the paint that gives the page its real
+     * height.
+     */
+    let second = 0;
+    const first = window.requestAnimationFrame(() => {
+      second = window.requestAnimationFrame(() => {
         // Instant, not smooth: this is meant to look like the page never
         // moved, and animating back down a long board draws attention to
         // exactly the thing being hidden.
         window.scrollTo({ top: Number(saved), behavior: 'instant' });
-      }
-    } catch {
-      // As above.
-    }
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(first);
+      window.cancelAnimationFrame(second);
+    };
   }, [ready, storageKey]);
 }

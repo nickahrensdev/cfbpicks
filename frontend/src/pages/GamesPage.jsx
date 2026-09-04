@@ -28,6 +28,7 @@ function filtersFromParams(params) {
     return raw === null || raw === '' ? null : Number(raw);
   };
   return {
+    search: params.get('q') ?? '',
     conference: params.get('conference'),
     teamId: params.get('team'),
     status: params.get('status'),
@@ -42,6 +43,7 @@ function filtersFromParams(params) {
 /** Only what differs from the default, so a clean board has a clean URL. */
 function filtersToParams(filters) {
   const out = {};
+  if (filters.search?.trim()) out.q = filters.search.trim();
   if (filters.conference) out.conference = filters.conference;
   if (filters.teamId) out.team = String(filters.teamId);
   if (filters.status) out.status = filters.status;
@@ -54,6 +56,7 @@ function filtersToParams(filters) {
 }
 
 const NO_FILTERS = {
+  search: '',
   conference: null,
   teamId: null,
   status: null,
@@ -283,8 +286,33 @@ export default function GamesPage() {
   const atNow = daily ? day === nowPeriod : week === nowPeriod;
   const jumpToNow = () => (daily ? setDay(nowPeriod) : setWeek(nowPeriod));
 
+  /**
+   * Every name a team goes by on a card, lowercased once per game rather than
+   * per keystroke - "Ohio State", "OSU", and whatever the schedule calls a
+   * non-FBS opponent that has no team record behind it.
+   */
+  const searchable = useMemo(() => {
+    const index = new Map();
+    for (const game of games) {
+      index.set(game.id, [
+        game.homeTeamName,
+        game.awayTeamName,
+        game.homeTeam?.school,
+        game.awayTeam?.school,
+        game.homeTeam?.abbreviation,
+        game.awayTeam?.abbreviation,
+      ].filter(Boolean).join(' ').toLowerCase());
+    }
+    return index;
+  }, [games]);
+
   const visibleGames = useMemo(() => {
+    const term = filters.search?.trim().toLowerCase() ?? '';
+
     const matched = games.filter((game) => {
+      // Either side matches. Searching "rutgers" should find the game
+      // whichever end of the card they are on.
+      if (term && !(searchable.get(game.id) ?? '').includes(term)) return false;
       if (filters.mine
           && !game.mySpreadPick && !game.myTotalPick && !game.myMoneylinePick) {
         return false;
@@ -337,7 +365,7 @@ export default function GamesPage() {
     // kickoff order - the order the server sent - survives inside each half.
     const done = (game) => (game.status === 'FINAL' || game.status === 'CANCELED' ? 1 : 0);
     return [...matched].sort((a, b) => done(a) - done(b));
-  }, [games, filters, daily, markets]);
+  }, [games, filters, daily, markets, searchable]);
 
   // Put the board back where it was. Waits for the cards, because restoring a
   // scroll position onto a page that is still a spinner tall does nothing.
@@ -576,11 +604,16 @@ export default function GamesPage() {
         ) : visibleGames.length === 0 ? (
           <EmptyState
             title={
-              filters.pickableOnly && !filters.mine && games.length > 0
-                ? `Every game ${daily ? 'today' : 'this week'} has locked`
-                : filters.mine
-                  ? 'No picks in this week yet'
-                  : 'No games match these filters'
+              // A search that matched nothing is the likeliest reason to be
+              // here, and naming the term is what tells someone they typed
+              // it wrong rather than that the week is empty.
+              filters.search?.trim()
+                ? `No teams matching "${filters.search.trim()}"`
+                : filters.pickableOnly && !filters.mine && games.length > 0
+                  ? `Every game ${daily ? 'today' : 'this week'} has locked`
+                  : filters.mine
+                    ? 'No picks in this week yet'
+                    : 'No games match these filters'
             }
           >
             <Button onClick={() => updateFilters(NO_FILTERS)}>Show all games</Button>

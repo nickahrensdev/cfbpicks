@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -14,15 +13,20 @@ import java.time.Instant;
  * actually Tier 1 (5,000 calls/month), not the 1,000/month free tier the
  * admin page used to assume.
  *
- * <p>Refreshed at most once every 24 hours, checked against a row in the
- * database rather than an in-memory timestamp - see {@link CfbdQuotaSnapshot}
- * for why that distinction matters here.
+ * <p>Fetched fresh on every ask. {@code /info} does not count against the
+ * quota - verified by reading it twice three seconds apart and getting the
+ * same usedCalls both times - so the 24-hour throttle this used to carry was
+ * protecting a budget it could not spend, at the cost of showing an admin a
+ * number that could be a day old at the moment they most wanted it accurate.
+ *
+ * <p>The snapshot row stays, and is still written on every refresh. It is
+ * what answers when CFBD cannot be reached, which is the only case a stored
+ * copy was ever needed for - see {@link CfbdQuotaSnapshot}.
  */
 @Service
 public class CfbdQuotaService {
 
     private static final Logger log = LoggerFactory.getLogger(CfbdQuotaService.class);
-    private static final Duration REFRESH_INTERVAL = Duration.ofHours(24);
 
     private final CfbdClient cfbd;
     private final CfbdQuotaSnapshotRepository snapshots;
@@ -35,13 +39,6 @@ public class CfbdQuotaService {
     @Transactional
     public CfbdQuotaSnapshot current() {
         CfbdQuotaSnapshot snapshot = snapshots.findById((short) 1).orElse(null);
-
-        boolean stale = snapshot == null
-                || snapshot.getFetchedAt().isBefore(Instant.now().minus(REFRESH_INTERVAL));
-
-        if (!stale) {
-            return snapshot;
-        }
 
         try {
             CfbdDtos.InfoDto info = cfbd.info();

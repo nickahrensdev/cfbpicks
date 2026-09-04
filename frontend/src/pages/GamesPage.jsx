@@ -11,6 +11,47 @@ import { EmptyState, ErrorNotice, Loading, isPickable, marketLabel, marketsOf } 
 import { api } from '../api/client.js';
 import { NoGroupNotice } from '../components/common.jsx';
 import { useGroup } from '../auth/GroupProvider.jsx';
+import { useScrollMemory } from '../lib/scrollMemory.js';
+
+/**
+ * The filters, to and from the URL.
+ *
+ * <p>All of them, not just "my picks". They were component state, so stepping
+ * into a game's details and back threw away a conference, a team and a spread
+ * band that had been chosen deliberately - the board came back showing
+ * everything. In the URL they survive Back, a reload, and being sent to
+ * somebody else.
+ */
+function filtersFromParams(params) {
+  const number = (key) => {
+    const raw = params.get(key);
+    return raw === null || raw === '' ? null : Number(raw);
+  };
+  return {
+    conference: params.get('conference'),
+    teamId: params.get('team'),
+    status: params.get('status'),
+    minSpread: number('minSpread'),
+    maxSpread: number('maxSpread'),
+    mine: params.get('mine') === '1',
+    pickableOnly: params.get('pickable') === '1',
+    todayOnly: params.get('today') === '1',
+  };
+}
+
+/** Only what differs from the default, so a clean board has a clean URL. */
+function filtersToParams(filters) {
+  const out = {};
+  if (filters.conference) out.conference = filters.conference;
+  if (filters.teamId) out.team = String(filters.teamId);
+  if (filters.status) out.status = filters.status;
+  if (filters.minSpread != null) out.minSpread = String(filters.minSpread);
+  if (filters.maxSpread != null) out.maxSpread = String(filters.maxSpread);
+  if (filters.mine) out.mine = '1';
+  if (filters.pickableOnly) out.pickable = '1';
+  if (filters.todayOnly) out.today = '1';
+  return out;
+}
 
 const NO_FILTERS = {
   conference: null,
@@ -61,10 +102,7 @@ export default function GamesPage() {
   });
   const [games, setGames] = useState([]);
   const [filterOptions, setFilterOptions] = useState(null);
-  const [filters, setFilters] = useState({
-    ...NO_FILTERS,
-    mine: searchParams.get('mine') === '1',
-  });
+  const [filters, setFilters] = useState(() => filtersFromParams(searchParams));
   const [picksUsed, setPicksUsed] = useState(0);
   const [maxPicks, setMaxPicks] = useState(null);
   const [cadence, setCadence] = useState('WEEKLY');
@@ -195,12 +233,28 @@ export default function GamesPage() {
     return () => clearInterval(timer);
   }, [anyLive, busyGameId, daily, day, groupId, meta, week]);
 
-  // Reset the filters when the period changes - a spread band or a team
-  // chosen for one week rarely means anything for the next. "My picks" is the
-  // exception: it is a view of the board rather than a filter of one week's.
+  /*
+   * Reset the filters when the period changes - a spread band or a team
+   * chosen for one week rarely means anything for the next. "My picks" is the
+   * exception: it is a view of the board rather than a filter of one week's.
+   *
+   * Only on a real change. The period arrives as null and is filled in once
+   * the season resolves, and treating that as a change wiped the filters this
+   * page had just restored from the URL - so arriving with filters set would
+   * clear them a tick later, which looked like the URL not working at all.
+   */
+  const lastPeriod = useRef(daily ? day : week);
+
   useEffect(() => {
+    const period = daily ? day : week;
+    if (period === lastPeriod.current) return;
+
+    const arriving = lastPeriod.current == null;
+    lastPeriod.current = period;
+    if (arriving) return;
+
     setFilters((current) => ({ ...NO_FILTERS, mine: current.mine }));
-  }, [week, day]);
+  }, [week, day, daily]);
 
   /**
    * The period and the "my picks" view live in the URL so this page can be
@@ -212,15 +266,14 @@ export default function GamesPage() {
    * weeks should not fill the history with entries Back has to walk out of.
    */
   useEffect(() => {
-    const next = {};
-    if (filters.mine) next.mine = '1';
+    const next = filtersToParams(filters);
     if (daily) {
       if (day) next.date = day;
     } else if (week !== null) {
       next.week = String(week);
     }
     setSearchParams(next, { replace: true });
-  }, [daily, day, filters.mine, setSearchParams, week]);
+  }, [daily, day, filters, setSearchParams, week]);
 
   const updateFilters = (next) => setFilters(next);
 
@@ -285,6 +338,10 @@ export default function GamesPage() {
     const done = (game) => (game.status === 'FINAL' || game.status === 'CANCELED' ? 1 : 0);
     return [...matched].sort((a, b) => done(a) - done(b));
   }, [games, filters, daily, markets]);
+
+  // Put the board back where it was. Waits for the cards, because restoring a
+  // scroll position onto a page that is still a spinner tall does nothing.
+  useScrollMemory(!loading && visibleGames.length > 0);
 
   /**
    * Applies a pick without reloading the board. `action` resolves straight

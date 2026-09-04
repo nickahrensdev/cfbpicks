@@ -16,6 +16,12 @@ under and landing every confirmed member on a GitHub 404.
 So the link points at the app instead, carrying the token hash, and
 `ConfirmEmailPage` exchanges it for a session with `verifyOtp`.
 
+## No paste-able fallback URL
+
+Deliberate. The raw link carries a single-use credential, and printing it in
+the body invites it into screenshots and forwarded mail. The button is the
+only way in.
+
 ## The trailing slash matters
 
 The links read `{{ .SiteURL }}confirm?…` with no slash of their own, because

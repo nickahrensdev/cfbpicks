@@ -23,6 +23,19 @@ const basename = BASENAME;
 // ProfileProvider re-applies once the authoritative value comes back.
 applyTheme(...cachedTheme());
 
+/*
+ * This app restores scroll itself (see lib/scrollMemory.js), so the browser
+ * must not also try.
+ *
+ * Set here, before the first render, as well as per-entry in the hook. The
+ * property belongs to a single history entry, and the default for a newly
+ * created entry is "auto" - so this is the opening position, not the whole
+ * answer.
+ */
+if ('scrollRestoration' in window.history) {
+  window.history.scrollRestoration = 'manual';
+}
+
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter basename={basename}>

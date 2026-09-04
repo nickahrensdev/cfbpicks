@@ -237,14 +237,34 @@ export default function GamesPage() {
   }, [anyLive, busyGameId, daily, day, groupId, meta, week]);
 
   /*
-   * Reset the filters when the period changes - a spread band or a team
-   * chosen for one week rarely means anything for the next. "My picks" is the
-   * exception: it is a view of the board rather than a filter of one week's.
+   * Filters survive a change of week or day.
+   *
+   * They used to be cleared, on the reasoning that a spread band or a team
+   * picked for one week rarely means anything for the next. In use it is the
+   * opposite: stepping through weeks looking at one conference, or tracking a
+   * team's next few games, is exactly what the arrows are for, and re-choosing
+   * the same filter every step made the board feel like it was fighting you.
+   *
+   * A filter that matches nothing in the new week is not a dead end - the
+   * empty state names the reason and offers "Show all games" - and the team
+   * select keeps showing its selection through a bye, see selectedTeamName.
+   *
+   * "Today only" is the exception, below.
+   */
+
+  /*
+   * Clear "today only" when the period changes.
+   *
+   * Every other filter narrows a week to part of it, and still means something
+   * in the next one. This one names an actual date, so on any week that is not
+   * the current one it matches nothing at all - not a narrower board but an
+   * empty one, and for a reason that is invisible once you have stepped away
+   * from today.
    *
    * Only on a real change. The period arrives as null and is filled in once
-   * the season resolves, and treating that as a change wiped the filters this
-   * page had just restored from the URL - so arriving with filters set would
-   * clear them a tick later, which looked like the URL not working at all.
+   * the season resolves; treating that as a change would clear a today=1 that
+   * had just been restored from the URL, so arriving with the filter set would
+   * drop it a tick later.
    */
   const lastPeriod = useRef(daily ? day : week);
 
@@ -256,7 +276,9 @@ export default function GamesPage() {
     lastPeriod.current = period;
     if (arriving) return;
 
-    setFilters((current) => ({ ...NO_FILTERS, mine: current.mine }));
+    // Same object back when there is nothing to clear: a new one would push a
+    // fresh identity through the URL-sync effect on every week step.
+    setFilters((current) => (current.todayOnly ? { ...current, todayOnly: false } : current));
   }, [week, day, daily]);
 
   /**
@@ -279,6 +301,27 @@ export default function GamesPage() {
   }, [daily, day, filters, setSearchParams, week]);
 
   const updateFilters = (next) => setFilters(next);
+
+  /*
+   * Every team seen in any week loaded this session.
+   *
+   * The team options are fetched per week, so once filters carry over, a team
+   * on a bye is a selection with no matching <option>. A select whose value
+   * matches nothing renders blank - the filter would still be hiding every
+   * game while the control claimed nothing was set, which reads as a bug
+   * rather than as a bye week. Remembering the names lets the select keep
+   * showing what is actually selected.
+   */
+  const teamNames = useRef(new Map());
+  useEffect(() => {
+    (filterOptions?.teams ?? []).forEach((team) => {
+      teamNames.current.set(String(team.id), team.school);
+    });
+  }, [filterOptions]);
+
+  const selectedTeamName = filters.teamId
+    ? teamNames.current.get(String(filters.teamId)) ?? null
+    : null;
 
   // Back to the period the season is actually on. Hidden when already there,
   // so the control only appears when it has somewhere to go.
@@ -568,6 +611,7 @@ export default function GamesPage() {
             </>
           }
           options={filterOptions}
+          selectedTeamName={selectedTeamName}
           value={filters}
           onChange={updateFilters}
           resultCount={visibleGames.length}

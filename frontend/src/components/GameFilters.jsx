@@ -88,6 +88,12 @@ const STATUSES = [
  */
 export default function GameFilters({
   options,
+  /**
+   * Name of the selected team when this period's options do not contain it -
+   * a team on a bye, now that filters carry across weeks. Without it the
+   * select renders blank while still hiding every game.
+   */
+  selectedTeamName = null,
   value,
   onChange,
   /** Shown at the right of the action row, describing the board below it. */
@@ -275,6 +281,11 @@ export default function GameFilters({
                 onChange={(e) => update({ conference: e.target.value || null })}
               >
                 <option value="">All conferences</option>
+                {/* As with teams below: keep the selection visible in a week
+                    that happens not to include it. */}
+                {value.conference && !(options?.conferences ?? []).includes(value.conference) && (
+                  <option value={value.conference}>{value.conference} — no games</option>
+                )}
                 {(options?.conferences ?? []).map((name) => (
                   <option key={name} value={name}>
                     {name}
@@ -294,6 +305,15 @@ export default function GameFilters({
                 onChange={(e) => update({ teamId: e.target.value || null })}
               >
                 <option value="">All teams</option>
+                {/* The selection, when it is not playing this week. Labelled,
+                    because a team that silently matches nothing looks like a
+                    broken filter rather than a bye. */}
+                {value.teamId
+                  && !(options?.teams ?? []).some((team) => String(team.id) === String(value.teamId)) && (
+                    <option value={value.teamId}>
+                      {selectedTeamName ? `${selectedTeamName} — not playing` : 'Not playing'}
+                    </option>
+                  )}
                 {(options?.teams ?? []).map((team) => (
                   <option key={team.id} value={team.id}>
                     {team.school}

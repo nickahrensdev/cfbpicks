@@ -31,13 +31,24 @@ export function AuthProvider({ children }) {
       loading,
       configured: isSupabaseConfigured,
       signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
-      // Both land in Supabase user metadata; the API seeds its own row from
-      // them on the first authenticated request.
-      signUp: (email, password, displayName, username) =>
+      /**
+       * Both names land in Supabase user metadata; the API seeds its own row
+       * from them on the first authenticated request.
+       *
+       * <p>{@code redirectTo} is where the confirmation link comes back to.
+       * Passed explicitly rather than left to Supabase's Site URL: the site
+       * lives under a base path, and a Site URL missing it sends every
+       * confirmed member to the bare github.io root, which serves a 404. The
+       * caller builds it with appUrl(), so the base path cannot be forgotten.
+       */
+      signUp: (email, password, displayName, username, redirectTo) =>
         supabase.auth.signUp({
           email,
           password,
-          options: { data: { display_name: displayName, username } },
+          options: {
+            data: { display_name: displayName, username },
+            emailRedirectTo: redirectTo,
+          },
         }),
       signOut: () => supabase.auth.signOut(),
     }),

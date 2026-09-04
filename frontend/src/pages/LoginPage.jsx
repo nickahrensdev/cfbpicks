@@ -3,6 +3,7 @@ import { Alert, Button, Card, Col, Container, Form, Row, Spinner } from 'react-b
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { appUrl } from '../lib/appUrl.js';
 
 export default function LoginPage() {
   const { session, signIn, signUp, configured } = useAuth();
@@ -54,7 +55,11 @@ export default function LoginPage() {
     const { data, error: authError } =
       mode === 'signin'
         ? await signIn(email, password)
-        : await signUp(email, password, displayName.trim(), username.trim());
+        // Someone who arrived from an invitation is sent back to it after
+        // confirming, rather than to the board - the group they were invited
+        // to is the whole reason they made an account.
+        : await signUp(email, password, displayName.trim(), username.trim(),
+                       appUrl(joinToken ? `/join/${joinToken}` : '/'));
 
     if (authError) {
       setError(authError.message);
@@ -123,7 +128,6 @@ export default function LoginPage() {
                         onChange={(e) => setDisplayName(e.target.value)}
                         autoComplete="name"
                         maxLength={20}
-                        placeholder="Nick Ahrens"
                       />
                       <Form.Text>
                         Up to 20 characters. Does not have to be unique.
@@ -139,7 +143,6 @@ export default function LoginPage() {
                         minLength={2}
                         maxLength={20}
                         pattern="[A-Za-z0-9][A-Za-z0-9._-]*[A-Za-z0-9]"
-                        placeholder="nick"
                       />
                       <Form.Text>
                         2-20 characters, no spaces. Unique across the site - shown as

@@ -8,6 +8,7 @@ import ProtectedRoute from './auth/ProtectedRoute.jsx';
 import AdminRoute from './auth/AdminRoute.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import JoinByLinkPage from './pages/JoinByLinkPage.jsx';
+import ConfirmEmailPage from './pages/ConfirmEmailPage.jsx';
 import GamesPage from './pages/GamesPage.jsx';
 import GameDetailPage from './pages/GameDetailPage.jsx';
 import MemberPicksPage from './pages/MemberPicksPage.jsx';
@@ -56,6 +57,12 @@ export default function App() {
               somebody who has no account yet. The page sends them on to sign
               in, carrying the token so they come back here. */}
           <Route path="/join/:token" element={<JoinByLinkPage />} />
+
+          {/* Unguarded, like the invite page: the whole point is that nobody
+              is signed in yet. The email carries a token hash and this
+              exchanges it for a session - see ConfirmEmailPage for why the
+              link comes here rather than to Supabase's own verify endpoint. */}
+          <Route path="/confirm" element={<ConfirmEmailPage />} />
 
           <Route path="/" element={guarded(<GamesPage />)} />
           <Route path="/games/:id" element={guarded(<GameDetailPage />)} />

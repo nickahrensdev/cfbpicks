@@ -99,6 +99,23 @@ public class EspnSiteClient {
         return fetch("/teams/" + teamId + "?enable=roster", ttl);
     }
 
+    /**
+     * Where ESPN thinks the season is: {@code season.year},
+     * {@code season.type} and {@code week.number}.
+     *
+     * <p>The same scoreboard the live scores come from carries these, but it
+     * is deliberately <em>not</em> reused. The cache is keyed by path, and
+     * live scores are fetched with a fifteen-second TTL against a fifteen
+     * minute one here - sharing the entry would let this staleness leak into
+     * the scores. A different path is a different entry.
+     *
+     * <p>{@code limit=1} because the games are not wanted at all; only the
+     * calendar position is, and it sits above the events.
+     */
+    public Optional<JsonNode> seasonPosition(Duration ttl) {
+        return fetch("/scoreboard?limit=1&groups=80", ttl);
+    }
+
     private Optional<JsonNode> fetch(String path, Duration ttl) {
         CacheEntry cached = cache.get(path);
         if (cached != null && cached.expiresAt().isAfter(Instant.now())) {

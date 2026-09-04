@@ -20,11 +20,11 @@ import java.util.Map;
  *
  * <p>ESPN's site API has no call limit, unlike CFBD's 5,000/month, so it is
  * safe to poll every minute for the score/clock/quarter update this class
- * writes and for near-real-time grading. The existing 15-minute
- * {@code IngestScheduler}/CFBD path and the manual admin
- * {@code /ingest/scores} endpoint are both untouched by this - either can
- * still be the one that first reports a game final, and
- * {@link GradingService#gradeGame} is idempotent either way.
+ * writes and for near-real-time grading. This is now the only scheduled score
+ * path: the CFBD one it used to run alongside was deleted, having never been
+ * switched on in production. The manual admin {@code /ingest/scores} endpoint
+ * is untouched - either can still be the one that first reports a game final,
+ * and {@link GradingService#gradeGame} is idempotent either way.
  */
 @Service
 public class EspnScoreIngestService {

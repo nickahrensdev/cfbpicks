@@ -1,0 +1,32 @@
+-- ---------------------------------------------------------------------------
+-- A scheduled refresh for rankings, team records and ATS.
+--
+-- All three were manual-only. Rankings did have a weekly job in
+-- IngestScheduler, but that whole class is switched off in production
+-- (app.cfbd.enabled=false), so in practice the polls, every team's W-L and
+-- every team's against-the-spread line only moved when someone remembered to
+-- press a button on the admin Data page. Team pages have been showing last
+-- season's records to anyone who did not.
+--
+-- One row for all three rather than three rows. They are read together - a
+-- team page shows the record, the ranking and the ATS line side by side - so
+-- refreshing them on different days would leave that page internally
+-- inconsistent, and there is nothing an admin would want to switch off about
+-- one of them but not the others.
+--
+-- Daily, not weekly, despite only the records genuinely changing that often.
+-- Three CFBD calls a day is 90 a month against a 5,000 limit; picking a day
+-- costs more than running it every day does, because there is no single right
+-- one - the AP and Coaches polls land Sunday afternoon, the CFP committee's
+-- rankings land Tuesday night, and late-season games run into midweek.
+--
+-- No new data_load_log kind: each of the three loads writes its own row under
+-- the kind its manual button already uses (RANKINGS, REFERENCE, ATS), so a
+-- scheduled run shows up on the Data page as the same history a person
+-- pressing those buttons would have left.
+-- ---------------------------------------------------------------------------
+
+-- Off, like 'lines' before it. Turning it on is a decision made on the admin
+-- page, and every call it makes spends CFBD quota.
+insert into public.cron_job (name, enabled, interval_seconds)
+values ('stats', false, 86400);

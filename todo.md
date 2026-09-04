@@ -95,6 +95,9 @@
 - [x] Turn off scheduled/cron ingest — all loads manual for now
   - `app.cfbd.enabled=false`. Only gates the cron jobs (schedule sync, line sync, score poll); the
     manual admin buttons and the on-demand ATS/matchup fetches above are unaffected.
+  - Since superseded: the flag and the `IngestScheduler` it gated were deleted, having never run in
+    production. Scheduling now lives in the `cron_job` table (`lines`, `stats`), switchable from
+    Admin → Data instead of by redeploying with a different property.
 
 ## Over/under picks
 - [x] Second market: over/under on the game total

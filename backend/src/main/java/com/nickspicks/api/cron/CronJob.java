@@ -12,10 +12,10 @@ import java.time.Instant;
 /**
  * One scheduled job, and whether it should act when its schedule calls.
  *
- * <p>The schedule lives in Supabase pg_cron, not here - see V26. This row is
- * the switch and the record of what happened last, which is what makes both
- * the admin toggle and the picks board's countdown possible without either
- * one hardcoding the interval.
+ * <p>The schedule itself lives in the scheduler class, as a cron expression.
+ * This row is the switch and the record of what happened last, which is what
+ * makes both the admin toggle and the picks board's countdown possible without
+ * either one hardcoding the interval.
  */
 @Entity
 @Table(name = "cron_job")
@@ -23,6 +23,12 @@ public class CronJob {
 
     /** Matches the last segment of the endpoint's path. */
     public static final String LINES = "lines";
+
+    /** Rankings, team records and ATS - see {@code StatsRefreshScheduler}. */
+    public static final String STATS = "stats";
+
+    /** The season's game schedule - see {@code ScheduleRefreshScheduler}. */
+    public static final String SCHEDULE = "schedule";
 
     public enum Status {
         SUCCESS, FAILED, SKIPPED

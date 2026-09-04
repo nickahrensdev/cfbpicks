@@ -1,12 +1,8 @@
 package com.nickspicks.api.cron;
 
-import com.nickspicks.api.cfbd.CfbdUnavailableException;
 import com.nickspicks.api.ingest.DataLoadLog;
-import com.nickspicks.api.ingest.DataLoadLogService;
 import com.nickspicks.api.ingest.GameIngestService;
 import com.nickspicks.api.season.CurrentWeekResolver;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,12 +20,12 @@ import java.time.temporal.ChronoUnit;
  * being told, and left the schedule and the switch in two systems that could
  * disagree about what was running.
  *
- * <p><b>The timer always fires.</b> No {@code @ConditionalOnProperty}, and it
- * does not read {@code app.cfbd.enabled} - that flag gates the other ingest
- * jobs and turning those off should not silently stop lines too. Whether a
- * CFBD call is actually made is decided inside the job, by the {@code
- * cron_job} row, which is what the admin page toggles. A timer that only
- * exists when a flag is set cannot report that it is switched off.
+ * <p><b>The timer always fires.</b> No {@code @ConditionalOnProperty}. Whether
+ * a CFBD call is actually made is decided inside the job, by the {@code
+ * cron_job} row, which is what the admin page toggles. A timer that only exists
+ * when a flag is set cannot report that it is switched off - which is exactly
+ * how the app's original ingest scheduler stayed dead unnoticed until it was
+ * deleted.
  *
  * <p>Aligned to :00 and :30 rather than "every 30 minutes from startup", which
  * would drift to whatever minute the app last restarted on. Predictable times
@@ -54,25 +50,21 @@ import java.time.temporal.ChronoUnit;
 @EnableScheduling
 public class LineRefreshScheduler {
 
-    private static final Logger log = LoggerFactory.getLogger(LineRefreshScheduler.class);
-
     /** Both halves of the hour, on the minute. Kept in step with {@link #nextRun}. */
     public static final String SCHEDULE = "0 0,30 * * * *";
 
     /** The zone the schedule is read in. UTC so the two boundaries never move. */
     public static final String ZONE = "UTC";
 
-    private final CronJobService cronJobs;
+    private final CronJobRunner runner;
     private final GameIngestService gameIngest;
     private final CurrentWeekResolver weeks;
-    private final DataLoadLogService dataLoadLogs;
 
-    public LineRefreshScheduler(CronJobService cronJobs, GameIngestService gameIngest,
-                                CurrentWeekResolver weeks, DataLoadLogService dataLoadLogs) {
-        this.cronJobs = cronJobs;
+    public LineRefreshScheduler(CronJobRunner runner, GameIngestService gameIngest,
+                                CurrentWeekResolver weeks) {
+        this.runner = runner;
         this.gameIngest = gameIngest;
         this.weeks = weeks;
-        this.dataLoadLogs = dataLoadLogs;
     }
 
     /**
@@ -89,39 +81,15 @@ public class LineRefreshScheduler {
         return onTheMinute.plus(Duration.ofMinutes(toAdd));
     }
 
+    /**
+     * The switch, the load log and the swallowing of exceptions all live in
+     * {@link CronJobRunner} - shared with the stats refresh, so the two cannot
+     * drift into recording their runs differently.
+     */
     @Scheduled(cron = SCHEDULE, zone = ZONE)
     public void refreshLines() {
-        // Asked every time, so switching it off in the admin page takes effect
-        // on the next tick with no restart - and so a run that was skipped is
-        // still recorded as having been considered.
-        if (!cronJobs.isEnabled(CronJob.LINES)) {
-            cronJobs.record(CronJob.LINES, CronJob.Status.SKIPPED, "Turned off");
-            log.debug("Line refresh skipped - turned off");
-            return;
-        }
-
         int season = weeks.currentSeason();
-        DataLoadLog started = dataLoadLogs.startForCron(DataLoadLog.Kind.LINES, season);
-
-        try {
-            int updated = gameIngest.ingestLines(season);
-            String detail = "%d games updated".formatted(updated);
-            dataLoadLogs.succeed(started.getId(), detail);
-            cronJobs.record(CronJob.LINES, CronJob.Status.SUCCESS, detail);
-            log.info("Line refresh: {}", detail);
-        } catch (CfbdUnavailableException ex) {
-            // Upstream being down is not this job failing. Recorded and left -
-            // the next tick is half an hour away and will try again.
-            dataLoadLogs.fail(started.getId(), ex.getMessage());
-            cronJobs.record(CronJob.LINES, CronJob.Status.FAILED, ex.getMessage());
-            log.warn("Line refresh skipped: {}", ex.getMessage());
-        } catch (RuntimeException ex) {
-            // Swallowed deliberately: an exception out of a @Scheduled method
-            // kills nothing else, but it also tells nobody. The row and the
-            // load log are where this is meant to be read.
-            dataLoadLogs.fail(started.getId(), ex.getMessage());
-            cronJobs.record(CronJob.LINES, CronJob.Status.FAILED, ex.getMessage());
-            log.error("Line refresh failed", ex);
-        }
+        runner.run(CronJob.LINES, season, DataLoadLog.Kind.LINES,
+                () -> "%d games updated".formatted(gameIngest.ingestLines(season)));
     }
 }

@@ -32,7 +32,7 @@ class LineRefreshSchedulerTest extends IntegrationTest {
     private LineRefreshScheduler scheduler;
 
     @Autowired
-    private CronJobService cronJobs;
+    private CronJobRunner runner;
 
     @Autowired
     private com.nickspicks.api.ingest.GameIngestService gameIngest;
@@ -40,12 +40,9 @@ class LineRefreshSchedulerTest extends IntegrationTest {
     @Autowired
     private com.nickspicks.api.season.CurrentWeekResolver weeks;
 
-    @Autowired
-    private com.nickspicks.api.ingest.DataLoadLogService dataLoadLogs;
-
     @org.junit.jupiter.api.BeforeEach
     void buildScheduler() {
-        scheduler = new LineRefreshScheduler(cronJobs, gameIngest, weeks, dataLoadLogs);
+        scheduler = new LineRefreshScheduler(runner, gameIngest, weeks);
     }
 
     @Autowired

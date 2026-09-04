@@ -203,8 +203,13 @@ curl -X POST -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/admin/
 curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/admin/ingest/scores
 ```
 
-In production `app.cfbd.enabled=true` runs these on a schedule and you never touch them by hand.
-Locally it is `false`, so a dev session cannot quietly burn the monthly quota.
+In production the `schedule`, `lines` and `stats` cron jobs cover this on a schedule, once switched
+on under Admin → Data. None exists outside production, so a dev session cannot quietly burn the
+monthly quota.
+
+The **Games** button loads the schedule only — kickoffs, venues, weeks — and writes no scores or
+status. Use **Scores** for those; it is also the only way to populate scores for a past season, as
+the ESPN poller only watches games that kicked off in the last 6 hours.
 
 ---
 
@@ -216,7 +221,7 @@ Locally it is `false`, so a dev session cannot quietly burn the monthly quota.
 | --- | --- | --- | --- |
 | Purpose | Shared defaults | Developer machine | Deployed |
 | Credentials | — | in the file (gitignored) | env vars, **no defaults** |
-| Scheduled ingest | `true` | `false` | `true` |
+| Scheduled jobs | see below | line/stats jobs absent | line/stats jobs present |
 | `show-sql` | — | `true` | `false` |
 | Log level | Spring default | `DEBUG` + SQL binds | `WARN` / `INFO` |
 | Actuator | `health,info` | `+ env,configprops,metrics` | `health,info` |
@@ -248,7 +253,6 @@ app:
     max-picks-per-week: 10
     lock-lead-minutes: 30
   cfbd:
-    enabled: true           # scheduled ingest on/off
     api-key: ${CFB_DATA_API_KEY:}
     classification: fbs
 ```

@@ -30,10 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * rather than throwing.
  */
 @EnabledIfSystemProperty(named = "cfbd.live", matches = "true")
-@TestPropertySource(properties = {
-        "app.cfbd.enabled=true",
-        "app.cfbd.api-key=${cfbd.key:}"
-})
+@TestPropertySource(properties = "app.cfbd.api-key=${cfbd.key:}")
 class CfbdLiveIngestTest extends IntegrationTest {
 
     @Autowired

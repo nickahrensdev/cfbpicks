@@ -148,9 +148,6 @@ public class AppProperties {
 
     public static class Cfbd {
 
-        /** Turn the scheduled ingest jobs on or off. */
-        private boolean enabled = true;
-
         private String baseUrl = "https://api.collegefootballdata.com";
 
         /** Free tier key from collegefootballdata.com/key. */
@@ -173,14 +170,6 @@ public class AppProperties {
          * plain text. Add "ii" and "iii" to go further.
          */
         private List<String> teamClassifications = List.of("fbs", "fcs");
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
 
         public String getBaseUrl() {
             return baseUrl;

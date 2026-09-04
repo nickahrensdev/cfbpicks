@@ -15,12 +15,12 @@ import org.springframework.stereotype.Component;
  * off, and a group can have minimums to settle in a week where the ingest is
  * turned off entirely.
  *
- * <p>Carries its own {@code @EnableScheduling} for that reason: the ingest
- * scheduler's copy is behind {@code app.cfbd.enabled}, and settlement must not
- * quietly stop working when CFBD is switched off.
+ * <p>Carries its own {@code @EnableScheduling} for that reason. Every other
+ * scheduler in the app is conditional - the two cron jobs are
+ * {@code @Profile("prod")} - and settlement must not quietly stop working
+ * because the class that happened to switch scheduling on was not loaded.
  *
- * <p>Assumes a single instance, like the ingest scheduler - add ShedLock before
- * running more than one.
+ * <p>Assumes a single instance - add ShedLock before running more than one.
  */
 @Component
 @EnableScheduling

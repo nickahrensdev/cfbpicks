@@ -55,7 +55,13 @@ public class GameIngestService {
      *
      * <p>Asking week by week costs one call each for exactly the same rows, so
      * this is both cheaper and gives members every future week to look at
-     * rather than only the ones somebody remembered to load.
+     * rather than only the ones somebody remembered to load. It is also why
+     * this can run daily: a kickoff moved for television two weeks out is
+     * picked up by the same single call that refreshes this week, and pick
+     * lock windows are computed from kickoff.
+     *
+     * <p>Schedule only - no scores, no status. See the note in the loop.
+     * {@link #ingestScores(int)} is the score path.
      */
     @Transactional
     public int ingestSchedule(int season) {
@@ -92,7 +98,17 @@ public class GameIngestService {
             game.setStartTimeTbd(Boolean.TRUE.equals(dto.startTimeTBD()));
             game.setHomePregameElo(dto.homePregameElo());
             game.setAwayPregameElo(dto.awayPregameElo());
-            applyScore(game, dto);
+            // Deliberately no score or status. This runs daily, and CFBD's
+            // /games lags: a game ESPN has already settled can still come back
+            // completed=false with null points, which used to null the score
+            // and drop FINAL back to IN_PROGRESS. Nothing repaired that - the
+            // ESPN poller only reconsiders games that kicked off in the last
+            // six hours - so the board kept showing a finished game as live.
+            //
+            // Scores and status belong to the ESPN poller, and to ingestScores
+            // for backfilling a season it never watched. A new row is SCHEDULED
+            // by the entity's own default, which is what a newly-announced game
+            // is anyway.
             game.setUpdatedAt(Instant.now());
             touched.add(game);
         }

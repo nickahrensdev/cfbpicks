@@ -202,8 +202,8 @@ export const api = {
     request(`/api/admin/settle${query({ season })}`, { method: 'POST' }),
   dataLoads: () => request('/api/admin/data-loads'),
 
-  // Scheduled jobs. The schedule itself lives in Supabase pg_cron; these only
-  // say whether the app acts when it is called - see V26.
+  // Scheduled jobs. The schedule itself is a cron expression in the backend's
+  // scheduler classes; these only say whether the job acts when it fires.
   cronJobs: () => request('/api/admin/cron'),
   setCronJob: (name, enabled) =>
     request(`/api/admin/cron/${name}`, { method: 'PUT', body: JSON.stringify({ enabled }) }),

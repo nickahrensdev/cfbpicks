@@ -14,6 +14,32 @@ const REFERENCE_PARTS = [
 ];
 
 /**
+ * What each job actually does, since the row is otherwise just its name.
+ *
+ * <p>Kept here rather than added to the API: it is wording for admins, and a
+ * job with no entry simply shows nothing extra, so a new job on the backend
+ * still appears without a frontend change.
+ */
+const CRON_BLURBS = {
+  lines: 'Every posted spread and total for the current season.',
+  stats: 'Poll rankings, team records and team ATS lines.',
+  schedule: 'Kickoff times, venues and weeks for the whole season. No scores.',
+};
+
+/** "every 30 min" reads fine; "every 1440 min" does not. */
+function cadence(seconds) {
+  if (seconds % 86400 === 0) {
+    const days = seconds / 86400;
+    return days === 1 ? 'daily' : `every ${days} days`;
+  }
+  if (seconds % 3600 === 0) {
+    const hours = seconds / 3600;
+    return hours === 1 ? 'hourly' : `every ${hours} hours`;
+  }
+  return `every ${Math.round(seconds / 60)} min`;
+}
+
+/**
  * A year box. Free text rather than a dropdown of known seasons: the whole
  * point of these controls is to reach a season the site has never loaded.
  */
@@ -304,10 +330,11 @@ export default function AdminPage() {
                   <div className="flex-grow-1" style={{ minWidth: 0 }}>
                     <div className="d-flex align-items-center gap-2">
                       <span className="fw-semibold text-capitalize">{job.name}</span>
-                      <span className="small text-body-tertiary">
-                        every {Math.round(job.intervalSeconds / 60)} min
-                      </span>
+                      <span className="small text-body-tertiary">{cadence(job.intervalSeconds)}</span>
                     </div>
+                    {CRON_BLURBS[job.name] && (
+                      <div className="small text-body-tertiary">{CRON_BLURBS[job.name]}</div>
+                    )}
                     {/* Last outcome, which is the thing that says whether it
                         is actually working - an enabled job that has never
                         run means the schedule is not calling it. */}

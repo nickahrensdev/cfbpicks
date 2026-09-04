@@ -241,6 +241,12 @@ so this is the weekly button as new polls publish.
 `completed` is a boolean rather than a status string, so `GameIngestService.applyScore` derives
 `SCHEDULED` / `IN_PROGRESS` / `FINAL` from it plus the kickoff time.
 
+`applyScore` is reached only from `ingestScores` — the **Scores** button, and the way to backfill a
+season the ESPN poller never watched. The schedule load deliberately does not call it: CFBD's
+`/games` lags the poller, so a game already settled can come back `completed=false` with null
+points, and letting a daily job write that would revert a finished game to live with no score.
+Nothing would repair it, since the poller only looks back 6 hours.
+
 **`/lines`** — returns a `lines` array per game, one entry per sportsbook. We take the first
 available in preference order (DraftKings, Bovada, ESPN Bet, consensus) so members see one stable
 number rather than a different book on each refresh. Supplies `spread`, `spreadOpen`, `overUnder`
@@ -250,17 +256,23 @@ and both moneylines. **Line movement updates `game` and never an existing `pick.
 
 | Job | Schedule | Calls/month |
 | --- | --- | --- |
-| Schedule sync | Sunday 03:00 | ~5 |
-| Line sync | Every 3h, Mon–Sat | ~150 |
-| Score + grading | Every 15 min, **only while a game is live** | ~200 |
-| Reference (calendar, teams, coaches) | Once per season | 3 |
+| `lines` | Every 30 min, on :00 and :30 | ~1,440 |
+| `stats` (rankings, records, ATS) | Daily 09:00 UTC | ~90 |
+| `schedule` (whole-season game schedule) | Daily 08:00 UTC | ~30 |
+| Reference (calendar, teams, coaches) | Once per season, inside `schedule` | 3 |
+| ESPN score poll + grading | Every minute while games are live | **0** — ESPN is unmetered |
 | Rosters | On demand | ≤1 per team viewed |
 
-The score poller runs a local query for a game with `kickoff <= now <= kickoff + 5h` **before**
-calling out, so a Tuesday with no football costs nothing. Budget lands near 350/month.
+All three on comes to roughly **1,560/month against the 5,000 limit**, and `lines` is 92% of that.
 
-Scheduled ingest is **off** in the local profile (`app.cfbd.enabled: false`) so a dev session cannot
-quietly spend the month; use Admin → Data. It is on in production.
+The ESPN poller runs a local query for a game that kicked off in the last 6 hours **before** calling
+out, so a Tuesday with no football costs nothing — and nothing at all against CFBD either way.
+
+Nothing scheduled spends CFBD quota outside production: the two jobs that do (`lines`, `stats`) are
+`@Profile("prod")`, so a dev session cannot quietly spend the month. Use Admin → Data locally.
+
+In production both are additionally gated on their `cron_job` row and ship switched **off**, so
+turning them on is a deliberate act on the admin page.
 
 ---
 

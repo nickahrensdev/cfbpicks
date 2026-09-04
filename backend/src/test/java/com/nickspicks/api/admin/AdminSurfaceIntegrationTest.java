@@ -98,53 +98,9 @@ class AdminSurfaceIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$[?(@.username == 'builder')].groupsJoined").value(0));
     }
 
-    @Test
-    void findsCandidatesByNameUsernameOrEmail() throws Exception {
-        Group group = adminGroup();
 
-        mockMvc.perform(get("/api/admin/groups/" + group.getId() + "/candidates?q=Bea")
-                        .with(admin()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].username").value("builder"));
 
-        mockMvc.perform(get("/api/admin/groups/" + group.getId() + "/candidates?q=joiner@")
-                        .with(admin()))
-                .andExpect(jsonPath("$[0].username").value("joiner"));
 
-        mockMvc.perform(get("/api/admin/groups/" + group.getId() + "/candidates?q=builder")
-                        .with(admin()))
-                .andExpect(jsonPath("$[0].displayName").value("Bea Builder"));
-    }
-
-    /** Offering to add someone already in is an option that can only fail. */
-    @Test
-    void leavesExistingMembersOutOfTheCandidates() throws Exception {
-        Group group = adminGroup();
-        members.save(new GroupMember(group.getId(), BUILDER, GroupRole.MEMBER));
-
-        mockMvc.perform(get("/api/admin/groups/" + group.getId() + "/candidates?q=builder")
-                        .with(admin()))
-                .andExpect(jsonPath("$").isEmpty());
-    }
-
-    /** No term is the picker's opening state, so it answers rather than refusing. */
-    @Test
-    void returnsCandidatesWithNoSearchTerm() throws Exception {
-        Group group = adminGroup();
-
-        mockMvc.perform(get("/api/admin/groups/" + group.getId() + "/candidates").with(admin()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
-    }
-
-    @Test
-    void keepsTheCandidatePickerBehindTheAdminRole() throws Exception {
-        Group group = adminGroup();
-
-        mockMvc.perform(get("/api/admin/groups/" + group.getId() + "/candidates")
-                        .with(user(JOINER, "joiner")))
-                .andExpect(status().isForbidden());
-    }
 
     // ------------------------------------------------------------- fixtures
 

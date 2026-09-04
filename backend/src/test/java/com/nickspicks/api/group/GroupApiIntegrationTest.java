@@ -533,22 +533,6 @@ class GroupApiIntegrationTest extends IntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
-    @Test
-    void adminsAddMembersDirectly() throws Exception {
-        String id = create(pickemJson("Secret League", "PRIVATE", null));
-        // Provision the member so there is a user row to add.
-        mockMvc.perform(get("/api/me").with(member()));
-
-        mockMvc.perform(post("/api/admin/groups/" + id + "/members").with(admin())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\": \"" + MEMBER + "\"}"))
-                .andExpect(status().isNoContent());
-
-        mockMvc.perform(get("/api/groups/" + id).with(member()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.myRole").value("MEMBER"));
-    }
-
     // ---------------------------------------------------------------- delete
 
     @Test
@@ -588,6 +572,33 @@ class GroupApiIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/groups/mine")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/groups/search")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/admin/groups")).andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Nobody is put into a group they did not choose.
+     *
+     * <p>The admin add-member endpoint is gone, not merely unlinked from the
+     * page - an endpoint the UI has stopped calling is still an endpoint. The
+     * ways in are search-and-join and an invite link, both of which are acts
+     * by the person joining.
+     */
+    @Test
+    void thereIsNoWayToAddSomebodyToAGroup() throws Exception {
+        String id = create(pickemJson("No Adding", "PUBLIC", null));
+
+        // 405 rather than 404: the path survives for GET, which lists the
+        // members. What matters is that POST is no longer handled.
+        mockMvc.perform(post("/api/admin/groups/" + id + "/members").with(admin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\": \"" + MEMBER + "\"}"))
+                .andExpect(status().isMethodNotAllowed());
+
+        // And the picker that fed it.
+        mockMvc.perform(get("/api/admin/groups/" + id + "/candidates").with(admin()))
+                .andExpect(status().isNotFound());
+
+        // Removing one is unaffected - an owner can still put someone out.
+        assertThat(groupMembers.findAll()).hasSize(2);
     }
 
     /**

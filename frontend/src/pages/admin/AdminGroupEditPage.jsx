@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Container, Form, InputGroup, ListGroup, Table } from 'react-bootstrap';
+import { Alert, Badge, Button, Card, Container, Form, Table } from 'react-bootstrap';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { api } from '../../api/client.js';
@@ -21,14 +21,10 @@ export default function AdminGroupEditPage() {
   const [members, setMembers] = useState([]);
   // Candidates for the add-member picker, fetched per search term rather than
   // held in full - see the search box below.
-  const [candidates, setCandidates] = useState([]);
-  const [candidateTerm, setCandidateTerm] = useState('');
-  const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(null);
-  const [addUserId, setAddUserId] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,34 +48,6 @@ export default function AdminGroupEditPage() {
     load();
   }, [load]);
 
-  /**
-   * Candidates for the picker, searched server-side.
-   *
-   * <p>The old version downloaded every account and rendered them all in one
-   * select. That is fine at twenty members and unusable at a thousand - and the
-   * growth is the point of the site. The server filters out existing members
-   * and caps the answer, so this only ever holds a screenful.
-   *
-   * <p>Debounced, because the box searches as you type and a request per
-   * keystroke is a request per keystroke.
-   */
-  const searchCandidates = useCallback(async (term) => {
-    setSearching(true);
-    try {
-      setCandidates(await api.adminGroupCandidates(id, { q: term || undefined }));
-    } catch {
-      // A failed lookup leaves the previous list rather than an error banner -
-      // the next keystroke tries again.
-    } finally {
-      setSearching(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => searchCandidates(candidateTerm.trim()), 250);
-    return () => clearTimeout(timer);
-  }, [candidateTerm, searchCandidates, members]);
-
   const save = async (event) => {
     event.preventDefault();
     setBusy('save');
@@ -94,22 +62,6 @@ export default function AdminGroupEditPage() {
       setNotice({ variant: 'success', text: 'Settings saved.' });
     } catch (err) {
       setNotice({ variant: 'danger', text: err.fieldErrors?.name ?? err.message });
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const addMember = async (event) => {
-    event.preventDefault();
-    if (!addUserId) return;
-    setBusy('add');
-    setNotice(null);
-    try {
-      await api.adminAddGroupMember(id, addUserId);
-      setAddUserId('');
-      await load();
-    } catch (err) {
-      setNotice({ variant: 'danger', text: err.message });
     } finally {
       setBusy(null);
     }
@@ -190,53 +142,10 @@ export default function AdminGroupEditPage() {
         <Card>
           <Card.Header className="fw-semibold">Members</Card.Header>
           <Card.Body className="pb-0">
-            <Form onSubmit={addMember} className="mb-3">
-              <InputGroup>
-                <Form.Control
-                  type="search"
-                  value={candidateTerm}
-                  onChange={(event) => {
-                    setCandidateTerm(event.target.value);
-                    // A stale selection under a new search would add whoever
-                    // happened to be picked before the list changed.
-                    setAddUserId('');
-                  }}
-                  placeholder="Search by name, username or email"
-                  aria-label="Find someone to add"
-                />
-                <Button type="submit" disabled={!addUserId || busy === 'add'}>
-                  {busy === 'add' ? 'Adding…' : 'Add'}
-                </Button>
-              </InputGroup>
-
-              {searching && candidates.length === 0 ? (
-                <div className="small text-body-secondary mt-2">Searching…</div>
-              ) : candidates.length === 0 ? (
-                <div className="small text-body-secondary mt-2">
-                  {candidateTerm
-                    ? 'Nobody matches, or everyone who does is already in.'
-                    : 'No one left to add.'}
-                </div>
-              ) : (
-                <ListGroup className="mt-2" style={{ maxHeight: '14rem', overflowY: 'auto' }}>
-                  {candidates.map((user) => (
-                    <ListGroup.Item
-                      key={user.id}
-                      action
-                      type="button"
-                      active={addUserId === user.id}
-                      onClick={() => setAddUserId(user.id)}
-                      className="d-flex justify-content-between align-items-center gap-3 py-2"
-                    >
-                      <span>{memberName(user.displayName, user.username)}</span>
-                      <span className="small text-body-secondary text-truncate">
-                        {user.email}
-                      </span>
-                    </ListGroup.Item>
-                  ))}
-                </ListGroup>
-              )}
-            </Form>
+            {/* The member picker was here. People join a group
+                themselves now - by search, or through an invite link - so
+                there is no way to put somebody into one they did not choose.
+                Removing a member is still an owner's call. */}
           </Card.Body>
           <Table hover responsive className="mb-0 align-middle">
             <thead>

@@ -3,7 +3,6 @@ package com.nickspicks.api.group;
 import com.nickspicks.api.security.CurrentUserService;
 import com.nickspicks.api.user.AppUser;
 import com.nickspicks.api.web.ApiDtos;
-import com.nickspicks.api.web.ApiDtos.AddMemberRequest;
 import com.nickspicks.api.web.ApiDtos.GroupDetail;
 import com.nickspicks.api.web.ApiDtos.GroupMemberRow;
 import com.nickspicks.api.web.ApiDtos.GroupSummary;
@@ -86,34 +85,6 @@ public class AdminGroupController {
     @GetMapping("/{id}/members")
     public List<GroupMemberRow> members(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return groups.members(id, currentUser.requireAdmin(jwt));
-    }
-
-    /**
-     * Candidates to add, by name or email.
-     *
-     * <p>Searched rather than listed. The page used to download every account
-     * and render them all in one select, which is fine at twenty members and
-     * unusable at a thousand - and the growth is the point of the site.
-     *
-     * <p>Capped at twenty: a picker is for finding someone you can already
-     * name, so a longer answer means the term was too vague, not that more rows
-     * would help.
-     */
-    @GetMapping("/{id}/candidates")
-    public List<ApiDtos.MemberOption> candidates(@AuthenticationPrincipal Jwt jwt,
-                                                 @PathVariable UUID id,
-                                                 @RequestParam(required = false) String q) {
-        currentUser.requireAdmin(jwt);
-        return groups.candidates(id, q);
-    }
-
-    /** Adds someone directly - no password, no invitation. */
-    @PostMapping("/{id}/members")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void addMember(@AuthenticationPrincipal Jwt jwt,
-                          @PathVariable UUID id,
-                          @Valid @RequestBody AddMemberRequest request) {
-        groups.addMember(id, currentUser.requireAdmin(jwt), request.userId());
     }
 
     @DeleteMapping("/{id}/members/{userId}")

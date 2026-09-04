@@ -281,30 +281,6 @@ public class GroupService {
         return new JoinOutcome(false, group);
     }
 
-    /**
-     * Members who could be added to this group, matching a search term.
-     *
-     * <p>Existing members are filtered out here rather than left for the caller
-     * to notice: offering to add someone who is already in is an option that
-     * can only fail.
-     *
-     * <p>A blank term returns the first twenty accounts rather than none, so
-     * the picker has something to show before anyone types - which is the old
-     * behaviour, just bounded.
-     */
-    @Transactional(readOnly = true)
-    public List<ApiDtos.MemberOption> candidates(UUID groupId, String term) {
-        require(groupId);
-        Set<UUID> existing = members.findAllByGroupId(groupId).stream()
-                .map(GroupMember::getUserId)
-                .collect(Collectors.toSet());
-
-        return users.search(term == null ? "" : term.trim(), PageRequest.of(0, 20)).stream()
-                .filter(user -> !existing.contains(user.getId()))
-                .map(user -> new ApiDtos.MemberOption(user.getId(), user.getDisplayName(),
-                        user.getUsername(), user.getEmail()))
-                .toList();
-    }
 
     // ---------------------------------------------------------------- sharing
 
@@ -484,23 +460,6 @@ public class GroupService {
 
         member.setRole(role);
         members.save(member);
-    }
-
-    /** Admin and owner path: add someone directly, no password. */
-    @Transactional
-    public void addMember(UUID groupId, AppUser caller, UUID userId) {
-        // Closes the admin route in as well: a personal board has exactly one
-        // member and nobody - staff included - may add another.
-        refuseIfPersonal(require(groupId), "added to");
-        requireManageable(groupId, caller);
-
-        if (!users.existsById(userId)) {
-            throw new NotFoundException("User %s not found".formatted(userId));
-        }
-        if (members.existsByGroupIdAndUserId(groupId, userId)) {
-            throw new GroupExceptions.AlreadyMemberException("They are already in this group");
-        }
-        members.save(new GroupMember(groupId, userId, GroupRole.MEMBER));
     }
 
     /**

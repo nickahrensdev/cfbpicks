@@ -165,14 +165,8 @@ export const api = {
     request(`/api/admin/groups/${id}`, { method: 'PUT', body: JSON.stringify(settings) }),
   adminDeleteGroup: (id) => request(`/api/admin/groups/${id}`, { method: 'DELETE' }),
   adminGroupMembers: (id) => request(`/api/admin/groups/${id}/members`),
-  // Searched rather than listed: the old picker downloaded every account.
-  adminGroupCandidates: (id, { q } = {}) =>
-    request(`/api/admin/groups/${id}/candidates${query({ q })}`),
-  adminAddGroupMember: (id, userId) =>
-    request(`/api/admin/groups/${id}/members`, {
-      method: 'POST',
-      body: JSON.stringify({ userId }),
-    }),
+  // No adminAddGroupMember: nobody is put into a group they did not choose.
+  // Removing one is still an owner's call.
   adminRemoveGroupMember: (id, userId) =>
     request(`/api/admin/groups/${id}/members/${userId}`, { method: 'DELETE' }),
 

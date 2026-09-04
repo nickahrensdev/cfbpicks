@@ -532,9 +532,6 @@ public final class ApiDtos {
             double points) {
     }
 
-    /** Someone who could be added to a group. Email disambiguates same-named people. */
-    public record MemberOption(UUID id, String displayName, String username, String email) {
-    }
 
     /** The token half of a share URL; the frontend builds the rest. */
     public record ShareLinkResponse(String token) {
@@ -625,9 +622,6 @@ public final class ApiDtos {
     }
 
     public record JoinGroupRequest(String password) {
-    }
-
-    public record AddMemberRequest(@NotNull UUID userId) {
     }
 
     public record MemberRoleRequest(@NotNull GroupRole role) {

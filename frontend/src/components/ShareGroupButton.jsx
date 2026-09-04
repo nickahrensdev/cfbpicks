@@ -201,6 +201,15 @@ export default function ShareGroupButton({
     return parts.filter(Boolean).join('\n\n');
   };
 
+  /** The same content minus the link, for the share sheet's separate url field. */
+  const summaryAndPassword = () =>
+    [message.trim(), password && includePassword ? `Password: ${password}` : null]
+      .filter(Boolean)
+      .join('\n\n');
+
+  const passwordOnly = () =>
+    (password && includePassword ? `Password: ${password}` : undefined);
+
   /**
    * The phone's own share sheet where there is one, the clipboard otherwise.
    *
@@ -215,7 +224,25 @@ export default function ShareGroupButton({
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: name ?? undefined, text });
+        /*
+         * url as its own field, not buried in text.
+         *
+         * The Web Share API has a dedicated url, and iOS Messages treats a
+         * payload whose text merely *contains* a link as a link share: it
+         * builds a rich preview from the URL and throws the rest of the text
+         * away. That is what dropped the summary - and putting the link first
+         * made it certain, since iOS reads the leading URL.
+         *
+         * Passing them separately is the documented usage and lets the target
+         * app compose them itself. Some targets still take only the url; the
+         * clipboard path below always carries everything, which is why the
+         * dialog shows the full text.
+         */
+        await navigator.share({
+          title: name ?? undefined,
+          text: withSummary ? summaryAndPassword() : passwordOnly(),
+          url: url ?? undefined,
+        });
         setState('idle');
         setOpen(false);
         return;

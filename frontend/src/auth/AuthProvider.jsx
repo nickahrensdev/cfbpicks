@@ -68,6 +68,30 @@ export function AuthProvider({ children }) {
           email,
           options: { emailRedirectTo: redirectTo },
         }),
+      /**
+       * Starts a password reset - sends the recovery email.
+       *
+       * <p>{@code redirectTo} has to be passed for the same reason it does
+       * everywhere else here: the site lives under a base path, and a link
+       * built from Supabase's Site URL alone drops it and lands on a 404.
+       * Callers build it with appUrl().
+       *
+       * <p>Supabase answers the same way whether or not the address has an
+       * account. That is deliberate on their side - it stops the form being
+       * used to find out who is registered - so the caller must not report
+       * "no such account" either, and cannot know it.
+       */
+      requestPasswordReset: (email, redirectTo) =>
+        supabase.auth.resetPasswordForEmail(email, { redirectTo }),
+      /**
+       * Sets a new password for whoever is currently signed in.
+       *
+       * <p>Used after a recovery link has been exchanged for a session, which
+       * is what makes this authorised - the link is the proof of identity, so
+       * no current password is asked for. It also works for a signed-in member
+       * changing their own password.
+       */
+      updatePassword: (password) => supabase.auth.updateUser({ password }),
       signOut: () => supabase.auth.signOut(),
     }),
     [session, loading],

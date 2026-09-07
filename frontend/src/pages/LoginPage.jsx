@@ -6,7 +6,8 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { appUrl } from '../lib/appUrl.js';
 
 export default function LoginPage() {
-  const { session, signIn, signUp, resendConfirmation, configured } = useAuth();
+  const { session, signIn, signUp, resendConfirmation, requestPasswordReset, configured } =
+    useAuth();
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
@@ -15,6 +16,9 @@ export default function LoginPage() {
   // way through the login screen.
   const joinToken = searchParams.get('join');
 
+  // 'signin' | 'signup' | 'reset'. Reset is a mode rather than its own page
+  // because it needs exactly the email box that is already here, and going
+  // back is then a toggle rather than a navigation out of a half-filled form.
   const [mode, setMode] = useState(searchParams.get('mode') === 'signup' ? 'signup' : 'signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,6 +55,34 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     setNotice(null);
+
+    if (mode === 'reset') {
+      const { error: resetError } = await requestPasswordReset(
+        email.trim(),
+        appUrl('/reset-password'),
+      );
+
+      if (resetError) {
+        setError(resetError.message);
+      } else {
+        /*
+         * Said the same way whether or not that address has an account.
+         *
+         * Supabase answers identically by design, so we could not tell the
+         * difference to report it - and would not want to: a form that says
+         * "no such account" tells anyone who asks which addresses are
+         * registered here.
+         */
+        setNotice({
+          variant: 'success',
+          text: `If ${email.trim()} has an account, a reset link is on its way. It is good for `
+            + '24 hours.',
+        });
+        setMode('signin');
+      }
+      setBusy(false);
+      return;
+    }
 
     // Where a confirmation link should land. Shared by signup and resend -
     // a resent link built without the base path 404s exactly like the first.
@@ -144,11 +176,17 @@ export default function LoginPage() {
         <Col md={7} lg={5}>
           <Card className="shadow-sm">
             <Card.Body className="p-4">
-              <h1 className="h4 mb-1">{mode === 'signin' ? 'Sign in' : 'Create an account'}</h1>
+              <h1 className="h4 mb-1">
+                {mode === 'signin' && 'Sign in'}
+                {mode === 'signup' && 'Create an account'}
+                {mode === 'reset' && 'Reset your password'}
+              </h1>
               <p className="text-body-secondary small mb-4">
-                {joinToken
-                  ? 'Sign in and we will take you straight back to the invitation.'
-                  : 'Members only - picks and the leaderboard need an account.'}
+                {mode === 'reset'
+                  ? 'Enter your email and we will send you a link to set a new password.'
+                  : joinToken
+                    ? 'Sign in and we will take you straight back to the invitation.'
+                    : 'Members only - picks and the leaderboard need an account.'}
               </p>
 
               {error && <Alert variant="danger">{error}</Alert>}
@@ -205,17 +243,43 @@ export default function LoginPage() {
                   />
                 </Form.Group>
 
-                <Form.Group className="mb-4" controlId="password">
-                  <Form.Label>Password</Form.Label>
-                  <Form.Control
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                    minLength={6}
-                    required
-                  />
-                </Form.Group>
+                {/* Nothing to type here when the point is that you cannot
+                    remember it. Left out rather than disabled so the browser
+                    does not offer to fill a box that is not being asked. */}
+                {mode !== 'reset' && (
+                  <Form.Group className="mb-2" controlId="password">
+                    <Form.Label>Password</Form.Label>
+                    <Form.Control
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                      minLength={6}
+                      required
+                    />
+                  </Form.Group>
+                )}
+
+                {/* Under the password box, where somebody who has just failed
+                    to remember it is already looking. */}
+                {mode === 'signin' && (
+                  <div className="mb-4">
+                    <Button
+                      variant="link"
+                      className="p-0 small text-decoration-none"
+                      onClick={() => {
+                        setMode('reset');
+                        setError(null);
+                        setNotice(null);
+                        setCanResend(false);
+                      }}
+                    >
+                      Forgot your password?
+                    </Button>
+                  </div>
+                )}
+
+                {mode !== 'signin' && <div className="mb-4" />}
 
                 {/* Only once something has told us the account exists and is
                     unconfirmed. Offering it unprompted would invite people to
@@ -231,7 +295,9 @@ export default function LoginPage() {
                 <div className="d-grid">
                   <Button type="submit" disabled={busy}>
                     {busy && <Spinner as="span" size="sm" animation="border" className="me-2" />}
-                    {mode === 'signin' ? 'Sign in' : 'Sign up'}
+                    {mode === 'signin' && 'Sign in'}
+                    {mode === 'signup' && 'Sign up'}
+                    {mode === 'reset' && 'Send reset link'}
                   </Button>
                 </div>
               </Form>
@@ -241,13 +307,14 @@ export default function LoginPage() {
                   variant="link"
                   className="p-0 small"
                   onClick={() => {
-                    setMode(mode === 'signin' ? 'signup' : 'signin');
+                    // Reset goes back where it came from; the other two swap.
+                    setMode(mode === 'signup' ? 'signin' : mode === 'reset' ? 'signin' : 'signup');
                     setError(null);
                   }}
                 >
-                  {mode === 'signin'
-                    ? 'Need an account? Sign up'
-                    : 'Already have an account? Sign in'}
+                  {mode === 'signin' && 'Need an account? Sign up'}
+                  {mode === 'signup' && 'Already have an account? Sign in'}
+                  {mode === 'reset' && 'Back to sign in'}
                 </Button>
               </div>
             </Card.Body>

@@ -9,6 +9,7 @@ import AdminRoute from './auth/AdminRoute.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import JoinByLinkPage from './pages/JoinByLinkPage.jsx';
 import ConfirmEmailPage from './pages/ConfirmEmailPage.jsx';
+import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import GamesPage from './pages/GamesPage.jsx';
 import GameDetailPage from './pages/GameDetailPage.jsx';
 import MemberPicksPage from './pages/MemberPicksPage.jsx';
@@ -63,6 +64,11 @@ export default function App() {
               exchanges it for a session - see ConfirmEmailPage for why the
               link comes here rather than to Supabase's own verify endpoint. */}
           <Route path="/confirm" element={<ConfirmEmailPage />} />
+
+          {/* Also unguarded, and necessarily so - somebody who has forgotten
+              their password cannot sign in to reach the page that changes it.
+              The recovery token in the link is what authorises the change. */}
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           <Route path="/" element={guarded(<GamesPage />)} />
           <Route path="/games/:id" element={guarded(<GameDetailPage />)} />
